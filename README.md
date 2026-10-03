@@ -4,11 +4,11 @@ Reqlica is a planned open-source, self-hosted tool for building mock backends fr
 
 The AI writes Python endpoint functions, including input validation and business logic. Users review the result, make changes, and start the API from a browser dashboard. Test data stays saved between requests and restarts.
 
-This document is a project reference during development. All features below are planned; the final README will describe what is available.
+This document is a project reference during development. Most features below are planned; the local development section describes the current setup.
 
 ## Planned features
 
-- [ ] **Terminal startup:** run `reqlica start` to launch Reqlica and open its dashboard.
+- [x] **Terminal startup:** run `reqlica start` to launch the console and mock server.
 - [ ] **Multiple projects:** create, open, start, and stop separate mock APIs.
 - [ ] **Custom project locations:** save projects in a directory of the user's choice.
 - [ ] **AI generation:** accept prompts, Markdown, plain text, and OpenAPI specs.
@@ -30,13 +30,13 @@ This document is a project reference during development. All features below are 
 
 ## How it works
 
-The planned entry command is:
+The entry command is:
 
 ```bash
 reqlica start
 ```
 
-It starts the console and the shared mock server, then opens the console in a browser.
+It starts the console and the shared mock server. Opening a browser dashboard is planned; the current console exposes only its API.
 
 From the console, a user creates a project or opens an existing one. Each project contains its own endpoints, data, authentication settings, and test scenarios. Projects can run at the same time and can be started or stopped independently.
 
@@ -207,6 +207,94 @@ reqlica/
 Python is the backend language. FastAPI, Pydantic, and SQLite are the proposed starting stack.
 
 The frontend can use any framework that builds static HTML, CSS, and JavaScript. Those files ship with the Python package and are served by the console server. Users will not need Node.js to run the dashboard.
+
+## Local development
+
+Use a single Python virtual environment at the repository root: `.venv/`.
+This setup requires Python 3.12 or newer and [uv](https://docs.astral.sh/uv/getting-started/installation/).
+Run the following commands from the repository root.
+Install the locked dependencies (this creates `.venv/` if needed):
+
+```bash
+uv sync --locked
+```
+
+Configure both servers in the repository-root `.env` file:
+
+```dotenv
+CONSOLE_HOST=127.0.0.1
+CONSOLE_PORT=3000
+MOCK_HOST=127.0.0.1
+MOCK_PORT=4000
+```
+
+These are the defaults when settings are omitted. Change `CONSOLE_PORT` or
+`MOCK_PORT` to use custom ports, keeping them different. Already-exported
+environment variables take precedence over `.env` values.
+
+Start both servers from one terminal:
+
+```bash
+uv run reqlica start
+```
+
+Alternatively, activate the environment and use the installed command directly:
+
+```bash
+source .venv/bin/activate
+reqlica start
+```
+
+`uv sync` installs the command inside `.venv`, not globally. If `reqlica start`
+reports `command not found`, activate `.venv` in that terminal or use
+`uv run reqlica start`. Activation applies only to the current terminal session.
+
+To make the command available without activating `.venv`, optionally install
+the checkout as an editable CLI tool:
+
+```bash
+uv tool install --editable .
+uv tool update-shell
+```
+
+Open a new terminal after updating the shell, then run `reqlica start` directly.
+The editable installation uses this checkout's code and repository-root `.env`.
+This is a local development installation, not a published package release.
+
+Press `Ctrl+C` to stop both servers. If either server exits unexpectedly, the CLI
+stops the other server and exits with an error. Restart `reqlica start` after
+changing settings or backend code; automatic reload is not enabled.
+
+For debugging, either server can still be run independently:
+
+```bash
+uv run python -m reqlica.console.app
+uv run python -m reqlica.runtime.app
+```
+
+Check both connections using the default ports:
+
+```bash
+curl http://127.0.0.1:3000/api/health
+curl http://127.0.0.1:4000/mock/demo/hello
+```
+
+The mock endpoint returns:
+
+```json
+{"message":"Hello from Reqlica","project_id":"demo"}
+```
+
+The mock server currently serves only this hardcoded demo endpoint. Project
+routing, worker processes, storage, and browser CORS configuration are not
+implemented yet. Each server exposes interactive API documentation at `/docs`.
+Use your configured ports in these URLs if they differ from the defaults.
+
+Run the backend tests:
+
+```bash
+uv run python -m unittest discover -s tests
+```
 
 ## Development order
 
