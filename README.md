@@ -1,5 +1,7 @@
 # Reqlica
 
+<img width="640" height="320" alt="Reqlica_Logo" src="https://github.com/user-attachments/assets/f2fd5444-1ecd-4ffc-bc58-2c236579745f" />
+
 Reqlica is a planned open-source, self-hosted tool for building mock backends from feature descriptions, API documentation, or OpenAPI specs. It helps frontend developers and QA engineers work before a backend is ready.
 
 The AI writes Python endpoint functions, including input validation and business logic. Users review the result, make changes, and start the API from a browser dashboard. Test data stays saved between requests and restarts.
