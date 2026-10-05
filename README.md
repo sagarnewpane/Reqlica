@@ -12,7 +12,7 @@ This document is a project reference during development. Most features below are
 
 - [x] **Terminal startup:** run `reqlica start` to launch the console and mock server.
 - [ ] **Multiple projects:** create, open, start, and stop separate mock APIs.
-- [ ] **Custom project locations:** save projects in a directory of the user's choice.
+- [x] **Custom project locations:** save projects in a directory of the user's choice.
 - [ ] **AI generation:** accept prompts, Markdown, plain text, and OpenAPI specs.
 - [ ] **Python endpoints:** generate request/response models and functions with custom processing logic.
 - [ ] **Review and editing:** inspect endpoints, fields, relationships, assumptions, and code before publishing changes.
@@ -26,7 +26,7 @@ This document is a project reference during development. Most features below are
 - [ ] **Inspection:** browse endpoints and records, inspect requests and responses, and view runtime errors.
 - [ ] **Persistence and reset:** keep saved data and restore a project's starting state.
 - [ ] **Drafts and versions:** prepare and test changes before replacing a running version.
-- [ ] **Separate project runtimes:** run generated code outside the console process.
+- [x] **Separate project runtimes:** run endpoint code outside the console and gateway processes.
 - [ ] **Export and import:** share complete project bundles and export OpenAPI specs.
 - [ ] **Local deployment:** bundle the dashboard with the Python package and support open-weight AI models.
 
@@ -287,10 +287,86 @@ The mock endpoint returns:
 {"message":"Hello from Reqlica","project_id":"demo"}
 ```
 
-The mock server currently serves only this hardcoded demo endpoint. Project
-routing, worker processes, storage, and browser CORS configuration are not
-implemented yet. Each server exposes interactive API documentation at `/docs`.
+The demo endpoint remains available for connection checks. Real project endpoints
+also run through the mock gateway, as described below. Browser CORS configuration
+is not implemented yet. Each main server exposes interactive API documentation
+at `/docs`; project workers do not expose documentation routes.
 Use your configured ports in these URLs if they differ from the defaults.
+
+### Create a mock endpoint
+
+Create a project in a new or empty directory:
+
+```bash
+uv run reqlica project create /path/to/books --name "Book API"
+```
+
+The command prints the project's stable ID and its `/hello` URL. It creates:
+
+```text
+books/
+├── project.json          # Stable ID and display name
+├── manifest.json         # HTTP methods, paths, and Python handlers
+└── endpoints/
+    └── hello.py          # A working GET /hello handler
+```
+
+The registry stores project locations in `~/.reqlica/projects/`. Set `REQLICA_HOME`
+in the environment or repository-root `.env` to use a different registry root.
+Use the same setting for project creation and server startup. Moving or importing
+existing projects is not supported yet; keep registered directories in place.
+
+With `reqlica start` running, call the URL printed by the creation command:
+
+```bash
+curl http://127.0.0.1:4000/mock/<project-id>/hello
+```
+
+The first request starts that project's worker. Further requests reuse it.
+Creating another project while Reqlica is running does not require a restart.
+Stopping Reqlica stops its workers and keeps project files and registry entries.
+
+To define your own endpoint, add a function in `endpoints/hello.py` or another
+project-relative Python file. Handlers use standard FastAPI signatures, including
+path/query parameters, Pydantic request models, `Request`, and `Response`:
+
+```python
+from pydantic import BaseModel
+
+class Greeting(BaseModel):
+    name: str
+
+def greet(body: Greeting) -> dict[str, str]:
+    return {"message": f"Hello, {body.name}"}
+```
+
+Add the route to the `endpoints` array in `manifest.json`, alongside `/hello`:
+
+```json
+{
+  "method": "POST",
+  "path": "/greet",
+  "handler": "endpoints/hello.py:greet"
+}
+```
+
+Restart Reqlica after editing a loaded project's manifest or Python code, then call:
+
+```bash
+curl -X POST http://127.0.0.1:4000/mock/<project-id>/greet \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Sam"}'
+```
+
+Supported methods are `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `HEAD`,
+and `TRACE`. Route paths are relative to the project's `/mock/<project-id>` base.
+Unknown project IDs return `404`; worker startup and connection failures return
+`502` with an error description. Drafts, version activation, per-project runtime
+controls, and dashboard endpoint editing remain planned.
+
+Only load trusted Python code. A separate worker process is not a security sandbox:
+handlers run with the same user permissions as Reqlica. Keep the servers bound to
+loopback; authentication for exposing them to other machines is not implemented.
 
 Run the backend tests:
 
