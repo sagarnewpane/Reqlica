@@ -9,8 +9,8 @@ import httpx
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Response
-
-from reqlica.runtime.worker import WorkerManager
+from reqlica.runtime.worker import ProjectStoppedError, WorkerManager
+from starlette.routing import compile_path
 
 SUPPORTED_METHODS = [
     "GET",
@@ -75,6 +75,69 @@ def hello() -> dict[str, str]:
     return {"message": "Hello from Reqlica", "project_id": "demo"}
 
 
+def _with_urls(request: Request, project: dict) -> dict:
+    url = f"{str(request.base_url).rstrip('/')}/mock/{project['id']}"
+    return {
+        **project,
+        "url": url,
+        "endpoints": [
+            {**endpoint, "url": url + compile_path(endpoint["path"])[1]}
+            for endpoint in project["endpoints"]
+        ],
+    }
+
+
+@app.get("/api/projects", tags=["Projects"])
+def list_projects(request: Request, running: bool = False) -> dict:
+    """List registered projects, live worker status, and endpoint URLs without starting them."""
+    projects = request.app.state.worker_manager.list_projects()
+    return {
+        "projects": [
+            _with_urls(request, project)
+            for project in projects
+            if not running or project["status"] == "running"
+        ]
+    }
+
+
+def _manage_project(
+    request: Request, project_id: str, action: str | None = None
+) -> dict:
+    manager = request.app.state.worker_manager
+    try:
+        if action == "start":
+            project = manager.start(project_id)
+        elif action == "stop":
+            project = manager.stop(project_id)
+        else:
+            project = manager.describe_project(project_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return _with_urls(request, project)
+
+
+@app.get("/api/projects/{project_id}/endpoints", tags=["Projects"])
+def project_endpoints(request: Request, project_id: str) -> dict:
+    """Show loaded routes for running workers, or configured routes for inactive projects."""
+    return _manage_project(request, project_id)
+
+
+@app.post("/api/projects/{project_id}/start", tags=["Projects"])
+def start_project(request: Request, project_id: str) -> dict:
+    """Start a worker now, or reuse it if already running."""
+    return _manage_project(request, project_id, "start")
+
+
+@app.post("/api/projects/{project_id}/stop", tags=["Projects"])
+def stop_project(request: Request, project_id: str) -> dict:
+    """Stop this worker and prevent lazy restart until explicitly started again."""
+    return _manage_project(request, project_id, "stop")
+
+
 @app.api_route("/mock/{project_id}", methods=SUPPORTED_METHODS)
 @app.api_route("/mock/{project_id}/{path:path}", methods=SUPPORTED_METHODS)
 async def proxy(request: Request, project_id: str, path: str = "") -> Response:
@@ -84,6 +147,8 @@ async def proxy(request: Request, project_id: str, path: str = "") -> Response:
         worker = await asyncio.to_thread(worker_manager.get_or_start, project_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ProjectStoppedError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

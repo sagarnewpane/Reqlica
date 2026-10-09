@@ -14,8 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 from fastapi.testclient import TestClient
-
-from reqlica.projects.store import create_project
+from reqlica.projects.store import Manifest, Project, create_project, registry_directory
 from reqlica.runtime.app import _filter_proxy_headers, app
 from reqlica.runtime.worker import Worker, WorkerManager
 
@@ -165,6 +164,298 @@ class WorkerIntegrationTests(unittest.TestCase):
             self.assertEqual(client.get(url).json(), original.json())
         with TestClient(app) as client:
             self.assertEqual(client.get(url).json(), {"edited": True})
+
+    def test_discovery_lists_projects_and_urls_without_importing_handlers(self):
+        project = self.project(
+            endpoints=[("GET", "/books/{book_id:int}", "get_book")],
+            source="raise RuntimeError('must not be imported by discovery')",
+        )
+        with TestClient(app, base_url="http://localhost:4100") as client:
+            response = client.get("/api/projects")
+            self.assertEqual(response.status_code, 200, response.text)
+            info = response.json()["projects"][0]
+            self.assertEqual(info["id"], project.id)
+            self.assertEqual(info["name"], project.name)
+            self.assertEqual(info["directory"], str(project.directory))
+            self.assertEqual(info["status"], "idle")
+            self.assertIsNone(info["pid"])
+            self.assertIsNone(info["error"])
+            self.assertEqual(info["url"], f"http://localhost:4100/mock/{project.id}")
+            self.assertEqual(
+                info["endpoints"],
+                [
+                    {
+                        "method": "GET",
+                        "path": "/books/{book_id:int}",
+                        "handler": "endpoints/hello.py:get_book",
+                        "url": info["url"] + "/books/{book_id}",
+                    }
+                ],
+            )
+            self.assertEqual(
+                client.get(f"/api/projects/{project.id}/endpoints").json(), info
+            )
+            self.assertEqual(
+                client.get("/api/projects?running=true").json(), {"projects": []}
+            )
+            self.assertEqual(app.state.worker_manager.workers, {})
+            paths = client.get("/openapi.json").json()["paths"]
+            self.assertIn("/api/projects", paths)
+            self.assertIn("/api/projects/{project_id}/endpoints", paths)
+            self.assertIn("post", paths["/api/projects/{project_id}/start"])
+            self.assertIn("post", paths["/api/projects/{project_id}/stop"])
+
+    def test_explicit_start_stop_is_idempotent_and_does_not_affect_other_workers(self):
+        first = self.project("first")
+        second = self.project("second")
+        with TestClient(app) as client:
+            start_url = f"/api/projects/{first.id}/start"
+            stop_url = f"/api/projects/{first.id}/stop"
+            started = client.post(start_url)
+            self.assertEqual(started.status_code, 200, started.text)
+            info = started.json()
+            self.assertEqual(info["status"], "running")
+            self.assertEqual(client.post(start_url).json()["pid"], info["pid"])
+            self.assertEqual(
+                client.get(f"/mock/{first.id}/").json()["pid"], info["pid"]
+            )
+            second_pid = client.get(f"/mock/{second.id}/").json()["pid"]
+            running = client.get("/api/projects?running=true").json()["projects"]
+            self.assertEqual(
+                {project["id"] for project in running}, {first.id, second.id}
+            )
+            stopped = client.post(stop_url)
+            self.assertEqual(stopped.status_code, 200, stopped.text)
+            self.assertEqual(stopped.json()["status"], "stopped")
+            self.assertIsNone(stopped.json()["pid"])
+            self.assertEqual(client.post(stop_url).json(), stopped.json())
+            self.assertNotIn(
+                info["pid"], {p.pid for p in multiprocessing.active_children()}
+            )
+            blocked = client.get(f"/mock/{first.id}/")
+            self.assertEqual(blocked.status_code, 503, blocked.text)
+            self.assertIn("project start", blocked.json()["detail"])
+            self.assertEqual(
+                client.get(f"/mock/{second.id}/").json()["pid"], second_pid
+            )
+            running = client.get("/api/projects?running=true").json()["projects"]
+            self.assertEqual([project["id"] for project in running], [second.id])
+            restarted = client.post(start_url)
+            self.assertEqual(restarted.status_code, 200, restarted.text)
+            self.assertEqual(restarted.json()["status"], "running")
+            self.assertNotEqual(restarted.json()["pid"], info["pid"])
+            self.assertEqual(client.get(f"/mock/{first.id}/").status_code, 200)
+
+    def test_stopping_idle_project_blocks_requests_until_start_and_resets_on_gateway_restart(
+        self,
+    ):
+        project = create_project(self.directory / "scaffold")
+        with TestClient(app) as client:
+            stopped = client.post(f"/api/projects/{project.id}/stop")
+            self.assertEqual(stopped.status_code, 200, stopped.text)
+            self.assertEqual(stopped.json()["status"], "stopped")
+            self.assertEqual(app.state.worker_manager.workers, {})
+            self.assertEqual(client.get(f"/mock/{project.id}/hello").status_code, 503)
+            self.assertEqual(
+                client.get(f"/api/projects/{project.id}/endpoints").json()["status"],
+                "stopped",
+            )
+        with TestClient(app) as client:
+            self.assertEqual(
+                client.get(f"/api/projects/{project.id}/endpoints").json()["status"],
+                "idle",
+            )
+            self.assertEqual(client.get(f"/mock/{project.id}/hello").status_code, 200)
+
+    def test_running_endpoints_are_loaded_snapshot_and_stop_start_loads_manifest_edits(
+        self,
+    ):
+        project = self.project(endpoints=[("GET", "/", "root")])
+        prefix = f"/api/projects/{project.id}"
+        with TestClient(app) as client:
+            original = client.post(prefix + "/start").json()
+            (project.directory / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "endpoints": [
+                            {
+                                "method": "GET",
+                                "path": "/new",
+                                "handler": "endpoints/hello.py:root",
+                            }
+                        ]
+                    }
+                )
+            )
+            loaded = client.get(prefix + "/endpoints").json()
+            self.assertEqual(loaded["endpoints"], original["endpoints"])
+            self.assertEqual(
+                client.post(prefix + "/start").json()["pid"], original["pid"]
+            )
+            self.assertEqual(client.get(f"/mock/{project.id}/new").status_code, 404)
+            self.assertEqual(client.post(prefix + "/stop").status_code, 200)
+            configured = client.get(prefix + "/endpoints").json()
+            self.assertEqual(configured["endpoints"][0]["path"], "/new")
+            restarted = client.post(prefix + "/start")
+            self.assertEqual(restarted.status_code, 200, restarted.text)
+            self.assertEqual(restarted.json()["endpoints"], configured["endpoints"])
+            self.assertEqual(client.get(f"/mock/{project.id}/new").status_code, 200)
+            self.assertEqual(client.get(f"/mock/{project.id}/").status_code, 404)
+
+    def test_discovery_reports_bad_projects_without_hiding_healthy_projects(self):
+        healthy = self.project("healthy")
+        broken = self.project(
+            "broken", source="raise RuntimeError('broken handler import')"
+        )
+        invalid_manifest = self.project("invalid-manifest")
+        (invalid_manifest.directory / "manifest.json").write_text("not json")
+        invalid_metadata = self.project("invalid-metadata")
+        (invalid_metadata.directory / "project.json").write_text("not json")
+        with TestClient(app) as client:
+            healthy_pid = client.get(f"/mock/{healthy.id}/").json()["pid"]
+            failed = client.post(f"/api/projects/{broken.id}/start")
+            self.assertEqual(failed.status_code, 502, failed.text)
+            info = client.get(f"/api/projects/{broken.id}/endpoints").json()
+            self.assertEqual(info["status"], "error")
+            self.assertIn("broken handler import", info["error"])
+            listing = client.get("/api/projects")
+            self.assertEqual(listing.status_code, 200, listing.text)
+            projects = {
+                project["id"]: project for project in listing.json()["projects"]
+            }
+            self.assertEqual(projects[healthy.id]["status"], "running")
+            self.assertEqual(projects[healthy.id]["pid"], healthy_pid)
+            for project in (broken, invalid_manifest, invalid_metadata):
+                self.assertEqual(projects[project.id]["status"], "error")
+                self.assertTrue(projects[project.id]["error"])
+            for project in (invalid_manifest, invalid_metadata):
+                response = client.get(f"/api/projects/{project.id}/endpoints")
+                self.assertEqual(response.status_code, 422, response.text)
+            for project_id in ("a" * 32, "invalid-id"):
+                for method, suffix in (
+                    ("GET", "endpoints"),
+                    ("POST", "start"),
+                    ("POST", "stop"),
+                ):
+                    response = client.request(
+                        method, f"/api/projects/{project_id}/{suffix}"
+                    )
+                    self.assertEqual(response.status_code, 404, response.text)
+            self.assertEqual(
+                client.get(f"/mock/{healthy.id}/").json()["pid"], healthy_pid
+            )
+
+    def test_discovery_reaps_crashed_workers_and_start_recovers_them(self):
+        project = self.project()
+        with TestClient(app) as client:
+            original = client.post(f"/api/projects/{project.id}/start").json()["pid"]
+            self.assertEqual(client.get(f"/mock/{project.id}/crash").status_code, 502)
+            info = client.get(f"/api/projects/{project.id}/endpoints")
+            self.assertEqual(info.status_code, 200, info.text)
+            self.assertEqual(info.json()["status"], "error")
+            self.assertIsNone(info.json()["pid"])
+            self.assertNotIn(project.id, app.state.worker_manager.workers)
+            self.assertNotIn(
+                original, {p.pid for p in multiprocessing.active_children()}
+            )
+            restarted = client.post(f"/api/projects/{project.id}/start")
+            self.assertEqual(restarted.status_code, 200, restarted.text)
+            self.assertEqual(restarted.json()["status"], "running")
+            self.assertIsNone(restarted.json()["error"])
+
+    def test_stop_succeeds_even_if_running_project_files_become_invalid(self):
+        project = self.project()
+        prefix = f"/api/projects/{project.id}"
+        with TestClient(app) as client:
+            started = client.post(prefix + "/start").json()
+            (project.directory / "manifest.json").unlink()
+            (project.directory / "project.json").write_text("not json")
+            stopped = client.post(prefix + "/stop")
+            self.assertEqual(stopped.status_code, 200, stopped.text)
+            self.assertEqual(stopped.json()["status"], "stopped")
+            self.assertIsNone(stopped.json()["pid"])
+            self.assertEqual(stopped.json()["name"], project.name)
+            self.assertEqual(stopped.json()["endpoints"], started["endpoints"])
+            self.assertEqual(client.post(prefix + "/stop").json(), stopped.json())
+            self.assertNotIn(
+                started["pid"], {p.pid for p in multiprocessing.active_children()}
+            )
+            self.assertEqual(client.get(f"/mock/{project.id}/").status_code, 503)
+            listed = client.get(prefix + "/endpoints")
+            self.assertEqual(listed.status_code, 200, listed.text)
+            self.assertEqual(listed.json()["status"], "stopped")
+            self.assertTrue(listed.json()["error"])
+
+    def test_stop_invalid_idle_project_and_missing_manifest_discovery(self):
+        project = self.project()
+        prefix = f"/api/projects/{project.id}"
+        (project.directory / "manifest.json").unlink()
+        with TestClient(app) as client:
+            self.assertEqual(client.get(prefix + "/endpoints").status_code, 422)
+            stopped = client.post(prefix + "/stop")
+            self.assertEqual(stopped.status_code, 200, stopped.text)
+            self.assertEqual(stopped.json()["status"], "stopped")
+            self.assertTrue(stopped.json()["error"])
+            self.assertEqual(client.get(f"/mock/{project.id}/").status_code, 503)
+            self.assertEqual(app.state.worker_manager.workers, {})
+            self.assertEqual(client.post(prefix + "/start").status_code, 502)
+            self.assertEqual(client.get(f"/mock/{project.id}/").status_code, 503)
+
+    def test_concurrent_lifecycle_commands_return_their_own_state_snapshots(self):
+        project = self.project()
+        manager = WorkerManager()
+        self.addCleanup(manager.close)
+
+        def start():
+            result = manager.start(project.id)
+            self.assertEqual(result["status"], "running")
+            self.assertIsNotNone(result["pid"])
+            return result
+
+        def stop():
+            result = manager.stop(project.id)
+            self.assertEqual(result["status"], "stopped")
+            self.assertIsNone(result["pid"])
+            return result
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futures = [
+                pool.submit(operation) for operation in (start, stop, start, stop)
+            ]
+            for future in futures:
+                future.result()
+
+    def test_stop_known_crashed_worker_after_registry_entry_is_deleted(self):
+        project = self.project()
+        with TestClient(app) as client:
+            self.assertEqual(
+                client.post(f"/api/projects/{project.id}/start").status_code, 200
+            )
+            self.assertEqual(client.get(f"/mock/{project.id}/crash").status_code, 502)
+            (registry_directory() / f"{project.id}.json").unlink()
+            stopped = client.post(f"/api/projects/{project.id}/stop")
+            self.assertEqual(stopped.status_code, 200, stopped.text)
+            self.assertEqual(stopped.json()["status"], "stopped")
+            self.assertEqual(stopped.json()["name"], project.name)
+            self.assertEqual(client.get(f"/mock/{project.id}/").status_code, 503)
+
+    def test_start_reports_failure_if_worker_exits_immediately_after_readiness(self):
+        project = create_project(self.directory / "scaffold")
+        process = MagicMock()
+        process.is_alive.return_value = False
+        manifest = Manifest.model_validate_json(
+            (project.directory / "manifest.json").read_text()
+        )
+        with TestClient(app) as client:
+            with patch.object(
+                app.state.worker_manager,
+                "_start_worker",
+                return_value=Worker(process, 4000, project, manifest),
+            ):
+                response = client.post(f"/api/projects/{project.id}/start")
+            self.assertEqual(response.status_code, 502, response.text)
+            self.assertIn("worker exited", response.json()["detail"])
+            process.close.assert_called_once_with()
 
     def test_delayed_handler_is_not_cut_off_by_default_httpx_timeout(self):
         source = 'import asyncio\nasync def slow():\n    await asyncio.sleep(5.1)\n    return {"delayed": True}\n'
@@ -390,7 +681,11 @@ class WorkerShutdownTests(unittest.TestCase):
             process = MagicMock()
             process.is_alive.return_value = True
             calls.attach_mock(process, f"worker{index}")
-            manager.workers[str(index)] = Worker(process, 4000 + index)
+            manager.workers[str(index)] = Worker(
+                process,
+                4000 + index,
+                Project(id=f"{index:032x}", name=str(index), directory=Path("/unused")),
+            )
         processes = [worker.process for worker in manager.workers.values()]
         with patch(
             "reqlica.runtime.worker.time.monotonic", side_effect=[0, 0.25, 1, 2.5]
