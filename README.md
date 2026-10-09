@@ -11,7 +11,7 @@ This document is a project reference during development. Most features below are
 ## Planned features
 
 - [x] **Terminal startup:** run `reqlica start` to launch the console and mock server.
-- [ ] **Multiple projects:** create, open, start, and stop separate mock APIs.
+- [x] **CLI project management:** create, list, inspect endpoints, start, and stop separate mock APIs.
 - [x] **Custom project locations:** save projects in a directory of the user's choice.
 - [ ] **AI generation:** accept prompts, Markdown, plain text, and OpenAPI specs.
 - [ ] **Python endpoints:** generate request/response models and functions with custom processing logic.
@@ -326,6 +326,80 @@ The first request starts that project's worker. Further requests reuse it.
 Creating another project while Reqlica is running does not require a restart.
 Stopping Reqlica stops its workers and keeps project files and registry entries.
 
+### Manage mock projects
+
+With `uv run reqlica start` running in another terminal, use the printed
+32-character lowercase hexadecimal project ID in these commands:
+
+```bash
+uv run reqlica project list
+uv run reqlica project list --running
+uv run reqlica project endpoints <project-id>
+uv run reqlica project start <project-id>
+uv run reqlica project stop <project-id>
+```
+
+These commands contact the running mock gateway, not the console, and do not load
+project Python code into the CLI. They show project IDs, statuses, and full
+endpoint URLs. `list` includes faulty registry entries as `error` projects rather
+than hiding them; `--running` asks the gateway to return only running projects.
+Unlike `project create`, management commands require a running gateway. If it is
+unreachable, run `reqlica start` first and check its host and port settings.
+
+Each management command supports `--json` for the unchanged API payload, without
+human-readable summaries. For example:
+
+```bash
+uv run reqlica project list --running --json
+uv run reqlica project endpoints <project-id> --json
+uv run reqlica project start <project-id> --json
+uv run reqlica project stop <project-id> --json
+```
+
+Errors go to stderr and return a nonzero exit status, including in JSON mode.
+The CLI loads `MOCK_HOST` and `MOCK_PORT` from the repository-root `.env`, with
+exported environment variables taking precedence. Requests bypass environment
+proxy settings and have a 30-second timeout. Wildcard bind addresses are mapped
+to loopback for CLI connections (`0.0.0.0` to `127.0.0.1`, `::` to `::1`);
+IPv6 URL hosts use brackets, for example `http://[::1]:4000`.
+
+| Status | Meaning |
+|---|---|
+| `idle` | No worker is running; calling a mock endpoint can lazily start it. |
+| `running` | A worker is running with its loaded endpoints. |
+| `stopped` | Explicitly stopped in this gateway session; mock requests return `503` until an explicit `project start`. |
+| `error` | Project files or worker state could not be read or started; inspect the error detail. |
+
+`project stop` is idempotent and keeps the project's files and registry entry.
+It disables lazy restart for that project until `project start` is called.
+Restarting the gateway resets the session's stopped state, allowing lazy startup
+again. Listing projects or endpoints does not start idle or stopped workers.
+
+The gateway's interactive API documentation is at
+`http://127.0.0.1:4000/docs` (use your configured host and port). Project
+management is available through these routes:
+
+| Method | Route | Result |
+|---|---|---|
+| `GET` | `/api/projects` | All registered projects in a `projects` array. |
+| `GET` | `/api/projects?running=true` | Only running projects. |
+| `GET` | `/api/projects/{id}/endpoints` | A single project's status and endpoints. |
+| `POST` | `/api/projects/{id}/start` | Start the worker and return the project. |
+| `POST` | `/api/projects/{id}/stop` | Stop the worker and return the project. |
+
+Each project object includes `id`, `name`, `directory`, `status`, `pid`, `error`,
+`url`, and `endpoints`. Each endpoint includes `method`, `path`, `handler`, and
+its full `url`. Unknown IDs return `404`, malformed stored project files return
+`422`, and worker failures return `502`. A gateway already running older code
+must be restarted to load these management routes; an unexpected `404 Not Found`
+from a management command can mean the server needs that restart.
+
+This adds CLI and API management only, not a GUI dashboard. Keep the gateway
+bound to loopback: management routes are unauthenticated and can start local
+Python code. Do not expose them to untrusted networks.
+
+### Edit mock endpoints
+
 To define your own endpoint, add a function in `endpoints/hello.py` or another
 project-relative Python file. Handlers use standard FastAPI signatures, including
 path/query parameters, Pydantic request models, `Request`, and `Response`:
@@ -350,19 +424,28 @@ Add the route to the `endpoints` array in `manifest.json`, alongside `/hello`:
 }
 ```
 
-Restart Reqlica after editing a loaded project's manifest or Python code, then call:
+After editing a loaded project's manifest or Python code, stop and start its
+worker to load the changes, then call the endpoint:
 
 ```bash
+uv run reqlica project stop <project-id>
+uv run reqlica project start <project-id>
 curl -X POST http://127.0.0.1:4000/mock/<project-id>/greet \
   -H 'Content-Type: application/json' \
   -d '{"name":"Sam"}'
 ```
 
+While a worker is running, its endpoint list reflects the loaded snapshot, not
+subsequent disk edits. `project start` on an already-running worker does not
+reload it; use stop/start. Restarting Reqlica also reloads project code when its
+worker next starts, but is only necessary for gateway/backend code changes.
+
 Supported methods are `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `HEAD`,
 and `TRACE`. Route paths are relative to the project's `/mock/<project-id>` base.
 Unknown project IDs return `404`; worker startup and connection failures return
-`502` with an error description. Drafts, version activation, per-project runtime
-controls, and dashboard endpoint editing remain planned.
+`502` with an error description. Explicitly stopped projects return `503` until
+started again. Drafts, version activation, and dashboard endpoint editing remain
+planned.
 
 Only load trusted Python code. A separate worker process is not a security sandbox:
 handlers run with the same user permissions as Reqlica. Keep the servers bound to
