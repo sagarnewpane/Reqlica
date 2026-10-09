@@ -96,6 +96,15 @@ def registry_directory() -> Path:
     return Path(home).expanduser().resolve() / "projects"
 
 
+def list_project_ids() -> list[str]:
+    """List registered IDs without importing handlers or hiding broken projects."""
+    return sorted(
+        entry.stem
+        for entry in registry_directory().glob("*.json")
+        if entry.is_file() and re.fullmatch(r"[0-9a-f]{32}", entry.stem)
+    )
+
+
 def create_project(directory: Path, name: str | None = None) -> Project:
     """Create an empty-directory project with a working, manually editable endpoint."""
     directory = Path(directory).expanduser().resolve()

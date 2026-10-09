@@ -15,8 +15,7 @@ from types import ModuleType
 
 import uvicorn
 from fastapi import FastAPI
-
-from reqlica.projects.store import Manifest, Project, get_project
+from reqlica.projects.store import Manifest, Project, get_project, list_project_ids
 
 
 def build_app(directory: Path) -> FastAPI:
@@ -60,6 +59,7 @@ def build_app(directory: Path) -> FastAPI:
         if not callable(handler):
             raise TypeError(f"Handler is not callable: {endpoint.handler}")
         app.add_api_route(endpoint.path, handler, methods=[endpoint.method])
+    app.state.manifest = manifest
     return app
 
 
@@ -76,7 +76,7 @@ def _run_worker(
             await super().startup(sockets=sockets)
             # Report readiness only after Uvicorn is accepting connections.
             if self.started:
-                startup_sender.send((True, None))
+                startup_sender.send((True, app.state.manifest.model_dump(mode="json")))
 
     try:
         app = build_app(directory)
@@ -106,6 +106,12 @@ def _run_worker(
 class Worker:
     process: multiprocessing.Process
     port: int
+    project: Project
+    manifest: Manifest | None = None
+
+
+class ProjectStoppedError(RuntimeError):
+    """An explicitly stopped project must not restart on a mock request."""
 
 
 class WorkerManager:
@@ -117,6 +123,8 @@ class WorkerManager:
         self._process_context = multiprocessing.get_context("spawn")
         self._lock = threading.Lock()
         self._closed = False
+        self._stopped: dict[str, dict] = {}
+        self._errors: dict[str, str] = {}
 
     @staticmethod
     def _stop_worker(worker: Worker) -> None:
@@ -132,23 +140,156 @@ class WorkerManager:
             process.join()
         process.close()
 
-    def get_or_start(self, project_id: str) -> Worker:
+    def get_or_start(self, project_id: str, *, explicit: bool = False) -> Worker:
         """Return the live worker, or start a replacement if it has exited."""
+        with self._lock:
+            return self._get_or_start(project_id, explicit=explicit)
+
+    def _get_or_start(self, project_id: str, *, explicit: bool) -> Worker:
+        if self._closed:
+            raise RuntimeError("Worker manager is closed")
+        if project_id in self._stopped and not explicit:
+            raise ProjectStoppedError(
+                f"Project {project_id} is stopped; use 'reqlica project start {project_id}'"
+            )
+
+        worker = self.workers.get(project_id)
+        if worker is not None:
+            if worker.process.is_alive():
+                return worker
+            self.workers.pop(project_id)
+            self._stop_worker(worker)
+
+        project = get_project(project_id)
+        try:
+            worker = self._start_worker(project)
+        except Exception as exc:
+            self._errors[project_id] = str(exc)
+            raise
+        self.workers[project_id] = worker
+        self._stopped.pop(project_id, None)
+        self._errors.pop(project_id, None)
+        return worker
+
+    def start(self, project_id: str) -> dict:
+        """Explicitly start a worker and report its state under the same lock."""
+        with self._lock:
+            self._get_or_start(project_id, explicit=True)
+            project = self._describe_project(project_id)
+            if project["status"] != "running":
+                raise RuntimeError(
+                    project["error"] or "Project worker exited during startup"
+                )
+            return project
+
+    def stop(self, project_id: str) -> dict:
+        """Stop only this worker and disable lazy startup for this session."""
         with self._lock:
             if self._closed:
                 raise RuntimeError("Worker manager is closed")
-
-            worker = self.workers.get(project_id)
+            if project_id in self._stopped:
+                return self._stopped[project_id]
+            known_worker = self.workers.get(project_id)
+            try:
+                project = self._describe_project(project_id)
+            except (OSError, ValueError) as exc:
+                if known_worker is None and project_id not in list_project_ids():
+                    raise
+                project = self._unavailable_project(project_id, exc)
+                if known_worker is not None:
+                    project.update(
+                        name=known_worker.project.name,
+                        directory=str(known_worker.project.directory),
+                        endpoints=(
+                            known_worker.manifest.model_dump(mode="json")["endpoints"]
+                            if known_worker.manifest is not None
+                            else []
+                        ),
+                    )
+            worker = self.workers.pop(project_id, None)
             if worker is not None:
-                if worker.process.is_alive():
-                    return worker
-                self.workers.pop(project_id)
                 self._stop_worker(worker)
+            project = {**project, "status": "stopped", "pid": None}
+            self._stopped[project_id] = project
+            self._errors.pop(project_id, None)
+            return project
 
-            project = get_project(project_id)
-            worker = self._start_worker(project)
-            self.workers[project_id] = worker
-            return worker
+    def describe_project(self, project_id: str) -> dict:
+        with self._lock:
+            return self._describe_project(project_id)
+
+    def list_projects(self) -> list[dict]:
+        """Report live process state without starting any workers."""
+        with self._lock:
+            project_ids = (
+                set(list_project_ids()) | self.workers.keys() | self._stopped.keys()
+            )
+            projects = []
+            for project_id in sorted(project_ids):
+                try:
+                    projects.append(self._describe_project(project_id))
+                except (OSError, ValueError) as exc:
+                    projects.append(self._unavailable_project(project_id, exc))
+            return projects
+
+    @staticmethod
+    def _unavailable_project(project_id: str, error: Exception) -> dict:
+        return {
+            "id": project_id,
+            "name": None,
+            "directory": None,
+            "status": "error",
+            "pid": None,
+            "endpoints": [],
+            "error": str(error),
+        }
+
+    def _describe_project(self, project_id: str) -> dict:
+        worker = self.workers.get(project_id)
+        if worker is not None and not worker.process.is_alive():
+            self.workers.pop(project_id)
+            self._stop_worker(worker)
+            self._errors[project_id] = "Project worker exited; start it again to retry"
+            worker = None
+        try:
+            project = worker.project if worker is not None else get_project(project_id)
+            # A running worker's routes may differ from a manifest edited on disk.
+            if worker is not None:
+                manifest = worker.manifest
+            else:
+                try:
+                    manifest = Manifest.model_validate_json(
+                        (project.directory / "manifest.json").read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                except (OSError, ValueError) as exc:
+                    raise ValueError(
+                        f"Cannot read project {project_id} manifest: {exc}"
+                    ) from exc
+        except (OSError, ValueError) as exc:
+            if project_id in self._stopped:
+                return {**self._stopped[project_id], "error": str(exc)}
+            raise
+        if manifest is None:
+            raise RuntimeError("Worker has not reported its loaded manifest")
+        error = self._errors.get(project_id)
+        status = "idle"
+        if worker is not None:
+            status = "running"
+        elif project_id in self._stopped:
+            status = "stopped"
+        elif error is not None:
+            status = "error"
+        return {
+            "id": project.id,
+            "name": project.name,
+            "directory": str(project.directory),
+            "status": status,
+            "pid": worker.process.pid if worker is not None else None,
+            "endpoints": manifest.model_dump(mode="json")["endpoints"],
+            "error": error,
+        }
 
     def _start_worker(self, project: Project) -> Worker:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
@@ -162,7 +303,7 @@ class WorkerManager:
                 args=(project.directory, project.id, listener, startup_sender),
                 daemon=True,
             )
-            worker = Worker(process, port)
+            worker = Worker(process, port, project)
             try:
                 process.start()
                 startup_sender.close()
@@ -171,19 +312,20 @@ class WorkerManager:
                         f"Worker startup timed out for project {project.id}"
                     )
                 try:
-                    started, startup_error = startup_receiver.recv()
+                    started, startup_detail = startup_receiver.recv()
                 except EOFError as exc:
                     raise RuntimeError(
                         f"Worker exited during startup for project {project.id}"
                     ) from exc
                 if not started:
                     raise RuntimeError(
-                        f"Worker startup failed for project {project.id}: {startup_error}"
+                        f"Worker startup failed for project {project.id}: {startup_detail}"
                     )
                 if not process.is_alive():
                     raise RuntimeError(
                         f"Worker exited during startup for project {project.id}"
                     )
+                worker.manifest = Manifest.model_validate(startup_detail)
             except BaseException:
                 self._stop_worker(worker)
                 raise

@@ -7,7 +7,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from reqlica.projects.store import Endpoint, Manifest, create_project, get_project
+from reqlica.projects.store import (
+    Endpoint,
+    Manifest,
+    create_project,
+    get_project,
+    list_project_ids,
+    registry_directory,
+)
 
 
 class ProjectTests(unittest.TestCase):
@@ -38,6 +45,17 @@ class ProjectTests(unittest.TestCase):
         reopened = get_project(project.id)
         self.assertEqual(reopened.id, project.id)
         self.assertEqual(reopened.name, "Renamed books")
+
+    def test_list_ids_includes_corrupt_entries_but_ignores_unrelated_files(self):
+        self.assertEqual(list_project_ids(), [])
+        first = create_project(self.root / "first")
+        second = create_project(self.root / "second")
+        registry = registry_directory()
+        (registry / f"{first.id}.json").write_text("invalid json")
+        (registry / "unrelated.json").write_text("{}")
+        (registry / f".{second.id}.temporary.tmp").write_text("{}")
+        (registry / f"{'f' * 32}.json").mkdir()
+        self.assertEqual(list_project_ids(), sorted([first.id, second.id]))
 
     def test_existing_empty_directory_and_default_name(self):
         directory = self.root / "cafe"
