@@ -3,6 +3,8 @@
 import json
 import os
 import re
+import sqlite3
+from contextlib import closing
 from pathlib import Path, PurePosixPath
 from typing import Literal
 from uuid import uuid4
@@ -16,6 +18,7 @@ class ProjectMetadata(BaseModel):
 
     id: str = Field(pattern=r"^[0-9a-f]{32}$")
     name: str = Field(min_length=1)
+    active_version: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
 
     @field_validator("name")
     @classmethod
@@ -107,11 +110,14 @@ def list_project_ids() -> list[str]:
 
 def create_project(directory: Path, name: str | None = None) -> Project:
     """Create an empty-directory project with a working, manually editable endpoint."""
+    from reqlica.projects.versions import atomic_write_json
+
     directory = Path(directory).expanduser().resolve()
     project = Project(
         id=uuid4().hex,
         name=name if name is not None else directory.name,
         directory=directory,
+        active_version=uuid4().hex,
     )
     if directory.exists() and any(directory.iterdir()):
         raise ValueError(f"Project directory must be empty: {directory}")
@@ -129,11 +135,20 @@ def hello() -> dict[str, str]:
             Endpoint(method="GET", path="/hello", handler="endpoints/hello.py:hello")
         ]
     )
-    project_files = {
-        "endpoints/hello.py": hello_source,
-        "manifest.json": manifest.model_dump_json(indent=2) + "\n",
-        "project.json": project.model_dump_json(indent=2, exclude={"directory"}) + "\n",
-    }
+    hello_test = f'''"""Check the sample endpoint without starting a server."""
+
+import unittest
+
+from endpoints.hello import hello
+
+
+class HelloTests(unittest.TestCase):
+    def test_hello(self):
+        self.assertEqual(hello(), {{
+            "message": "Hello from Reqlica",
+            "project_id": "{project.id}",
+        }})
+'''
     registry = registry_directory()
     registry.mkdir(parents=True, exist_ok=True)
     registry_entry = registry / f"{project.id}.json"
@@ -144,19 +159,45 @@ def hello() -> dict[str, str]:
         # Check registry access before creating files, then publish the entry last.
         with temporary_entry.open("x", encoding="utf-8") as file:
             file.write(json.dumps({"directory": str(directory)}) + "\n")
+            file.flush()
+            os.fsync(file.fileno())
         directory_existed = directory.exists()
         directory.mkdir(parents=True, exist_ok=True)
         if not directory_existed:
             created_directories.append(directory)
-        endpoints_directory = directory / "endpoints"
-        endpoints_directory.mkdir()
-        created_directories.append(endpoints_directory)
+        code = directory / "versions" / project.active_version
+        for path in (
+            directory / "versions",
+            code,
+            code / "endpoints",
+            code / "tests",
+            directory / "drafts",
+        ):
+            path.mkdir()
+            created_directories.append(path)
 
-        for filename, content in project_files.items():
-            path = directory / filename
+        for path, content in (
+            (code / "endpoints" / "hello.py", hello_source),
+            (code / "tests" / "test_hello.py", hello_test),
+        ):
             with path.open("x", encoding="utf-8") as file:
                 created_files.append(path)
                 file.write(content)
+                file.flush()
+                os.fsync(file.fileno())
+        database = directory / "data.sqlite"
+        created_files.append(database)
+        with closing(sqlite3.connect(database)) as connection:
+            connection.execute("PRAGMA user_version = 0")
+        for path, payload in (
+            (code / "manifest.json", manifest.model_dump()),
+            (
+                directory / "project.json",
+                project.model_dump(mode="json", exclude={"directory"}),
+            ),
+        ):
+            created_files.append(path)
+            atomic_write_json(path, payload)
         temporary_entry.replace(registry_entry)
     except BaseException:
         # Roll back only this invocation's scaffolding; preserve existing contents.
@@ -197,8 +238,6 @@ def get_project(project_id: str) -> Project:
         )
         if metadata.id != project_id:
             raise ValueError("Registered ID does not match project.json")
-        return Project(
-            id=metadata.id, name=metadata.name, directory=directory.resolve()
-        )
+        return Project(**metadata.model_dump(), directory=directory.resolve())
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise ValueError(f"Cannot open project {project_id}: {exc}") from exc

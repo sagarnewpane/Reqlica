@@ -1,5 +1,21 @@
-"""Expose project start/stop controls, runtime status, and mock API URLs.
+"""Forward publication and legacy conversion to the owning mock gateway."""
 
-Delegate worker lifecycle management to reqlica.runtime. These management
-routes do not serve mock API requests or execute generated endpoint code.
-"""
+from fastapi import APIRouter
+from pydantic import Field
+from reqlica.console.dependencies import Revision, gateway_operation
+
+router = APIRouter(prefix="/api/projects/{project_id}", tags=["Runtime"])
+
+
+class Activation(Revision):
+    draft_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+
+
+@router.post("/activate")
+def activate(project_id: str, body: Activation) -> dict:
+    return gateway_operation(project_id, "activate", body.model_dump())
+
+
+@router.post("/convert")
+def convert(project_id: str) -> dict:
+    return gateway_operation(project_id, "convert")

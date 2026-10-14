@@ -9,7 +9,12 @@ import httpx
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Response
-from reqlica.runtime.worker import ProjectStoppedError, WorkerManager
+from pydantic import BaseModel, ConfigDict, Field
+from reqlica.runtime.worker import (
+    ProjectActivatingError,
+    ProjectStoppedError,
+    WorkerManager,
+)
 from starlette.routing import compile_path
 
 SUPPORTED_METHODS = [
@@ -113,6 +118,8 @@ def _manage_project(
             project = manager.describe_project(project_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ProjectActivatingError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except (OSError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
@@ -138,20 +145,76 @@ def stop_project(request: Request, project_id: str) -> dict:
     return _manage_project(request, project_id, "stop")
 
 
+class Activation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    draft_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+def _publish(
+    request: Request, project_id: str, activation: Activation | None = None
+) -> dict:
+    try:
+        manager = request.app.state.worker_manager
+        if activation is None:
+            result = manager.convert(project_id)
+        else:
+            result = manager.activate(
+                project_id, activation.draft_id, activation.expected_revision
+            )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ProjectActivatingError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (ValueError, OSError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return _with_urls(request, result)
+
+
+@app.post("/api/projects/{project_id}/convert", tags=["Projects"])
+def convert_project(request: Request, project_id: str) -> dict:
+    return _publish(request, project_id)
+
+
+@app.post("/api/projects/{project_id}/activate", tags=["Projects"])
+def activate_project(request: Request, project_id: str, activation: Activation) -> dict:
+    return _publish(request, project_id, activation)
+
+
 @app.api_route("/mock/{project_id}", methods=SUPPORTED_METHODS)
 @app.api_route("/mock/{project_id}/{path:path}", methods=SUPPORTED_METHODS)
 async def proxy(request: Request, project_id: str, path: str = "") -> Response:
+    worker_manager = request.app.state.worker_manager
+    acquisition = asyncio.create_task(
+        asyncio.to_thread(worker_manager.acquire_request, project_id)
+    )
     try:
-        worker_manager = request.app.state.worker_manager
         # Startup may wait for imports; keep other requests responsive while it runs.
-        worker = await asyncio.to_thread(worker_manager.get_or_start, project_id)
+        worker = await asyncio.shield(acquisition)
+    except asyncio.CancelledError:
+
+        def release_abandoned(task):
+            if not task.cancelled() and task.exception() is None:
+                worker_manager.release_request(project_id)
+
+        acquisition.add_done_callback(release_abandoned)
+        raise
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ProjectStoppedError as exc:
+    except (ProjectStoppedError, ProjectActivatingError) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+    try:
+        return await _proxy_to_worker(request, worker)
+    finally:
+        worker_manager.release_request(project_id)
+
+
+async def _proxy_to_worker(request: Request, worker) -> Response:
     # Strip the gateway prefix without decoding escaped slashes or other path bytes.
     path_parts = request.scope["raw_path"].split(b"/", maxsplit=3)
     endpoint_path = b"/"
