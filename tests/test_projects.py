@@ -15,6 +15,7 @@ from reqlica.projects.store import (
     list_project_ids,
     registry_directory,
 )
+from reqlica.projects.versions import code_directory
 
 
 class ProjectTests(unittest.TestCase):
@@ -30,16 +31,24 @@ class ProjectTests(unittest.TestCase):
         project = create_project(self.root / "books", name=" Books ")
         self.assertEqual(project.name, "Books")
         self.assertEqual(get_project(project.id), project)
+        self.assertIsNotNone(project.active_version)
         metadata = json.loads((project.directory / "project.json").read_text())
-        self.assertEqual(metadata, {"id": project.id, "name": "Books"})
+        self.assertEqual(
+            metadata,
+            {
+                "id": project.id,
+                "name": "Books",
+                "active_version": project.active_version,
+            },
+        )
         manifest = Manifest.model_validate_json(
-            (project.directory / "manifest.json").read_text()
+            (code_directory(project) / "manifest.json").read_text()
         )
         self.assertEqual(
             manifest.endpoints,
             [Endpoint(method="GET", path="/hello", handler="endpoints/hello.py:hello")],
         )
-        self.assertTrue((project.directory / "endpoints" / "hello.py").is_file())
+        self.assertTrue((code_directory(project) / "endpoints" / "hello.py").is_file())
         metadata["name"] = "Renamed books"
         (project.directory / "project.json").write_text(json.dumps(metadata))
         reopened = get_project(project.id)

@@ -1,6 +1,6 @@
 """Configure the console's FastAPI application.
 
-Register management API routes and serve the bundled dashboard from static/.
+Register local management API routes; a bundled dashboard is not implemented.
 Mock API traffic and generated endpoint execution belong to reqlica.runtime.
 """
 
@@ -10,8 +10,12 @@ from pathlib import Path
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from reqlica.console.routes import drafts, runtime, validation
 
 app = FastAPI(title="Console")
+app.include_router(drafts.router)
+app.include_router(validation.router)
+app.include_router(runtime.router)
 
 
 @app.get("/api/health", tags=["Console"])

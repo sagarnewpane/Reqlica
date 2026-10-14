@@ -1,4 +1,4 @@
-"""Launch and supervise Reqlica's console and mock servers."""
+"""Supervise servers, manage projects/drafts, and record local human approval."""
 
 import argparse
 import json
@@ -12,6 +12,7 @@ from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
+from reqlica.projects import drafts
 from reqlica.projects.store import create_project
 
 
@@ -39,6 +40,7 @@ def main() -> int:
         ("endpoints", "Show a project's endpoints"),
         ("start", "Start a project's worker"),
         ("stop", "Stop a project and disable its lazy restart"),
+        ("convert", "Convert a stopped or idle legacy project to versions"),
     ):
         command_parser = project_commands.add_parser(command, help=help_text)
         command_parser.add_argument(
@@ -47,12 +49,56 @@ def main() -> int:
         command_parser.add_argument(
             "--json", action="store_true", help="Print the API JSON payload"
         )
+    draft_parser = commands.add_parser("draft", help="Edit and check unpublished code")
+    draft_commands = draft_parser.add_subparsers(dest="draft_command", required=True)
+    for command in (
+        "create",
+        "list",
+        "inspect",
+        "write",
+        "delete",
+        "upsert",
+        "remove",
+        "validate",
+        "test",
+        "call",
+        "approve",
+        "activate",
+    ):
+        command_parser = draft_commands.add_parser(command)
+        command_parser.add_argument("project_id")
+        if command not in {"create", "list"}:
+            command_parser.add_argument("draft_id")
+        if command not in {"create", "list", "inspect"}:
+            command_parser.add_argument("--revision", required=True)
+        if command in {"write", "delete"}:
+            command_parser.add_argument("path", help="Draft-relative file path")
+        if command == "write":
+            command_parser.add_argument("--file", type=Path, required=True)
+        if command in {"upsert", "remove", "call"}:
+            command_parser.add_argument("method")
+            command_parser.add_argument("path", help="Endpoint route path")
+        if command == "upsert":
+            command_parser.add_argument("handler", help="relative/file.py:function")
+        if command == "call":
+            command_parser.add_argument(
+                "--body", type=json.loads, help="JSON request body"
+            )
+        if command == "approve":
+            command_parser.add_argument(
+                "--yes",
+                action="store_true",
+                help="Explicitly approve without prompting",
+            )
+        command_parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
     if args.command == "project":
         if args.project_command == "create":
             return _create_project(args.directory, args.name)
         return _manage_project(args)
+    if args.command == "draft":
+        return _manage_draft(args)
     return _start_servers()
 
 
@@ -64,6 +110,141 @@ def _mock_base_url() -> str:
         host = f"[{host}]"
     port = os.environ.get("MOCK_PORT", "4000")
     return f"http://{host}:{port}"
+
+
+def _console_base_url() -> str:
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+    host = os.environ.get("CONSOLE_HOST", "127.0.0.1")
+    host = {"0.0.0.0": "127.0.0.1", "::": "::1", "[::]": "::1"}.get(host, host)
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"http://{host}:{os.environ.get('CONSOLE_PORT', '3000')}"
+
+
+def _manage_draft(args: argparse.Namespace) -> int:
+    command = args.draft_command
+    for field, length in (("project_id", 32), ("draft_id", 32), ("revision", 64)):
+        value = getattr(args, field, None)
+        if value is not None and not re.fullmatch(rf"[0-9a-f]{{{length}}}", value):
+            print(
+                f"Invalid {field}: expected {length} lowercase hex characters.",
+                file=sys.stderr,
+            )
+            return 1
+    try:
+        if command == "approve":
+            # This intentionally has no HTTP equivalent or agent-facing operation.
+            load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+            state = drafts.inspect_draft(args.project_id, args.draft_id)
+            if state["revision"] != args.revision:
+                raise ValueError("Draft revision conflict; inspect the current draft")
+            if not args.yes:
+                print(
+                    json.dumps(
+                        {
+                            key: state[key]
+                            for key in (
+                                "id",
+                                "revision",
+                                "changes",
+                                "validation",
+                                "test",
+                            )
+                        },
+                        indent=2,
+                    ),
+                    file=sys.stderr,
+                )
+                print(
+                    f"Approve exact revision {args.revision}? [y/N] ",
+                    end="",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                try:
+                    accepted = input().strip().lower() in {"y", "yes"}
+                except EOFError:
+                    accepted = False
+                if not accepted:
+                    print("Approval declined; no approval recorded.", file=sys.stderr)
+                    return 1
+            payload = drafts.approve_draft(
+                args.project_id, args.draft_id, args.revision
+            )
+        else:
+            route = f"/api/projects/{args.project_id}/drafts"
+            method = "GET" if command in {"list", "inspect"} else "POST"
+            body = None
+            options = {}
+            if command not in {"create", "list"}:
+                route += f"/{args.draft_id}"
+            if command not in {"create", "list", "inspect"}:
+                body = {"expected_revision": args.revision}
+                if command in {"write", "delete"}:
+                    route += "/files"
+                    options["params"] = {"path": args.path}
+                    method = "PUT" if command == "write" else "DELETE"
+                    if command == "write":
+                        body["content"] = args.file.read_text(encoding="utf-8")
+                elif command in {"upsert", "remove"}:
+                    route += "/endpoints"
+                    method = "PUT" if command == "upsert" else "DELETE"
+                    endpoint = {"method": args.method, "path": args.path}
+                    if command == "upsert":
+                        body["endpoint"] = {**endpoint, "handler": args.handler}
+                    else:
+                        body.update(endpoint)
+                elif command == "activate":
+                    route = f"/api/projects/{args.project_id}/activate"
+                    body["draft_id"] = args.draft_id
+                else:
+                    route += f"/{command}"
+                    if command == "call":
+                        body.update(
+                            method=args.method, path=args.path, json_body=args.body
+                        )
+            base_url = (
+                _mock_base_url() if command == "activate" else _console_base_url()
+            )
+            response = httpx.request(
+                method,
+                base_url + route,
+                json=body,
+                trust_env=False,
+                timeout=60.0,
+                **options,
+            )
+            if not response.is_success:
+                try:
+                    error_payload = response.json()
+                    detail = (
+                        error_payload.get("detail", error_payload)
+                        if isinstance(error_payload, dict)
+                        else error_payload
+                    )
+                except ValueError:
+                    detail = response.text or "No error detail returned"
+                print(
+                    f"Draft {command} error ({response.status_code}): {detail}",
+                    file=sys.stderr,
+                )
+                return 1
+            payload = response.json()
+            if not isinstance(payload, dict):
+                raise ValueError("Malformed API reply: expected a JSON object")
+    except (OSError, ValueError, httpx.HTTPError, httpx.InvalidURL) as error:
+        print(f"Could not {command} draft: {error}", file=sys.stderr)
+        return 1
+    if not args.json:
+        print(f"Draft {command}:")
+    print(json.dumps(payload, indent=2))
+    if command in {"validate", "test", "call"} and payload.get("status") != "passed":
+        print(
+            f"Draft {command} did not pass: {payload.get('status', 'missing status')}",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
 
 
 def _create_project(directory: Path, name: str | None) -> int:
@@ -95,7 +276,7 @@ def _manage_project(args: argparse.Namespace) -> int:
             route += "?running=true"
     else:
         route += f"/{args.project_id}/{command}"
-    method = "POST" if command in {"start", "stop"} else "GET"
+    method = "POST" if command in {"start", "stop", "convert"} else "GET"
     try:
         response = httpx.request(
             method, _mock_base_url() + route, trust_env=False, timeout=30.0

@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 from fastapi.testclient import TestClient
 from reqlica.projects.store import Manifest, Project, create_project, registry_directory
+from reqlica.projects.versions import code_directory
 from reqlica.runtime.app import _filter_proxy_headers, app
 from reqlica.runtime.worker import Worker, WorkerManager
 
@@ -86,9 +87,10 @@ class WorkerIntegrationTests(unittest.TestCase):
         directory = self.directory / name
         directory.mkdir()
         project = create_project(directory, name=name)
-        (directory / "endpoints").mkdir(exist_ok=True)
-        (directory / "endpoints" / "hello.py").write_text(source)
-        (directory / "helper.py").write_text(f"IMPORTS = 0\nNAME = {name!r}\n")
+        code = code_directory(project)
+        (code / "endpoints").mkdir(exist_ok=True)
+        (code / "endpoints" / "hello.py").write_text(source)
+        (code / "helper.py").write_text(f"IMPORTS = 0\nNAME = {name!r}\n")
         if endpoints is None:
             endpoints = [
                 ("GET", "/", "root"),
@@ -115,7 +117,7 @@ class WorkerIntegrationTests(unittest.TestCase):
                 for method, path, handler in endpoints
             ]
         }
-        (directory / "manifest.json").write_text(json.dumps(manifest))
+        (code / "manifest.json").write_text(json.dumps(manifest))
         return project
 
     def test_lazy_isolated_workers_reuse_modules_and_shutdown(self):
@@ -158,7 +160,7 @@ class WorkerIntegrationTests(unittest.TestCase):
                 original.json(),
                 {"message": "Hello from Reqlica", "project_id": project.id},
             )
-            (project.directory / "endpoints" / "hello.py").write_text(
+            (code_directory(project) / "endpoints" / "hello.py").write_text(
                 'def hello():\n    return {"edited": True}\n'
             )
             self.assertEqual(client.get(url).json(), original.json())
@@ -274,7 +276,7 @@ class WorkerIntegrationTests(unittest.TestCase):
         prefix = f"/api/projects/{project.id}"
         with TestClient(app) as client:
             original = client.post(prefix + "/start").json()
-            (project.directory / "manifest.json").write_text(
+            (code_directory(project) / "manifest.json").write_text(
                 json.dumps(
                     {
                         "endpoints": [
@@ -308,7 +310,7 @@ class WorkerIntegrationTests(unittest.TestCase):
             "broken", source="raise RuntimeError('broken handler import')"
         )
         invalid_manifest = self.project("invalid-manifest")
-        (invalid_manifest.directory / "manifest.json").write_text("not json")
+        (code_directory(invalid_manifest) / "manifest.json").write_text("not json")
         invalid_metadata = self.project("invalid-metadata")
         (invalid_metadata.directory / "project.json").write_text("not json")
         with TestClient(app) as client:
@@ -368,7 +370,7 @@ class WorkerIntegrationTests(unittest.TestCase):
         prefix = f"/api/projects/{project.id}"
         with TestClient(app) as client:
             started = client.post(prefix + "/start").json()
-            (project.directory / "manifest.json").unlink()
+            (code_directory(project) / "manifest.json").unlink()
             (project.directory / "project.json").write_text("not json")
             stopped = client.post(prefix + "/stop")
             self.assertEqual(stopped.status_code, 200, stopped.text)
@@ -389,7 +391,7 @@ class WorkerIntegrationTests(unittest.TestCase):
     def test_stop_invalid_idle_project_and_missing_manifest_discovery(self):
         project = self.project()
         prefix = f"/api/projects/{project.id}"
-        (project.directory / "manifest.json").unlink()
+        (code_directory(project) / "manifest.json").unlink()
         with TestClient(app) as client:
             self.assertEqual(client.get(prefix + "/endpoints").status_code, 422)
             stopped = client.post(prefix + "/stop")
@@ -444,7 +446,7 @@ class WorkerIntegrationTests(unittest.TestCase):
         process = MagicMock()
         process.is_alive.return_value = False
         manifest = Manifest.model_validate_json(
-            (project.directory / "manifest.json").read_text()
+            (code_directory(project) / "manifest.json").read_text()
         )
         with TestClient(app) as client:
             with patch.object(
@@ -553,9 +555,9 @@ class WorkerIntegrationTests(unittest.TestCase):
         )
         missing = self.project("missing", endpoints=[("GET", "/", "absent")])
         malformed = self.project("malformed")
-        (malformed.directory / "manifest.json").write_text("not json")
+        (code_directory(malformed) / "manifest.json").write_text("not json")
         no_manifest = self.project("no-manifest")
-        (no_manifest.directory / "manifest.json").unlink()
+        (code_directory(no_manifest) / "manifest.json").unlink()
         with TestClient(app) as client:
             self.assertEqual(client.get("/mock/not-registered/").status_code, 404)
             healthy_pid = client.get(f"/mock/{healthy.id}").json()["pid"]
@@ -578,11 +580,11 @@ class WorkerIntegrationTests(unittest.TestCase):
         escaped = self.project("escaped")
         outside = self.directory / "outside.py"
         outside.write_text("raise RuntimeError('outside handler was imported')")
-        handler = escaped.directory / "endpoints" / "hello.py"
+        handler = code_directory(escaped) / "endpoints" / "hello.py"
         handler.unlink()
         handler.symlink_to(outside)
         not_file = self.project("not-file")
-        handler = not_file.directory / "endpoints" / "hello.py"
+        handler = code_directory(not_file) / "endpoints" / "hello.py"
         handler.unlink()
         handler.mkdir()
         with TestClient(app) as client:
