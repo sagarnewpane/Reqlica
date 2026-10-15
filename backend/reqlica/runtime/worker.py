@@ -149,7 +149,7 @@ class ProjectStoppedError(RuntimeError):
 
 
 class ProjectActivatingError(RuntimeError):
-    """Requests cannot enter a project during publication or conversion."""
+    """Requests cannot enter a project during publication, conversion, or deletion."""
 
 
 class WorkerManager:
@@ -307,6 +307,21 @@ class WorkerManager:
             self._stopped[project_id] = project
             self._errors.pop(project_id, None)
             return project
+
+    def deletion_info(self, project_id: str, delete_files: bool = False) -> dict:
+        from reqlica.runtime.deletion import deletion_info
+
+        return deletion_info(self, project_id, delete_files)
+
+    def delete(
+        self,
+        project_id: str,
+        delete_files: bool = False,
+        expected_directory: str | None = None,
+    ) -> dict:
+        from reqlica.runtime.deletion import delete_project
+
+        return delete_project(self, project_id, delete_files, expected_directory)
 
     def describe_project(self, project_id: str) -> dict:
         with self._lock:

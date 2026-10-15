@@ -36,9 +36,27 @@ class Project(ProjectMetadata):
 class Endpoint(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    method: Literal["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD", "TRACE"]
-    path: str
-    handler: str
+    method: Literal[
+        "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD", "TRACE"
+    ] = Field(
+        description="Uppercase HTTP method. Together with path, identifies this route.",
+        examples=["GET", "POST"],
+    )
+    path: str = Field(
+        description=(
+            "API route pattern starting with '/', e.g. /books or /books/{book_id}. "
+            "No query, fragment, full URL, or /mock/<project-id> gateway prefix."
+        ),
+        examples=["/books", "/books/{book_id}"],
+    )
+    handler: str = Field(
+        description=(
+            "Project-relative Python file and function, in relative/file.py:function "
+            "format, e.g. endpoints/books.py:list_books. The file must define that "
+            "function; saving a route definition does not create its source code."
+        ),
+        examples=["endpoints/books.py:list_books"],
+    )
 
     @field_validator("path")
     @classmethod

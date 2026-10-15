@@ -10,13 +10,13 @@ from unittest.mock import patch
 import httpx
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
-from reqlica.console.app import app, main
+from reqlica.console.app import app, create_app, main
 from reqlica.projects.store import create_project
 
 
 class ConsoleTests(unittest.TestCase):
     def test_health(self):
-        with TestClient(app) as client:
+        with TestClient(create_app()) as client:
             response = client.get("/api/health")
 
         self.assertEqual(response.status_code, 200)
@@ -59,7 +59,7 @@ class DraftConsoleTests(unittest.TestCase):
             patch.dict(os.environ, {"REQLICA_HOME": str(self.directory / "home")})
         )
         self.project = create_project(self.directory / "books")
-        self.client = self.enterContext(TestClient(app))
+        self.client = self.enterContext(TestClient(create_app()))
         self.root = f"/api/projects/{self.project.id}"
         response = self.client.post(self.root + "/drafts")
         self.assertEqual(response.status_code, 200, response.text)

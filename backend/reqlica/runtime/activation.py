@@ -184,6 +184,9 @@ def activate_draft(
                     raise RuntimeError("Worker manager closed during activation")
                 if candidate is not None and not candidate.process.is_alive():
                     raise RuntimeError("Candidate worker exited during activation")
+                from reqlica.projects.schemas import promote_draft_schema
+
+                promote_draft_schema(project, draft_id, version, revision)
                 atomic_write_json(
                     project.directory / "project.json",
                     next_project.model_dump(mode="json", exclude={"directory"}),

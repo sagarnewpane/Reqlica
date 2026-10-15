@@ -1,7 +1,7 @@
 # Roadmap and Design
 
-This document records the intended product direction, not a list of available
-features. See the [README](../README.md) for the current backend and quick start.
+This document records the intended product direction and implementation progress.
+See the [README](../README.md) for the current backend and quick start.
 
 ## Product Direction
 
@@ -22,8 +22,8 @@ The planned workflow is:
 OpenAPI provides routes, schemas, and documented responses, but does not supply
 every business rule. Missing behavior must appear as a proposal for review.
 Once an endpoint is active, requests execute Python directly without another AI
-call. The manual draft/check/approval/activation backend already exists; AI and
-dashboard integration do not.
+call. The draft/check/approval/activation backend and initial AI-facing MCP tools
+already exist; an embedded AI generator and dashboard integration do not.
 
 ## Planned Capabilities
 
@@ -61,27 +61,31 @@ authentication, responses, and logging. Only the SQLite helpers are currently
 implemented. A worker process is not a security sandbox; filesystem, network,
 dependency, and secret-access restrictions need a separate design.
 
-## Planned MCP Tools
+## MCP Tools
 
-MCP tools should call the same project operations as the console API, not duplicate
-their implementation. Proposed tools are:
+The console automatically exposes Streamable HTTP MCP at `/mcp`. Tools call the
+same project operations as the console API, not duplicate their implementation.
+See the [MCP guide](mcp.md) for connection details and the initial workflow.
 
-| Tool | Purpose |
-|---|---|
-| `get_project_context` | Read endpoint definitions, schemas, source, and available helpers. |
-| `create_draft` | Create an editable project version. |
-| `upsert_endpoint` | Add or replace a handler's route definition. |
-| `write_draft_file` | Save source, tests, and eventually migration/seed files. |
-| `remove_endpoint` | Remove a draft route. |
-| `validate_draft` | Check syntax, imports, and route definitions. |
-| `test_draft` | Run tests with separate data. |
-| `call_draft_endpoint` | Make an isolated test request and return results. |
-| `get_draft_changes` | Present changes and check results for review. |
-| `activate_draft` | Publish a tested revision already approved by the user. |
-| `read_project_logs` | Inspect request history and runtime errors. |
+| Tool | Purpose | Status |
+|---|---|---|
+| `get_project_context` | Read routes/source, live SQLite definitions/relationships, draft progress, contract status, project notes, and SDK helpers; supports focused reads. | Implemented |
+| `list_drafts` | Discover and page through existing draft summaries so new sessions can resume appropriate work. | Implemented |
+| `get_api_schema` | Inspect generated revision-linked OpenAPI contracts, with separate draft/published Swagger pages. | Implemented; incomplete contracts currently warn |
+| `create_draft` | Create an editable project version. | Implemented |
+| `upsert_endpoint` | Add or replace a handler's route definition. | Implemented |
+| `write_draft_file` | Save source and tests; migration/seed workflows remain planned. | Implemented |
+| `remove_endpoint` | Remove a draft route. | Implemented |
+| `validate_draft` | Check syntax, imports, and route definitions. | Implemented |
+| `test_draft` | Run tests with separate data. | Implemented |
+| `call_draft_endpoint` | Make an isolated test request and return results. | Implemented |
+| `get_draft_changes` | Present changed file names and check results for review. | Implemented |
+| `activate_draft` | Publish a tested revision already approved by the user. | Planned; use CLI |
+| `read_project_logs` | Inspect request history and runtime errors. | Planned |
 
-Optional project-management tools are `list_projects`, `create_project`,
-`open_project`, `get_project_status`, `start_project`, and `stop_project`.
+`list_projects` is implemented for local metadata discovery. Further proposed
+project-management tools are `create_project`, `open_project`,
+`get_project_status`, `start_project`, and `stop_project`.
 
 AI tools must not expose approval or approve their own output. Approval belongs
 to the exact tested content; edits invalidate it. The current explicit local CLI
@@ -92,7 +96,7 @@ approval is a workflow boundary, not authentication against another local proces
 1. CLI startup, console, project storage, and the shared mock server. Implemented.
 2. A manually written endpoint in its own project worker. Implemented.
 3. Persistent data, drafts, testing, and version activation. Implemented for stable schemas.
-4. AI generation through MCP, starting with one simple endpoint. Next milestone.
+4. AI generation through MCP, starting with one simple endpoint. Initial HTTP tools implemented; broader generation integration remains planned.
 5. Stateful workflows, authentication, failures, rate limits, and inspection.
 6. Reset, export/import, installation instructions, and a working demo.
 
@@ -101,7 +105,7 @@ approval is a workflow boundary, not authentication against another local proces
 - Isolation rules for generated Python, filesystem/network access, and dependencies.
 - Extensions to the existing FastAPI handler format and SQLite SDK for generated code.
 - Database migration/rollback rules when older code needs an older schema.
-- AI model/provider and MCP transport.
+- Embedded AI model/provider; initial MCP uses Streamable HTTP on the console.
 - Dashboard packaging and serving strategy for the existing Next.js scaffold.
 - Supported OpenAPI features and project export format.
 - License and whether supported installation paths require a container runtime.

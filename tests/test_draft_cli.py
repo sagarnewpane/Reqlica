@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from io import StringIO
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import httpx
 from reqlica.cli import main
@@ -190,6 +190,121 @@ class DraftCliTests(unittest.TestCase):
                     self.assertEqual(json.loads(output), payload)
                     self.assertEqual(bool(errors), status != "passed")
 
+    def test_checks_and_calls_resolve_current_revision_without_manual_hash(self):
+        for command, extra in (
+            ("validate", []),
+            ("test", []),
+            ("call", ["POST", "/hello", "--body", '{"name":"Sagar"}']),
+        ):
+            with self.subTest(command=command):
+                self.request.reset_mock()
+                self.request.side_effect = [
+                    httpx.Response(200, json=self.payload),
+                    httpx.Response(
+                        200, json={"status": "passed", "revision": self.revision}
+                    ),
+                ]
+                result, _, errors = self.run_command(
+                    "draft", command, self.project_id, self.draft_id, *extra, "--json"
+                )
+                self.assertEqual((result, errors), (0, ""))
+                root = f"http://127.0.0.1:3000/api/projects/{self.project_id}/drafts/{self.draft_id}"
+                body = {"expected_revision": self.revision}
+                if command == "call":
+                    body.update(
+                        method="POST", path="/hello", json_body={"name": "Sagar"}
+                    )
+                self.assertEqual(
+                    self.request.call_args_list,
+                    [
+                        call("GET", root, trust_env=False, timeout=60.0),
+                        call(
+                            "POST",
+                            root + "/" + command,
+                            json=body,
+                            trust_env=False,
+                            timeout=60.0,
+                        ),
+                    ],
+                )
+
+    def test_automatic_revision_lookup_rejects_errors_and_malformed_replies(self):
+        for response in (
+            httpx.Response(404, json={"detail": "Unknown draft"}),
+            httpx.Response(200, json=[]),
+            httpx.Response(200, json={"revision": "placeholder"}),
+            httpx.Response(200, json={}),
+        ):
+            with self.subTest(response=response):
+                self.request.reset_mock()
+                self.request.return_value = response
+                result, output, errors = self.run_command(
+                    "draft", "test", self.project_id, self.draft_id, "--json"
+                )
+                self.assertEqual((result, output), (1, ""))
+                self.assertTrue(errors)
+                self.assertEqual(self.request.call_count, 1)
+                self.assertEqual(self.request.call_args.args[0], "GET")
+
+    def test_automatic_revision_conflicts_are_not_silently_retried(self):
+        self.request.side_effect = [
+            httpx.Response(200, json=self.payload),
+            httpx.Response(409, json={"detail": "Draft revision conflict"}),
+        ]
+        result, _, errors = self.run_command(
+            "draft", "test", self.project_id, self.draft_id
+        )
+        self.assertEqual(result, 1)
+        self.assertIn("revision conflict", errors)
+        self.assertEqual(self.request.call_count, 2)
+
+    def test_short_references_and_url_command(self):
+        temporary = self.enterContext(tempfile.TemporaryDirectory())
+        self.enterContext(
+            patch.dict(os.environ, {"REQLICA_HOME": str(Path(temporary) / "home")})
+        )
+        project = create_project(Path(temporary) / "todo", "Todo API")
+        draft = drafts.create_draft(project.id)
+        for reference in (project.name, project.id[:8]):
+            with self.subTest(reference=reference):
+                self.request.reset_mock()
+                self.request.side_effect = [
+                    httpx.Response(200, json=draft),
+                    httpx.Response(200, json={"status": "passed"}),
+                ]
+                result, _, errors = self.run_command(
+                    "draft", "test", reference, draft["id"][:8]
+                )
+                self.assertEqual((result, errors), (0, ""))
+                self.assertIn(
+                    f"/{project.id}/drafts/{draft['id']}",
+                    self.request.call_args.args[1],
+                )
+                self.assertEqual(
+                    self.request.call_args.kwargs["json"]["expected_revision"],
+                    draft["revision"],
+                )
+        self.request.reset_mock(side_effect=True)
+        result, output, errors = self.run_command(
+            "draft", "url", project.name, draft["id"][:8], "/hello", "--json"
+        )
+        self.assertEqual((result, errors), (0, ""))
+        payload = json.loads(output)
+        self.assertEqual(payload["kind"], "draft_preview")
+        self.assertTrue(payload["endpoints"][0]["url"].endswith("/preview/hello"))
+        result, output, errors = self.run_command(
+            "draft", "url", project.id[:8], draft["id"][:8], "/hello"
+        )
+        self.assertEqual((result, errors), (0, ""))
+        self.assertTrue(output.startswith("GET http://127.0.0.1:3000/"))
+        create_project(Path(temporary) / "duplicate", "Todo API")
+        result, _, errors = self.run_command(
+            "draft", "test", "Todo API", draft["id"][:8]
+        )
+        self.assertEqual(result, 1)
+        self.assertIn("Ambiguous", errors)
+        self.request.assert_not_called()
+
     def test_activate_uses_configured_mock_gateway_and_sixty_seconds(self):
         payload = {**self.payload, "status": "running", "active_version": "d" * 32}
         self.request.return_value = httpx.Response(200, json=payload)
@@ -269,9 +384,6 @@ class DraftCliTests(unittest.TestCase):
             "delete",
             "upsert",
             "remove",
-            "validate",
-            "test",
-            "call",
             "approve",
             "activate",
         ):

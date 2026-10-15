@@ -10,6 +10,7 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
+from reqlica.runtime.schema_routes import router as schema_router
 from reqlica.runtime.worker import (
     ProjectActivatingError,
     ProjectStoppedError,
@@ -45,6 +46,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Reqlica Mock Server", lifespan=lifespan)
+app.include_router(schema_router)
 
 
 def _filter_proxy_headers(
@@ -143,6 +145,44 @@ def start_project(request: Request, project_id: str) -> dict:
 def stop_project(request: Request, project_id: str) -> dict:
     """Stop this worker and prevent lazy restart until explicitly started again."""
     return _manage_project(request, project_id, "stop")
+
+
+class ProjectDeletion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    delete_files: bool = False
+    expected_directory: str | None = None
+
+
+def _delete_operation(request: Request, project_id: str, body: ProjectDeletion) -> dict:
+    manager = request.app.state.worker_manager
+    try:
+        return manager.delete(project_id, body.delete_files, body.expected_directory)
+    except FileNotFoundError as error:
+        raise HTTPException(404, str(error)) from error
+    except ProjectActivatingError as error:
+        raise HTTPException(503, str(error)) from error
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    except (OSError, RuntimeError) as error:
+        raise HTTPException(502, str(error)) from error
+
+
+@app.get("/api/projects/{project_id}/deletion", tags=["Projects"])
+def project_deletion_info(
+    request: Request, project_id: str, delete_files: bool = False
+) -> dict:
+    try:
+        return request.app.state.worker_manager.deletion_info(project_id, delete_files)
+    except FileNotFoundError as error:
+        raise HTTPException(404, str(error)) from error
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+
+
+@app.delete("/api/projects/{project_id}", tags=["Projects"])
+def delete_project(request: Request, project_id: str, body: ProjectDeletion) -> dict:
+    return _delete_operation(request, project_id, body)
 
 
 class Activation(BaseModel):

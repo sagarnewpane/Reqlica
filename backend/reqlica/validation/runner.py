@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from reqlica.runtime.sdk import configure_database
 from reqlica.runtime.worker import build_app
+from reqlica.validation.openapi import generate_openapi
 
 OUTPUT_LIMIT = 16_384
 RESULT_LIMIT = 65_536
@@ -23,6 +24,10 @@ def run(job: dict) -> dict:
     app = build_app(directory, database=Path(job["database"]))
     with TestClient(app) as client:
         if job["kind"] == "validation":
+            document = generate_openapi(app)
+            Path(job["openapi_result"]).write_text(
+                json.dumps(document, allow_nan=False), encoding="utf-8"
+            )
             return {
                 "status": "passed",
                 "output": "Static checks and application loading passed",
