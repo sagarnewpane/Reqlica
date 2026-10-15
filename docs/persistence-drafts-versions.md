@@ -74,9 +74,10 @@ uv run reqlica draft upsert <project-id> <draft-id> GET /books \
 uv run reqlica draft write <project-id> <draft-id> tests/test_books.py \
   --file /path/to/local/test_books.py --revision <revision-after-upsert> --json
 uv run reqlica draft inspect <project-id> <draft-id> --json
-uv run reqlica draft validate <project-id> <draft-id> --revision <final-revision> --json
-uv run reqlica draft test <project-id> <draft-id> --revision <final-revision> --json
-uv run reqlica draft call <project-id> <draft-id> GET /books --revision <final-revision> --json
+uv run reqlica draft validate <project-id> <draft-id> --json
+uv run reqlica draft test <project-id> <draft-id> --json
+uv run reqlica draft call <project-id> <draft-id> GET /books --json
+uv run reqlica draft url <project-id> <draft-id> /books
 uv run reqlica draft inspect <project-id> <draft-id>
 uv run reqlica draft approve <project-id> <draft-id> --revision <final-revision>
 uv run reqlica draft activate <project-id> <draft-id> --revision <final-revision> --json
@@ -87,7 +88,26 @@ only a manifest changed. Direct edits under `drafts/<draft-id>` are detected by
 the digest on inspection or the next operation; they invalidate stored results
 and approval. Do not reuse an older revision after editing.
 
+Human verification commands (`validate`, `test`, `call`, and `url`) also accept
+an exact project name or unique project ID prefix and a unique draft ID prefix
+(at least six characters). `--revision` is optional for CLI checks/calls: the CLI
+inspects once, sends the real revision, and still rejects concurrent edits. Set
+it explicitly to pin a reviewed revision. No short references or automatic
+revision selection are added to authoring mutations, approval, or activation.
+
+`draft url` prints disposable preview URLs usable in a browser, curl, or Postman.
+The URL uses the current draft when requested, not the revision at URL creation.
+It returns bounded JSON/text diagnostics, accepts JSON bodies up to 1 MiB, and
+does not forward custom request headers or cookie sessions. See the
+[MCP convenience guide](mcp.md#convenience-tools-not-required-by-the-core-workflow).
+
 `validate` performs static checks and application loading in a disposable runner.
+It also generates revision-linked OpenAPI artifacts outside editable code. The
+returned `schema` summary reports incomplete-contract warnings without inventing
+input fields. These warnings do not introduce a new publication gate; generation
+failures do fail validation. Read contracts through MCP `get_api_schema` or the
+draft's `/openapi.json` and `/docs` URLs. Edits require revalidation; schema reads
+never rerun code or clear valid approval. See [API schemas](api-schemas.md).
 `test` discovers `test*.py` under the draft's `tests/` directory and must run at
 least one genuinely passing test (`tests_passed`); skipped tests and expected
 failures do not count. Both results must have `status: passed` and the exact
@@ -166,11 +186,17 @@ The console's base prefix is `/api/projects/{project_id}`:
 | `POST` | `/drafts/{draft_id}/validate` | Body `{expected_revision}`; return check result. |
 | `POST` | `/drafts/{draft_id}/test` | Body `{expected_revision}`; return test result. |
 | `POST` | `/drafts/{draft_id}/call` | Body `{expected_revision, method, path, json_body?}`; return runner result. |
+| Any supported endpoint method | `/drafts/{draft_id}/preview/{path}` | Optional JSON body and query string; resolve current revision and return the draft HTTP response using disposable data. |
+| `GET` | `/drafts/{draft_id}/openapi.json` | Saved current validated OpenAPI, with Swagger requests directed to draft previews. |
+| `GET` | `/drafts/{draft_id}/docs` | Draft Swagger with revision-pinned preview requests. |
 | `POST` | `/activate` | Body `{draft_id, expected_revision}`; forward to gateway. |
 | `POST` | `/convert` | Forward legacy conversion to gateway. |
 
-No `/approve` route exists. All mutations/checks require `expected_revision`,
-except draft creation and legacy conversion. CLI `--revision` maps to this field.
+No `/approve` route exists. The explicit management mutations/checks require
+`expected_revision`, except draft creation and legacy conversion. Preview URLs
+resolve the current revision automatically and never count as validation/tests.
+CLI `--revision` maps to `expected_revision`; for CLI checks/calls only, omission
+fetches the current revision first. Core MCP edit/check tools remain explicit.
 Unknown projects/drafts/files return `404`, domain conflicts return `409`, invalid
 request bodies return `422`, and gateway startup/connection failures return `502`.
 Checks can return HTTP `200` with `failed`, `error`, or `timeout` status; inspect

@@ -13,7 +13,12 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from reqlica.projects import drafts
+from reqlica.projects.references import (
+    resolve_draft_reference,
+    resolve_project_reference,
+)
 from reqlica.projects.store import create_project
+from reqlica.projects.urls import get_draft_urls
 
 
 def main() -> int:
@@ -35,6 +40,23 @@ def main() -> int:
     )
     listing.add_argument(
         "--json", action="store_true", help="Print the API JSON payload"
+    )
+    deletion = project_commands.add_parser(
+        "delete", help="Stop and unregister a project; keep its files unless requested"
+    )
+    deletion.add_argument(
+        "project", help="Project name, full ID, or unique 6+ character ID prefix"
+    )
+    deletion.add_argument(
+        "--delete-files",
+        action="store_true",
+        help="Permanently delete the project folder, database, and drafts",
+    )
+    deletion.add_argument(
+        "--yes", action="store_true", help="Confirm without prompting"
+    )
+    deletion.add_argument(
+        "--json", action="store_true", help="Print the deletion result as JSON"
     )
     for command, help_text in (
         ("endpoints", "Show a project's endpoints"),
@@ -62,6 +84,7 @@ def main() -> int:
         "validate",
         "test",
         "call",
+        "url",
         "approve",
         "activate",
     ):
@@ -69,8 +92,23 @@ def main() -> int:
         command_parser.add_argument("project_id")
         if command not in {"create", "list"}:
             command_parser.add_argument("draft_id")
-        if command not in {"create", "list", "inspect"}:
-            command_parser.add_argument("--revision", required=True)
+        if command not in {"create", "list", "inspect", "url"}:
+            command_parser.add_argument(
+                "--revision",
+                required=command not in {"validate", "test", "call"},
+                help="Exact revision; checks/calls inspect the current revision if omitted",
+            )
+        if command in {"validate", "test", "call", "url"}:
+            command_parser.description = (
+                "Accepts a project name or unique ID prefix (6+ characters), "
+                "and a full draft ID or unique draft prefix (6+ characters)."
+            )
+        if command == "url":
+            command_parser.add_argument(
+                "path",
+                nargs="?",
+                help="Registered route pattern; omit to list all URLs",
+            )
         if command in {"write", "delete"}:
             command_parser.add_argument("path", help="Draft-relative file path")
         if command == "write":
@@ -96,6 +134,8 @@ def main() -> int:
     if args.command == "project":
         if args.project_command == "create":
             return _create_project(args.directory, args.name)
+        if args.project_command == "delete":
+            return _delete_project(args)
         return _manage_project(args)
     if args.command == "draft":
         return _manage_draft(args)
@@ -123,6 +163,14 @@ def _console_base_url() -> str:
 
 def _manage_draft(args: argparse.Namespace) -> int:
     command = args.draft_command
+    if command in {"validate", "test", "call", "url"}:
+        load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+        try:
+            args.project_id = resolve_project_reference(args.project_id)
+            args.draft_id = resolve_draft_reference(args.project_id, args.draft_id)
+        except (OSError, ValueError) as error:
+            print(f"Could not resolve draft: {error}", file=sys.stderr)
+            return 1
     for field, length in (("project_id", 32), ("draft_id", 32), ("revision", 64)):
         value = getattr(args, field, None)
         if value is not None and not re.fullmatch(rf"[0-9a-f]{{{length}}}", value):
@@ -132,7 +180,11 @@ def _manage_draft(args: argparse.Namespace) -> int:
             )
             return 1
     try:
-        if command == "approve":
+        if command == "url":
+            payload = get_draft_urls(
+                args.project_id, args.draft_id, _console_base_url(), args.path
+            )
+        elif command == "approve":
             # This intentionally has no HTTP equivalent or agent-facing operation.
             load_dotenv(Path(__file__).resolve().parents[2] / ".env")
             state = drafts.inspect_draft(args.project_id, args.draft_id)
@@ -179,6 +231,10 @@ def _manage_draft(args: argparse.Namespace) -> int:
             if command not in {"create", "list"}:
                 route += f"/{args.draft_id}"
             if command not in {"create", "list", "inspect"}:
+                if command in {"validate", "test", "call"} and args.revision is None:
+                    args.revision = _current_draft_revision(
+                        args.project_id, args.draft_id
+                    )
                 body = {"expected_revision": args.revision}
                 if command in {"write", "delete"}:
                     route += "/files"
@@ -235,6 +291,10 @@ def _manage_draft(args: argparse.Namespace) -> int:
     except (OSError, ValueError, httpx.HTTPError, httpx.InvalidURL) as error:
         print(f"Could not {command} draft: {error}", file=sys.stderr)
         return 1
+    if command == "url" and not args.json:
+        for endpoint in payload["endpoints"]:
+            print(f"{endpoint['method']} {endpoint['url']}")
+        return 0
     if not args.json:
         print(f"Draft {command}:")
     print(json.dumps(payload, indent=2))
@@ -245,6 +305,25 @@ def _manage_draft(args: argparse.Namespace) -> int:
         )
         return 1
     return 0
+
+
+def _current_draft_revision(project_id: str, draft_id: str) -> str:
+    """Resolve once, then pass the exact hash to preserve normal conflict checks."""
+    response = httpx.request(
+        "GET",
+        f"{_console_base_url()}/api/projects/{project_id}/drafts/{draft_id}",
+        trust_env=False,
+        timeout=60.0,
+    )
+    if not response.is_success:
+        raise ValueError(
+            f"Could not inspect draft ({response.status_code}): {response.text}"
+        )
+    state = response.json()
+    revision = state.get("revision") if isinstance(state, dict) else None
+    if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{64}", revision):
+        raise ValueError("Malformed draft reply: expected a 64-character revision")
+    return revision
 
 
 def _create_project(directory: Path, name: str | None) -> int:
@@ -258,6 +337,114 @@ def _create_project(directory: Path, name: str | None) -> int:
     print(f"Created {project.name} ({project.id}) at {project.directory}")
     print(f"Mock endpoint: {base_url}/mock/{project.id}/hello")
     print("Run 'reqlica start' to serve it, or call it if Reqlica is already running.")
+    return 0
+
+
+def _deletion_request(method: str, url: str, **options) -> dict:
+    response = httpx.request(method, url, trust_env=False, timeout=60.0, **options)
+    try:
+        payload = response.json()
+    except ValueError as error:
+        raise ValueError(
+            f"Gateway returned non-JSON ({response.status_code})"
+        ) from error
+    if not response.is_success:
+        detail = (
+            payload.get("detail", payload) if isinstance(payload, dict) else payload
+        )
+        raise ValueError(f"Gateway error ({response.status_code}): {detail}")
+    if not isinstance(payload, dict):
+        raise TypeError("Malformed deletion reply: expected a JSON object")
+    return payload
+
+
+def _delete_project(args: argparse.Namespace) -> int:
+    """Require gateway-owned cleanup; never silently fall back to offline deletion."""
+    try:
+        base = _mock_base_url() + "/api/projects"
+        project_id = args.project
+        if not re.fullmatch(r"[0-9a-f]{32}", project_id):
+            listing = _deletion_request("GET", base).get("projects")
+            if not isinstance(listing, list) or any(
+                not isinstance(item, dict) for item in listing
+            ):
+                raise ValueError("Malformed project listing")
+            matches = {
+                item["id"]
+                for item in listing
+                if isinstance(item.get("id"), str)
+                and re.fullmatch(r"[0-9a-f]{32}", item["id"])
+                and (
+                    isinstance(item.get("name"), str)
+                    and item["name"].casefold() == args.project.casefold()
+                    or re.fullmatch(r"[0-9a-f]{6,31}", args.project)
+                    and item["id"].startswith(args.project)
+                )
+            }
+            if len(matches) != 1:
+                raise ValueError(
+                    "Unknown or ambiguous project; use its full ID or a longer unique prefix"
+                )
+            project_id = matches.pop()
+        route = base + "/" + project_id
+        info = _deletion_request(
+            "GET", route + "/deletion", params={"delete_files": args.delete_files}
+        )
+        if info.get("id") != project_id or not isinstance(info.get("registered"), bool):
+            raise ValueError("Malformed deletion info")
+        directory = info.get("directory")
+        if args.delete_files and (
+            not isinstance(directory, str) or not Path(directory).is_absolute()
+        ):
+            raise ValueError(
+                "Gateway did not return a confirmed absolute project directory"
+            )
+        if not args.yes:
+            print(json.dumps(info, indent=2), file=sys.stderr)
+            action = (
+                "Permanently delete the folder and all project data"
+                if args.delete_files
+                else "Unregister the project and keep its files"
+            )
+            print(f"{action}? [y/N] ", end="", file=sys.stderr, flush=True)
+            try:
+                accepted = input().strip().lower() in {"y", "yes"}
+            except EOFError:
+                accepted = False
+            if not accepted:
+                print("Deletion declined; no changes made.", file=sys.stderr)
+                return 1
+        payload = _deletion_request(
+            "DELETE",
+            route,
+            json={
+                "delete_files": args.delete_files,
+                "expected_directory": directory if args.delete_files else None,
+            },
+        )
+        if (
+            payload.get("id") != project_id
+            or payload.get("status") != "deleted"
+            or payload.get("files_deleted") is not args.delete_files
+        ):
+            raise ValueError(
+                "Malformed deletion result; inspect project state before retrying"
+            )
+    except (OSError, ValueError, TypeError, httpx.HTTPError, httpx.InvalidURL) as error:
+        print(
+            f"Could not delete project: {error}. Ensure 'reqlica start' is running with the current code.",
+            file=sys.stderr,
+        )
+        return 1
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        action = (
+            "Deleted project files and registration"
+            if args.delete_files
+            else "Unregistered project (files kept)"
+        )
+        print(f"{action}: {payload.get('name') or project_id} ({project_id})")
     return 0
 
 

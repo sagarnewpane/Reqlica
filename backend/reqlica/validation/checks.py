@@ -20,6 +20,7 @@ from reqlica.projects.versions import (
     snapshot_code,
 )
 from reqlica.runtime.sdk import backup_database
+from reqlica.validation.openapi import OPENAPI_LIMIT
 
 CHECK_TIMEOUT = 10.0
 OUTPUT_LIMIT = 16_384
@@ -168,6 +169,7 @@ def _check(
                     "kind": kind,
                     "directory": str(snapshot),
                     "database": str(database),
+                    "openapi_result": str(workspace / "openapi.json"),
                     **request,
                 },
                 workspace,
@@ -195,6 +197,25 @@ def _check(
                     "Draft changed during execution; result was not stored"
                 )
             if kind in {"validation", "test"}:
+                if kind == "validation" and result["status"] == "passed":
+                    try:
+                        from reqlica.projects.schemas import store_draft_schema
+
+                        schema_path = _contained(workspace, "openapi.json")
+                        if schema_path.stat().st_size > OPENAPI_LIMIT:
+                            raise ValueError("Generated OpenAPI exceeds its size limit")
+                        document = json.loads(schema_path.read_text(encoding="utf-8"))
+                        result["schema"] = store_draft_schema(
+                            project, draft_id, revision, document
+                        )
+                    except (OSError, ValueError, TypeError) as error:
+                        result.update(
+                            status="error",
+                            output=(
+                                result["output"]
+                                + f"\nOpenAPI generation/storage failed: {error}"
+                            )[:OUTPUT_LIMIT],
+                        )
                 state[kind] = result
                 state["approval"] = None
                 atomic_write_json(_state_path(project, draft_id), state)

@@ -366,9 +366,7 @@ with connection() as database:
         revision = state["revision"]
         self.assertEqual(starter.read_text(encoding="utf-8"), starter_source)
         for command in ("test", "validate"):
-            checked = self.cli(
-                "draft", command, project_id, draft_id, "--revision", revision
-            )
+            checked = self.cli("draft", command, project_id[:8], draft_id[:8])
             self.assertEqual(checked["status"], "passed", str(checked)[:LOG_LIMIT])
             self.assertEqual(checked["revision"], revision)
             if command == "test":
@@ -388,8 +386,6 @@ with connection() as database:
             "/records",
             "--body",
             json.dumps({"value": "draft-only"}),
-            "--revision",
-            revision,
         )
         self.assertEqual(called["status"], "passed", str(called)[:LOG_LIMIT])
         self.assertEqual(called["status_code"], 200)
@@ -408,6 +404,12 @@ with connection() as database:
         )
         self.assertEqual(called["status_code"], 200)
         self.assertEqual(called["body"], baseline)
+        self.assertEqual(self.live_rows(primary), baseline)
+        preview = self.cli("draft", "url", project_id[:8], draft_id[:8], "/records")
+        preview_url = preview["endpoints"][0]["url"]
+        response = self.request("GET", preview_url)
+        self.assertEqual(response.json(), baseline)
+        self.assertEqual(response.headers["x-reqlica-draft-revision"], revision)
         self.assertEqual(self.live_rows(primary), baseline)
         self.assertEqual(self.request("GET", base + "/hello").json(), hello)
         self.request("GET", base + "/records", status=404)
@@ -501,6 +503,19 @@ with connection() as database:
         self.assertEqual(
             self.request("GET", other_base + "/records").json(), other_saved
         )
+
+        unregistered = self.cli("project", "delete", other_id[:8], "--yes")
+        self.assertFalse(unregistered["files_deleted"])
+        self.assertTrue(secondary.exists())
+        self.assertEqual(self.cli("project", "list")["projects"][0]["id"], project_id)
+        self.assertEqual(self.request("GET", base + "/hello").json(), hello)
+        deleted = self.cli("project", "delete", project_id, "--delete-files", "--yes")
+        self.assertTrue(deleted["files_deleted"])
+        self.assertFalse(primary.exists())
+        self.assertTrue(secondary.exists())
+        self.assertEqual(self.cli("project", "list")["projects"], [])
+        self.request("GET", base + "/hello", status=404)
+        self.request("GET", other_base + "/hello", status=404)
 
 
 if __name__ == "__main__":

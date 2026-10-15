@@ -31,16 +31,7 @@ def draft_operation(operation: Callable, *args, **kwargs):
 
 
 def list_drafts(project_id: str) -> dict:
-    project = get_project(project_id)
-    with project_lock(project.directory):
-        state_directory = drafts._contained(project.directory, ".reqlica/drafts")
-        return {
-            "drafts": [
-                drafts.inspect_draft(project_id, path.stem)
-                for path in sorted(state_directory.glob("*.json"))
-                if re.fullmatch(r"[0-9a-f]{32}", path.stem)
-            ]
-        }
+    return drafts.list_drafts(project_id)
 
 
 def read_draft_file(project_id: str, draft_id: str, path: str) -> dict:

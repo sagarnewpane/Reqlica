@@ -10,9 +10,10 @@ then review, test, and publish them without waiting for a production backend.
 
 The backend supports manually written FastAPI handlers, independent project
 workers, persistent SQLite data, and a draft/test/approval/version workflow through
-the CLI and management APIs.
+the CLI and management APIs. AI clients can now create and check endpoint drafts
+through the console's built-in HTTP MCP server.
 
-AI/MCP generation, the dashboard, database migrations, reset, and import/export
+An embedded AI generator, the dashboard, database migrations, reset, and import/export
 are not implemented yet. See the [roadmap](docs/roadmap.md) for planned work.
 
 ## Quick Start
@@ -29,6 +30,7 @@ Default addresses:
 
 - Console management API: `http://127.0.0.1:3000`
 - Mock gateway: `http://127.0.0.1:4000`
+- MCP for AI clients (Streamable HTTP): `http://127.0.0.1:3000/mcp`
 - Interactive API reference: `/docs` on either server
 
 Override hosts, ports, or `REQLICA_HOME` in the root `.env` or environment.
@@ -53,6 +55,17 @@ uv run reqlica project stop <project-id>
 uv run reqlica project start <project-id>
 ```
 
+Remove a project through the running gateway (confirmation required):
+
+```bash
+uv run reqlica project delete "Book API"                # Unregister; keep files/data
+uv run reqlica project delete <project-id> --delete-files # Also erase the project folder
+```
+
+Names and unique ID prefixes of six or more characters work. Add `--yes` to
+confirm non-interactively. Deletion stops the worker and clears registry/runtime
+state without restarting Reqlica; `project stop` alone does not remove a project.
+
 ## Change an API
 
 Create a draft rather than editing published versions:
@@ -61,6 +74,23 @@ Create a draft rather than editing published versions:
 uv run reqlica draft create <project-id> --json
 uv run reqlica draft inspect <project-id> <draft-id>
 ```
+
+For human checks, use a project name or unique ID prefix and a draft ID prefix
+(six or more characters), without copying a revision hash:
+
+```bash
+uv run reqlica draft validate "Book API" <draft-prefix>
+uv run reqlica draft test "Book API" <draft-prefix>
+uv run reqlica draft url "Book API" <draft-prefix> /hello
+```
+
+The URL previews current draft code using disposable data. `draft call` also
+resolves the revision automatically; explicit `--revision` is still supported.
+
+Validation also saves revision-linked OpenAPI. Ask MCP's `get_api_schema` for
+request/response formats, or `get_draft_urls` for Swagger and JSON links. See the
+[API schema guide](docs/api-schemas.md); unknown/free-form contracts produce warnings
+rather than guessed payloads.
 
 Edit draft files/routes, validate and test the exact revision, then explicitly
 approve and activate it. Draft checks use disposable database copies and do not
@@ -77,6 +107,8 @@ uv run python -m unittest discover -s tests
 
 - [Development guide](docs/development.md): configuration, troubleshooting, project APIs, and code layout.
 - [Drafts and versions](docs/persistence-drafts-versions.md): editing, checks, approval, persistence, and activation.
+- [MCP tools](docs/mcp.md): connect an AI client and generate endpoint drafts.
+- [API schemas](docs/api-schemas.md): generated contracts and draft/published Swagger docs.
 - [Roadmap and design](docs/roadmap.md): planned features, MCP tools, and development order.
 
 **Local trusted use only:** management APIs are unauthenticated. Keep servers on

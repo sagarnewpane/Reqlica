@@ -13,7 +13,7 @@ uv run reqlica start
 
 The current backend uses FastAPI, Pydantic, and SQLite. The frontend directory
 contains a Next.js scaffold, not a working dashboard. The console currently
-serves management APIs only; bundled static frontend installation is planned.
+serves management APIs and HTTP MCP; bundled static frontend installation is planned.
 
 ## Configuration
 
@@ -39,7 +39,8 @@ Browser CORS configuration is not implemented.
 
 ## Startup and Debugging
 
-`reqlica start` launches the console and shared mock gateway. Each project worker
+`reqlica start` launches the console (including MCP at `/mcp`) and shared mock
+gateway. Each project worker
 starts on demand or through an explicit project start command. `Ctrl+C` shuts down
 the servers and workers without deleting project files or data. If either server
 exits unexpectedly, the CLI stops the other server and exits with an error.
@@ -109,6 +110,43 @@ Stopping is idempotent and keeps files/data. Restarting the gateway resets its
 session-only stopped state. Discovery does not start workers and reports broken
 registry entries as error projects rather than hiding them.
 
+### Remove a Project
+
+```bash
+# Default: stop the worker, unregister, and clear runtime caches. Keep files/data.
+uv run reqlica project delete "Book API"
+
+# Explicit irreversible deletion of the folder, versions, drafts, and database.
+uv run reqlica project delete <project-id> --delete-files
+
+# For deliberate scripted cleanup; output stays machine-readable.
+uv run reqlica project delete <project-id> --delete-files --yes --json
+```
+
+The command accepts exact names (case-insensitive), full IDs, or unique ID prefixes
+of at least six characters. Ambiguous references fail. It displays the exact ID,
+directory, and deletion mode before confirmation; `n`, an empty answer, or EOF
+declines without stopping/removing anything. `--yes` explicitly skips the prompt.
+
+The gateway must be running with current code. The command never falls back to
+offline filesystem deletion. It rejects new requests, allows existing gateway
+requests to finish (bounded by five seconds), stops the worker, removes the
+registration, and clears stopped/error/request caches. No restart is needed to
+remove deleted projects from discovery. Other workers remain running.
+
+Permanent file deletion checks project identity, the confirmed directory, project
+and database locks, and protected/shared/nested paths. Root/metadata symlinks,
+identity mismatches, and missing/corrupt metadata cannot authorize file deletion.
+Child symlinks are not followed. If another registration references the same or an
+overlapping directory, unregister that alias/nested registration first, without
+`--delete-files`. The default unregister-only mode can clean stale/broken entries
+and cached stopped entries even when their project files no longer exist.
+
+Deletion is irreversible and not a filesystem transaction. I/O failures are
+reported, retain the registry entry when possible, and leave a stopped project
+rather than automatically restarting partially deleted code. Inspect the reported
+state before retrying. No destructive MCP deletion tool is exposed.
+
 The gateway's management routes are:
 
 | Method | Route | Result |
@@ -120,12 +158,22 @@ The gateway's management routes are:
 | `POST` | `/api/projects/{id}/stop` | Stop and disable lazy restart. |
 | `POST` | `/api/projects/{id}/convert` | Convert an idle/stopped legacy project. |
 | `POST` | `/api/projects/{id}/activate` | Publish an approved `{draft_id, expected_revision}`. |
+| `GET` | `/api/projects/{id}/deletion?delete_files=false` | Inspect identity/directory and validate the requested deletion mode. |
+| `DELETE` | `/api/projects/{id}` | Body `{delete_files: false}` unregisters and clears runtime state. To erase files, use `{delete_files: true, expected_directory: "<confirmed absolute directory>"}`. |
+| `GET` | `/api/projects/{id}/openapi.json` | Generated contract of the active published version, if available after validated activation. |
+| `GET` | `/api/projects/{id}/docs` | Published Swagger; requests use persistent live data. |
 
 Project payloads include `id`, `name`, `directory`, `status`, `pid`, `error`, `url`,
 `endpoints`, and `active_version`. Endpoints include `method`, `path`, `handler`,
 and a full `url`. Unknown IDs return `404`, malformed stored files normally return
 `422`, and worker failures return `502`. Conversion/activation conflicts return
 `409`; activation temporarily rejects new project requests with `503`.
+
+Deletion returns `id`, `name`, `directory`, `status: "deleted"`, `unregistered`, and
+`files_deleted`. It does not use the standard running-project payload. Unknown IDs
+return `404`; unsafe/changed targets return `409`; busy lifecycle operations return
+`503`; worker/drain/filesystem failures return `502`. Like other management routes,
+the API is unauthenticated and intended for trusted loopback use only.
 
 An unexpected management-route `404` can mean the gateway is running older code;
 restart it. See the [draft and version guide](persistence-drafts-versions.md) for
@@ -141,11 +189,13 @@ backend/reqlica/
   runtime/      # Gateway, workers, activation, and database SDK
   validation/   # Static checks and disposable execution
   generation/   # Planned AI integration
-  mcp/          # Planned MCP integration
+  mcp/          # AI-facing Streamable HTTP tools, mounted by the console
 frontend/       # Dashboard scaffold
 tests/          # Backend tests
 docs/           # Usage and design references
 ```
+
+See [MCP tools](mcp.md) for AI client connection and endpoint draft generation.
 
 Run the backend suite with:
 

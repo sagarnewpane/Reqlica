@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
@@ -123,6 +124,135 @@ def inspect_draft(project_id: str, draft_id: str) -> dict:
     with project_lock(project.directory):
         project = get_project(project_id)
         return _inspect(project, draft_id, _state(project, draft_id))
+
+
+def _draft_summary(project: Project, state: dict, updated_at: float) -> dict:
+    current = state["base_version"] == project.active_version
+
+    def check(name: str) -> dict | None:
+        result = state.get(name)
+        if not result:
+            return None
+        if not isinstance(result, dict):
+            raise TypeError("Invalid draft check metadata")
+        compact = {
+            key: result[key]
+            for key in ("status", "revision", "tests_run", "tests_passed")
+            if key in result
+        }
+        if isinstance(result.get("schema"), dict):
+            compact["schema"] = {
+                key: result["schema"][key]
+                for key in ("status", "warning_count", "artifact")
+                if key in result["schema"]
+            }
+        return compact
+
+    validation, test = check("validation"), check("test")
+    passed = (
+        all(
+            result
+            and result.get("status") == "passed"
+            and result.get("revision") == state["revision"]
+            for result in (validation, test)
+        )
+        and test.get("tests_passed", 0) > 0
+    )
+    approval = state.get("approval")
+    if approval is not None and not isinstance(approval, dict):
+        raise ValueError("Invalid draft approval metadata")
+    approved = passed and (approval or {}).get("revision") == state["revision"]
+    failed = any(
+        result and result.get("status") in {"failed", "error", "timeout"}
+        for result in (validation, test)
+    )
+    stale_checks = any(
+        result and result.get("revision") != state["revision"]
+        for result in (validation, test)
+    )
+    if not current:
+        progress = "stale_base"
+    elif approved:
+        progress = "approved"
+    elif passed:
+        progress = "ready_for_review"
+    elif stale_checks:
+        progress = "checks_stale"
+    elif failed:
+        progress = "checks_failed"
+    elif validation and validation.get("status") == "passed":
+        progress = "validated"
+    else:
+        progress = "editing"
+    return {
+        "id": state["id"],
+        "revision": state["revision"],
+        "base_version": state["base_version"],
+        "base_is_current": current,
+        "progress": progress,
+        "eligible_for_activation": bool(current and approved),
+        "state_updated_at": datetime.fromtimestamp(updated_at, UTC).isoformat(),
+        "file_count": len(state["files"]),
+        "changes": state["changes"],
+        "validation": validation,
+        "test": test,
+        "approval": state.get("approval"),
+        "error": None,
+    }
+
+
+def list_drafts(
+    project_id: str, *, summary: bool = False, limit: int | None = None, offset: int = 0
+) -> dict:
+    """Discover saved drafts, including unreadable entries, without executing code.
+
+    Full mode preserves the console/CLI response. Summary mode omits runner logs
+    and pages by saved-state modification time; time is not evidence of task intent.
+    """
+    if offset < 0 or limit is not None and not 1 <= limit <= 100:
+        raise ValueError("Draft limit must be 1..100 and offset must be nonnegative")
+    project = get_project(project_id)
+    with project_lock(project.directory):
+        project = get_project(project_id)
+        directory = _contained(project.directory, ".reqlica/drafts")
+        paths = [
+            path
+            for path in directory.glob("*.json")
+            if re.fullmatch(r"[0-9a-f]{32}", path.stem)
+        ]
+        times = {}
+        for path in paths:
+            try:
+                times[path.stem] = path.lstat().st_mtime
+            except OSError:
+                times[path.stem] = 0.0
+        paths.sort(
+            key=lambda path: (-times[path.stem], path.stem) if summary else path.stem
+        )
+        total = len(paths)
+        selected = paths[offset : None if limit is None else offset + limit]
+        result = []
+        for path in selected:
+            try:
+                state = inspect_draft(project_id, path.stem)
+                updated = path.lstat().st_mtime
+                result.append(
+                    _draft_summary(project, state, updated) if summary else state
+                )
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                result.append(
+                    {"id": path.stem, "error": str(error), "progress": "unreadable"}
+                )
+        payload = {"drafts": result}
+        if summary or limit is not None or offset:
+            next_offset = offset + len(selected)
+            payload.update(
+                total=total,
+                offset=offset,
+                limit=limit,
+                next_offset=next_offset if next_offset < total else None,
+            )
+        return payload
 
 
 def _editable_path(directory: Path, path: str) -> Path:
