@@ -13,3 +13,26 @@ body {
 body {
   min-height: 100vh;
 }
+
+.component-test {
+  padding: 20px;
+}
+
+.component-test__input {
+  width: 300px;
+  margin-top: 20px;
+}
+
+.component-test__button {
+  margin-top: 20px;
+}
+
+.component-test__card {
+  max-width: 400px;
+  margin-top: 30px;
+}
+
+.component-test__select {
+  width: 300px;
+  margin-top: 20px;
+}
