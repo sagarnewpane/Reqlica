@@ -1,0 +1,1231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Local Reqlica dashboard with live project APIs, single-turn Groq endpoint generation, and draft review.">
+<title>Reqlica — Local workspace</title>
+<style>
+:root{color-scheme:dark;--workspace:#0f172a;--panel:#182236;--inset:#101a2d;--ink:#f1f5f9;--secondary:#cbd5e1;--muted:#9baec5;--line:#33435b;--control-line:#667a93;--request:#4ade80;--request-soft:#193a32;--on-request:#10241a;--draft:#f3d181;--draft-soft:#3a3020;--error:#ffaaaa;--error-soft:#442b33;--terminal:#0c1322;--terminal-ink:#d6e4f5;--focus:#a7f3d0;--radius:10px;--mono:'JetBrains Mono','SFMono-Regular',Consolas,monospace;--sans:'IBM Plex Sans','Avenir Next',Avenir,'Segoe UI',sans-serif}
+:root[data-theme=light]{color-scheme:light;--workspace:#f5f7fa;--panel:#fff;--inset:#f0f3f8;--ink:#19273a;--secondary:#43546b;--muted:#53657d;--line:#d7dfe9;--control-line:#7b8ca2;--request:#167244;--request-soft:#e6f4ed;--on-request:#fff;--draft:#805a13;--draft-soft:#fff5de;--error:#a62e40;--error-soft:#fff0f2;--focus:#167244}
+*{box-sizing:border-box}body{margin:0;background:var(--workspace);color:var(--ink);font:15px/1.6 var(--sans);-webkit-font-smoothing:antialiased}button,input,textarea,select{font:inherit}button,a,input,textarea,select{touch-action:manipulation}button{cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--focus);outline-offset:3px}[hidden]{display:none!important}h1,h2,h3,p{margin:0}h1{font:600 30px/1.3 var(--mono);letter-spacing:-1px}h2{font-size:21px;letter-spacing:-.5px}h3{font-size:16px}p{color:var(--secondary)}code,pre,.mono{font-family:var(--mono);font-size:13px}code{overflow-wrap:anywhere}a{color:var(--request)}.muted,.help{color:var(--muted)}.small,.help{font-size:13px}.help{margin-top:8px}.eyebrow{font-size:11px;letter-spacing:1px;font-weight:650;text-transform:uppercase;color:var(--muted)}.app{display:grid;grid-template-columns:224px minmax(0,1fr);min-height:100dvh}.app.selecting-project{grid-template-columns:1fr}.selecting-project .sidebar{display:none}.sidebar{position:sticky;top:0;height:100dvh;border-right:1px solid var(--line);padding:28px 16px;display:flex;flex-direction:column;gap:32px}.brand{font:600 25px var(--mono);letter-spacing:-1px}.brand span{color:var(--request)}.nav{display:grid;gap:4px;margin-top:12px}.nav button{display:flex;align-items:center;gap:12px;background:none;border:0;border-radius:6px;color:var(--secondary);padding:12px;text-align:left;min-height:44px}.nav button:hover,.nav button.active{background:var(--request-soft);color:var(--request)}.side-bottom{margin-top:auto;font-size:12px;color:var(--muted)}main{min-width:0}.topbar{padding:16px 32px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;min-height:76px}.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.content{max-width:1600px;margin:auto;padding:32px}.selecting-project .content{max-width:1280px;padding-top:48px}.page-head,.view-title{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:24px}.page-head p,.view-title p{margin-top:8px}.btn{display:inline-flex;gap:8px;align-items:center;justify-content:center;padding:9px 14px;min-height:44px;border:1px solid var(--control-line);border-radius:6px;color:var(--ink);background:var(--panel);font-size:13px;font-weight:600;text-decoration:none}.btn:hover:not(:disabled){background:var(--inset)}.btn.primary{color:var(--on-request);background:var(--request);border-color:var(--request)}.btn.ghost{border-color:transparent;background:transparent}.btn.danger{color:var(--error);border-color:var(--error)}.badge{display:inline-flex;gap:8px;align-items:center;border-radius:5px;padding:4px 9px;font-size:11px;letter-spacing:.3px;background:var(--request-soft);color:var(--request);font-weight:650;white-space:nowrap}.badge.neutral{color:var(--muted);background:var(--inset)}.badge.draft{color:var(--draft);background:var(--draft-soft)}.badge.error{color:var(--error);background:var(--error-soft)}.dot{height:6px;width:6px;border-radius:50%;background:currentColor}.panel{border:1px solid var(--line);background:var(--panel);border-radius:var(--radius);overflow:hidden}.panel-head,.panel-body{padding:24px}.panel-head{display:flex;gap:16px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);flex-wrap:wrap}.panel-head h2{font-size:16px}.panel-foot{padding:16px 24px;border-top:1px solid var(--line);display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}.project-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}.project-card{padding:24px;display:flex;flex-direction:column;gap:20px;min-width:0}.project-card h3{font-size:19px}.project-card .folder{color:var(--muted);flex:1}.project-symbol{color:var(--request);font:600 24px var(--mono)}.connection{display:flex;gap:16px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);padding:12px 16px;border-radius:8px;margin-bottom:24px}.connection code{flex:1}.notice{padding:16px 20px;border:1px solid var(--line);border-radius:8px;margin-bottom:24px;background:var(--inset);overflow-wrap:anywhere}.notice.error{color:var(--error);background:var(--error-soft);border-color:var(--error)}.notice.draft{color:var(--draft);background:var(--draft-soft)}.notice p{color:inherit}.empty{padding:48px 24px;text-align:center;grid-column:1/-1}.empty p{max-width:65ch;margin:8px auto 20px}.layout-two{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:24px}.workbench{display:grid;grid-template-columns:260px minmax(0,1fr);gap:24px}.route-list{padding:8px;display:grid;gap:4px;align-content:start;max-height:600px;overflow:auto}.route{display:flex;gap:12px;align-items:center;padding:12px;border:0;border-radius:6px;background:transparent;color:var(--secondary);text-align:left;min-height:44px;min-width:0}.route code{overflow-wrap:anywhere}.route.active,.route:hover{background:var(--request-soft);color:var(--ink)}.method{font:600 11px var(--mono);color:var(--request);min-width:48px}.method.POST{color:var(--draft)}.method.DELETE{color:var(--error)}.method.PUT,.method.PATCH{color:#93c5fd}.code{margin:0;background:var(--terminal);color:var(--terminal-ink);padding:24px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;max-height:560px;tab-size:4}.field{margin-bottom:20px}.field:last-child{margin-bottom:0}label{display:block;font-size:13px;font-weight:600;margin-bottom:8px}input,textarea,select{width:100%;background:var(--inset);border:1px solid var(--control-line);border-radius:6px;padding:10px 12px;min-height:44px;color:var(--ink)}textarea{resize:vertical;min-height:120px}textarea.source{min-height:340px;font-family:var(--mono);font-size:13px;tab-size:4}.field-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px}.toolbar input{flex:1;min-width:160px}.check-label{display:flex;gap:8px;align-items:center;white-space:nowrap;margin:0}.check-label input{width:18px;min-height:18px}.details-grid{display:grid;grid-template-columns:140px minmax(0,1fr);gap:12px 20px;margin:0}.details-grid dt{color:var(--muted);font-size:13px}.details-grid dd{margin:0;overflow-wrap:anywhere}.section-gap{margin-top:24px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}.draft-item{padding:16px 24px;border-bottom:1px solid var(--line);display:flex;gap:12px;justify-content:space-between;align-items:center}.draft-item.active{background:var(--request-soft)}.draft-item>div{min-width:0}.file-list{display:flex;gap:8px;flex-wrap:wrap;padding:16px 24px;border-bottom:1px solid var(--line)}.file-list .btn{font:12px var(--mono);padding:6px 10px}.file-list .active{border-color:var(--request);color:var(--request)}.check-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.check-grid>div{padding:16px;border:1px solid var(--line);border-radius:6px}.response-meta{padding:12px 24px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-variant-numeric:tabular-nums}details>summary{cursor:pointer;color:var(--secondary);padding:12px 0;min-height:44px}.footer{padding-top:32px;font-size:12px;color:var(--muted)}.skip-link{position:fixed;top:8px;left:8px;background:var(--request);color:var(--on-request);padding:12px;z-index:10;transform:translateY(-150%)}.skip-link:focus{transform:translateY(0)}.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 20px;background:var(--request-soft);color:var(--request);border:1px solid var(--request);border-radius:8px;max-width:90vw;z-index:10}.toast:empty{display:none}.view[hidden]{display:none}dialog{max-width:520px;width:calc(100% - 32px);padding:0;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink)}dialog::backdrop{background:#0009}.mobile-nav{display:none}body.busy{cursor:progress}.status-line{font-size:12px;color:var(--muted)}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+@media(min-width:1440px){.content{padding:40px}.selecting-project .content{padding-top:64px}}
+@media(max-width:1100px){.project-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.layout-two{grid-template-columns:1fr}.app{grid-template-columns:200px minmax(0,1fr)}.app.selecting-project{grid-template-columns:1fr}.workbench{grid-template-columns:220px minmax(0,1fr)}}
+@media(max-width:760px){.app{display:block}.sidebar{display:none}.mobile-nav{display:block;margin-bottom:24px}.selecting-project .mobile-nav{display:none}.topbar{padding:12px 16px}.content,.selecting-project .content{padding:24px 16px}.topbar .brand{font-size:22px}.page-head,.view-title{align-items:flex-start;flex-direction:column}.project-grid,.workbench,.field-row,.check-grid{grid-template-columns:1fr}.route-list{max-height:220px}.panel-head,.panel-body,.project-card{padding:20px}.details-grid{grid-template-columns:1fr;gap:4px}.details-grid dd{margin-bottom:12px}.connection code{flex-basis:100%;order:2}.draft-item{flex-wrap:wrap}.code{padding:20px}h1{font-size:26px}.topbar .status-line{display:none}}
+@media(prefers-reduced-motion:no-preference){button,a{transition:background 160ms,color 160ms}button:active:not(:disabled){transform:translateY(1px)}}
+/* AI UI: the existing developer workbench, not a chat template. Provider forms
+   lead; amber separates local previews from live green worker/check statuses.
+   Reuse slate surfaces, mono contracts, quiet borders, and 4px spacing. */
+.provider-list{display:grid;gap:16px}.provider-card{border:1px solid var(--line);border-radius:8px;padding:20px}.provider-card h3{overflow-wrap:anywhere}.provider-card .actions{justify-content:space-between;margin-bottom:12px}.provider-card .details-grid{grid-template-columns:80px minmax(0,1fr)}.provider-card .provider-actions{margin-top:16px;margin-bottom:0;justify-content:flex-start}.ai-intro{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:16px 20px;background:var(--draft-soft);border:1px solid var(--line);border-radius:8px;margin-bottom:24px}.ai-intro p{color:var(--draft);font-size:13px}.ai-modes{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}.ai-modes .active{border-color:var(--request);color:var(--request);background:var(--request-soft)}.ai-steps{display:grid;gap:20px;padding:0;list-style:none;counter-reset:ai-step}.ai-steps li{counter-increment:ai-step;display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px}.ai-steps li:before{content:counter(ai-step);display:flex;align-items:center;justify-content:center;height:28px;border:1px solid var(--line);border-radius:50%;color:var(--muted);font:12px var(--mono)}.ai-steps p{font-size:13px;margin-top:4px}.ai-provider-summary{color:var(--muted);font-size:13px;margin-top:8px;overflow-wrap:anywhere}.ai-preview-body{min-height:160px}.ai-preview-body p{max-width:65ch}.ai-defaults{display:grid;gap:16px}.ai-defaults .check-label{align-items:flex-start;white-space:normal}.key-control{display:flex;align-items:center;gap:8px}.key-control input{min-width:0;flex:1}.ai-status{font-size:13px;color:var(--muted)}.ai-dialog>form{display:flex;flex-direction:column;max-height:90dvh}.ai-dialog .panel-body{overflow:auto;min-height:0}.ai-dialog .panel-head,.ai-dialog .panel-foot{flex-shrink:0}.ai-context{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px}.preview-table{border-collapse:collapse;width:100%;font-size:13px}.preview-table th,.preview-table td{border-bottom:1px solid var(--line);padding:12px 16px;text-align:left;vertical-align:top;max-width:240px;overflow-wrap:anywhere}.preview-table th{color:var(--muted);font-weight:500}.table-scroll{overflow:auto}.settings-description{max-width:75ch}.ai-preview-empty{padding:32px 24px}.ai-preview-empty p{margin-top:8px}.ai-provider-select{min-width:0}#generation-spec-text{min-height:180px}.provider-empty{padding:32px 24px;text-align:center}.provider-empty p{margin:8px 0 20px}
+@media(max-width:760px){.provider-card{padding:16px}.provider-card .details-grid{grid-template-columns:1fr}.ai-intro{padding:16px}.ai-dialog .panel-head{flex-wrap:nowrap}.ai-dialog .panel-head h2{min-width:0}.ai-dialog .panel-foot .btn{flex:1}.key-control{align-items:stretch}.ai-modes .btn{flex:1}}
+.sidebar{overflow-y:auto}
+#request-form .field-row{margin-bottom:20px}#request-form .field-row>.field{margin-bottom:0}
+.project-answer{white-space:pre-wrap;overflow-wrap:anywhere}.project-answer-sources{margin-top:12px;padding-left:20px}
+#project-answered-question,#project-answer-revision{overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<div class="app selecting-project" id="app">
+  <aside class="sidebar" aria-label="Project navigation">
+    <div class="brand"><span>{ }</span> reqlica<span>.</span></div>
+    <div><div class="eyebrow">Local workspace</div><p class="small" id="nav-project">Choose a project</p>
+      <nav class="nav">
+        <button data-view="overview">◫ &nbsp; Overview</button>
+        <button data-view="generate">✧ &nbsp; Generate API</button>
+        <button data-view="endpoints">{ } &nbsp; Endpoints</button>
+        <button data-view="drafts">▤ &nbsp; Drafts &amp; checks</button>
+        <button data-view="tester">▷ &nbsp; Request tester</button>
+        <button data-view="data">▧ &nbsp; Sample data <span class="badge draft">UI</span></button>
+        <button data-view="settings">⚙ &nbsp; Settings</button>
+      </nav>
+    </div>
+    <div class="side-bottom">Your APIs. Your machine.<br>Real backend · no sample data<br><button class="btn ghost" data-view="setup">Connection &amp; help →</button></div>
+  </aside>
+  <main id="main-content" tabindex="-1">
+    <header class="topbar"><div class="actions"><div class="brand">reqlica<span>.</span></div><button class="btn ghost" id="back-projects" data-view="projects" hidden>← Projects</button><strong id="breadcrumb">Projects</strong></div><div class="actions"><span class="status-line" id="connection-status" role="status">Not connected</span><button class="btn ghost" data-view="settings">Settings</button><button class="btn ghost" data-view="setup">Connection</button><button class="btn ghost" id="theme-toggle" aria-label="Switch to light theme">☼</button></div></header>
+    <div class="content">
+      <div id="notice" class="notice error" role="alert" hidden></div>
+      <div id="launch-notice" class="notice draft" hidden><strong>Open this dashboard through its local server.</strong><p>Opening the HTML directly cannot bypass browser CORS. Use the launcher in Connection &amp; help; no backend changes are needed.</p><button class="btn section-gap" data-view="setup">Show launch instructions →</button></div>
+      <div class="mobile-nav"><label for="mobile-view">Project section</label><select id="mobile-view"><option value="overview">Overview</option><option value="generate">Generate API · Groq</option><option value="endpoints">Endpoints</option><option value="drafts">Drafts &amp; checks</option><option value="tester">Request tester</option><option value="data">Sample data · UI preview</option><option value="settings">Settings</option><option value="setup">Connection &amp; help</option></select></div>
+      <section id="project-header" hidden><div class="page-head"><div><div class="eyebrow">Mock API workspace</div><h1 id="project-title"></h1><p id="project-subtitle"></p></div><div class="actions"><span class="badge neutral" id="runtime-status"></span><button class="btn" id="runtime-button" data-action="runtime">Start API</button><button class="btn ghost" data-action="refresh-project">Refresh</button></div></div><div class="connection"><span class="eyebrow">Live base URL</span><code id="base-url"></code><button class="btn ghost" data-action="copy-url">Copy URL</button></div></section>
+
+      <section class="view" id="projects-view">
+        <div class="page-head"><div><div class="eyebrow">Workspace</div><h1>Your API workspace.</h1><p>Create a project, open its workspace, and control its real worker.</p></div><div class="actions"><button class="btn" data-action="refresh-projects">Refresh projects</button><button class="btn primary" data-action="new-project">+ New project</button></div></div>
+        <div class="toolbar"><label class="sr-only" for="project-search">Search projects</label><input id="project-search" placeholder="Search name, directory, or ID…"><label class="check-label"><input id="running-only" type="checkbox">Running only</label><span class="small muted" id="projects-summary" role="status">Not loaded</span></div>
+        <div class="project-grid" id="project-grid"><div class="panel empty"><h2>Connect to your local backend</h2><p>Start Reqlica, then launch this HTML’s local server. Your registered projects will appear here.</p><button class="btn" data-view="setup">Connection &amp; help →</button></div></div>
+        <div class="notice section-gap"><strong>Your files stay on your machine.</strong><p class="small">Choose a new or empty absolute directory when creating a project. Locations refer to the machine running Reqlica, not browser storage. The CLI remains available: <code>uv run reqlica project create /absolute/path/to/project --name "My API"</code>.</p></div>
+      </section>
+
+      <section class="view" id="overview-view" hidden><div class="layout-two"><div class="panel"><div class="panel-head"><h2>Project details</h2><span class="badge neutral">LIVE REGISTRY</span></div><div class="panel-body"><dl class="details-grid" id="project-details"></dl></div><div class="panel-foot"><button class="btn" data-view="endpoints">Browse endpoints →</button><button class="btn" data-view="tester">Try a request →</button></div></div><div class="panel"><div class="panel-head"><h2>Draft workflow</h2></div><div class="panel-body"><p>Edit a draft, validate and test the saved revision, then approve it using the CLI. Only an already-approved revision can be activated here.</p><div class="actions section-gap"><button class="btn primary" data-view="drafts">Open drafts →</button><button class="btn" id="convert-button" data-action="convert" hidden>Convert legacy project</button></div><p class="help">Draft calls use disposable data. Live requests use persistent project records.</p></div></div></div><div class="notice draft section-gap" id="project-error" hidden></div><details class="section-gap"><summary>Remove project</summary><div class="notice"><p>Keep the files and unregister, or explicitly choose irreversible deletion of the project directory, drafts, and database. You will review the exact target before continuing.</p><button class="btn danger section-gap" data-action="delete-project">Delete project…</button></div></details></section>
+
+      <section class="view" id="endpoints-view" hidden>
+        <div class="view-title"><div><h2>Active API contract</h2><p>Actual routes loaded by the worker, or configured routes while inactive.</p></div><div class="actions"><button class="btn" id="ai-edit-endpoint" data-action="ai-edit-endpoint">✧ Modify with AI <span class="badge draft">UI</span></button><a class="btn" id="published-docs" target="_blank" rel="noopener noreferrer">Swagger ↗</a><button class="btn" data-action="load-schema">Load OpenAPI</button></div></div>
+        <div class="workbench"><aside class="panel"><div class="panel-head"><h2>Endpoints</h2><span id="route-count" class="small muted"></span></div><div class="panel-body" style="padding:12px"><label class="sr-only" for="route-search">Search endpoints</label><input id="route-search" placeholder="Search method or path…"></div><div class="route-list" id="route-list"></div></aside><div class="panel"><div class="panel-head"><h2 id="endpoint-title">Choose an endpoint</h2><button class="btn" id="test-endpoint" data-action="test-endpoint" disabled>Test endpoint →</button></div><div class="panel-body"><dl class="details-grid" id="endpoint-details"></dl><p class="help section-gap">Published Python source and business rules have no dedicated read API. Use a draft to inspect or edit source files.</p></div><pre class="code" id="endpoint-schema" tabindex="0">Load the generated OpenAPI contract to inspect this route. Contracts exist only after validation and activation.</pre></div></div>
+      </section>
+
+      <section class="view" id="drafts-view" hidden>
+        <div class="view-title"><div><h2>Drafts &amp; checks</h2><p>Unpublished code, exact-revision checks, and human-controlled publication.</p></div><div class="actions"><button class="btn" data-action="refresh-drafts">Refresh drafts</button><button class="btn primary" data-action="create-draft">Create draft</button></div></div>
+        <div id="draft-error" class="notice error" role="alert" hidden></div>
+        <div class="panel" id="draft-list"><div class="empty"><p>No drafts loaded.</p></div></div>
+        <div id="draft-workspace" class="section-gap" hidden>
+          <div class="notice"><strong id="draft-heading"></strong><p class="small mono" id="draft-revision"></p><p class="help" id="draft-base"></p><div class="actions section-gap"><button class="btn" data-action="refresh-draft">Reload draft state</button><a class="btn" id="draft-docs" target="_blank" rel="noopener noreferrer">Draft Swagger ↗</a><button class="btn" data-action="draft-schema">Inspect draft OpenAPI</button><button class="btn" data-action="test-draft">Try a draft request →</button></div></div>
+          <div class="layout-two"><div class="panel"><div class="panel-head"><h2>Source files</h2><span class="badge draft" id="editor-status">UNPUBLISHED</span></div><div class="file-list" id="draft-files"></div><form id="file-form"><div class="panel-body"><div class="field"><label for="file-path">Project-relative file path</label><input id="file-path" required placeholder="endpoints/hello.py" autocomplete="off"><p class="help">Choose a file above to load it. For a new file, enter an unused relative path.</p></div><div class="field"><label for="file-content">File contents</label><textarea id="file-content" class="source" spellcheck="false" aria-describedby="file-warning"></textarea><p id="file-warning" class="help">Python runs with your local user’s permissions. Save only trusted code.</p></div></div><div class="panel-foot"><button class="btn danger" type="button" data-action="delete-file">Delete file</button><button class="btn primary" type="submit">Save file to draft</button></div></form></div><aside><div class="panel"><div class="panel-head"><h2>Route definitions</h2></div><form id="route-form"><div class="panel-body"><div class="field"><label for="draft-route-select">Existing draft route</label><select id="draft-route-select"><option value="">New route</option></select></div><div class="field-row"><div class="field"><label for="route-method">Method</label><select id="route-method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>HEAD</option><option>TRACE</option></select></div><div class="field"><label for="route-path">Path</label><input id="route-path" required placeholder="/hello" pattern="/.*"></div></div><div class="field"><label for="route-handler">Handler reference</label><input id="route-handler" required placeholder="endpoints/hello.py:hello"><p class="help">Save the Python function in Source files first. Method + path identifies a route; changing either adds a new route rather than renaming the old one.</p></div></div><div class="panel-foot"><button class="btn danger" type="button" data-action="remove-route">Remove route</button><button class="btn" type="submit">Save route</button></div></form></div><div class="panel section-gap"><div class="panel-head"><h2>Changed files</h2></div><pre class="code" id="draft-changes"></pre></div></aside></div>
+          <div class="panel section-gap"><div class="panel-head"><h2>Check the saved revision</h2><div class="actions"><button class="btn" data-action="validate">Validate</button><button class="btn" data-action="test">Run tests</button></div></div><div class="panel-body"><div class="check-grid" id="check-results"></div><p class="help">HTTP success is not a passing check. Results below show the backend’s actual status and output. Unsaved editor changes are not tested.</p></div><pre class="code" id="check-output" tabindex="0">No checks run.</pre><div class="panel-body"><h3>Human approval is CLI-only</h3><p class="help">After reviewing this exact revision and passing both checks, run:</p><pre class="code section-gap" id="approval-command"></pre><div class="actions section-gap"><button class="btn" data-action="copy-approval">Copy command</button><button class="btn" data-action="refresh-draft">Refresh approval status</button><button class="btn primary" id="activate-button" data-action="activate" disabled>Activate approved revision</button></div><p class="help" id="activation-help"></p></div></div>
+        </div>
+      </section>
+
+      <section class="view" id="tester-view" hidden>
+        <div class="view-title"><div><h2>Try a real request</h2><p>Choose the live API or an isolated draft call.</p></div><span class="badge neutral">NOT SIMULATED</span></div>
+        <div class="layout-two"><div class="panel"><form id="request-form"><div class="panel-body">
+          <div class="field-row"><div class="field"><label for="request-target">Target</label><select id="request-target"><option value="live">Live API · persistent data</option><option value="draft">Selected draft · disposable data</option></select></div><div class="field"><label for="request-route">Route shortcut</label><select id="request-route"><option value="">Custom request</option></select></div></div>
+          <div class="actions"><button class="btn" type="button" id="insert-request-example" data-action="insert-request-example" aria-describedby="request-example-status" disabled>Insert example</button><span class="small muted">From OpenAPI · does not send</span></div>
+          <p class="help" id="request-example-status" role="status">Choose a route shortcut to insert its example. Review sample values before sending; existing records and business rules are not inferred.</p>
+          <div class="field-row section-gap"><div class="field"><label for="request-method">Method</label><select id="request-method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>HEAD</option></select></div><div class="field"><label for="request-path">Path and query string</label><input id="request-path" required value="/hello" placeholder="/books/123?limit=10"></div></div><div class="field" id="request-headers-field"><label for="request-headers">Headers · JSON object</label><textarea id="request-headers" class="mono" spellcheck="false">{}</textarea><p class="help">Optional authorization/content-type headers. Browser-controlled and proxy-internal headers cannot be overridden.</p></div><div class="field"><label for="request-body">JSON body · optional</label><textarea id="request-body" class="mono" spellcheck="false" placeholder='{"title": "Example"}'></textarea></div><p class="help" id="request-help"></p></div><div class="panel-foot"><span class="small muted">Redirects are not followed by the local bridge.</span><button class="btn primary" type="submit">Send request →</button></div></form><div class="response-meta"><span class="badge neutral" id="response-status" role="status">Not sent</span><span class="muted small" id="response-time">—</span><button class="btn ghost" data-action="copy-response">Copy response</button></div><pre class="code" id="response-body" tabindex="0">Send a request to inspect its real response.</pre><details class="panel-body"><summary>Response headers / draft runner details</summary><pre class="code" id="response-details">—</pre></details></div><aside><div class="notice draft"><strong>Live requests can change real data.</strong><p class="small">POST, PUT, PATCH, and DELETE run against persistent project data. A request to an idle project starts its worker; a stopped project must be started explicitly.</p></div><div class="notice"><strong>Draft calls are disposable.</strong><p class="small">Select a draft in Drafts &amp; checks first. Calls pin its revision and accept JSON bodies, but do not forward custom headers or cookies. Each call gets a fresh disposable data copy. A call never counts as validation or a test.</p></div><div class="notice"><strong>No scenario API yet.</strong><p class="small">Artificial delays, forced errors, seeding/reset, and server request logs are not implemented. This page does not fake them.</p></div></aside></div>
+      </section>
+
+      <section class="view" id="settings-view" aria-label="AI settings" hidden>
+        <div class="view-title"><div><div class="eyebrow">Workspace preferences</div><h2>Settings</h2><p class="settings-description">Choose your LLM providers and defaults for the AI workflow. These preferences belong to this browser, across projects.</p></div><span class="badge neutral">LOCAL PROFILES</span></div>
+        <div class="ai-intro"><div><strong>Groq project AI is available.</strong><p>Saving profiles makes no network call. In Generate API, ask read-only questions about the project or generate an unexecuted draft. Both share project context only after confirmation. Other providers, endpoint-edit briefs, and sample fixtures remain previews.</p></div></div>
+        <div class="layout-two"><div class="panel"><div class="panel-head"><h2>LLM providers</h2><button class="btn primary" data-action="add-provider">+ Add provider</button></div><div class="panel-body"><div id="provider-list" class="provider-list"></div></div><div class="panel-foot"><span class="ai-status" id="ai-storage-status" role="status">Non-secret preferences are saved in this browser only.</span></div></div>
+          <div class="panel"><div class="panel-head"><h2>Generation defaults</h2><span id="ai-defaults-status" class="badge neutral">BROWSER ONLY</span></div><form id="ai-defaults-form"><div class="panel-body"><div id="ai-defaults-error" class="notice error" role="alert" hidden></div><div class="field"><label for="default-ai-provider">Default provider</label><select id="default-ai-provider" data-ai-provider></select></div><div class="field-row"><div class="field"><label for="ai-temperature">Temperature</label><input id="ai-temperature" type="number" min="0" max="2" step="0.1" value="0.2" required></div><div class="field"><label for="ai-max-tokens">Maximum output tokens</label><input id="ai-max-tokens" type="number" min="256" max="32768" step="256" value="8192" required></div></div><div class="ai-defaults"><label class="check-label"><input id="ai-include-tests" type="checkbox" checked><span>Include automated tests · preview preference</span></label><label class="check-label"><input id="ai-include-schema" type="checkbox" checked><span>Include request/response schemas · preview preference</span></label><label class="check-label"><input id="ai-clarify" type="checkbox" checked><span>Surface assumptions and ask about ambiguous behavior · preview preference</span></label></div><p class="help section-gap">Groq uses the saved model, temperature, and token limit. This first integration always requests typed contracts, tests, and assumptions, regardless of preview preferences. It has no conversation memory or automatic repair loop. Human review and CLI approval remain required.</p></div><div class="panel-foot"><button class="btn" type="button" data-action="reset-ai-defaults">Reset defaults</button><button class="btn primary" type="submit">Save preferences</button></div></form></div>
+        </div>
+        <div class="panel section-gap"><div class="panel-head"><h2>AI features</h2><span class="badge neutral">GROQ GENERATION · OTHER FLOWS ARE PREVIEWS</span></div><div class="panel-body"><ol class="ai-steps"><li><div><h3>Generate an API draft</h3><p>Describe requirements or upload a specification. Preview locally, or explicitly send the inputs and current project context to Groq. Generated code is saved for review, never executed automatically.</p><button class="btn ghost" data-view="generate" data-ai-project-feature>Open Generate API →</button></div></li><li><div><h3>Modify an endpoint · preview only</h3><p>Start from a real route and capture a change brief. This separate preview does not edit its handler or manifest.</p><button class="btn ghost" data-view="endpoints" data-ai-project-feature>Browse endpoints →</button></div></li><li><div><h3>Prepare sample data · preview only</h3><p>Choose a collection, record template, and count. Inspect deterministic local fixtures—nothing is inserted into SQLite.</p><button class="btn ghost" data-view="data" data-ai-project-feature>Open Sample data →</button></div></li></ol><p class="help" id="ai-project-help">Open a project to explore these screens. Provider settings are available without a project.</p></div></div>
+      </section>
+
+      <section class="view" id="generate-view" aria-label="Generate API" hidden>
+        <div class="view-title"><div><h2>Understand or build your API</h2><p>Ask about the current project, or explicitly generate an unpublished draft.</p></div><span class="badge draft">ONE REQUEST · GROQ</span></div>
+        <div class="ai-intro"><div><strong>Current published project context, no conversation history.</strong><p>Both modes share your input, published Python/test source, project notes, and SQLite definitions with Groq after confirmation. No database rows, other drafts, or environment files are included. Ask mode only explains; generation saves unexecuted code for review.</p></div><button class="btn" data-view="settings">Provider settings →</button></div>
+        <div class="ai-modes" role="group" aria-label="Project AI task"><button class="btn active" type="button" data-project-ai-task="generate" aria-pressed="true">Generate draft</button><button class="btn" type="button" data-project-ai-task="ask" aria-pressed="false">Ask about project</button></div>
+        <div class="notice draft" id="generation-result" role="status" hidden></div>
+        <div class="layout-two"><div class="panel"><div class="panel-head"><h2 id="project-ai-input-title">Requirements</h2></div>
+          <form id="generate-form"><div class="panel-body"><div id="generation-error" class="notice error" role="alert" hidden></div>
+            <div class="field"><label for="generation-provider">Provider</label><select id="generation-provider" data-ai-provider required></select><p class="ai-provider-summary" id="generation-provider-summary"></p></div>
+            <div id="project-question-input" hidden><label for="project-question">What would you like to understand?</label><textarea id="project-question" rows="8" maxlength="16384" placeholder="How is POST /books designed? Which fields does it accept, what rules does it enforce, and where is that behavior implemented?"></textarea><p class="help">Read-only, based on published code—not unsaved or draft changes. Each question is independent; include the endpoint name and enough detail. The answer cites supplied files and flags unknowns.</p></div>
+            <div class="ai-modes" id="generation-input-modes" role="group" aria-label="Generation input"><button class="btn active" type="button" data-generation-mode="describe" aria-pressed="true">Describe the API</button><button class="btn" type="button" data-generation-mode="upload" aria-pressed="false">Upload a specification</button></div>
+            <div id="generation-describe"><label for="generation-prompt">What should your API do?</label><textarea id="generation-prompt" rows="8" placeholder="Add a typed GET /greeting endpoint with an optional name and meaningful HTTP tests…"></textarea><p class="help">Start with a small task. Schema migrations are not supported. Real generation accepts at most 32,768 characters plus bounded project context.</p></div>
+            <div id="generation-upload" hidden><div class="field"><label for="generation-file">OpenAPI, JSON schema, or documentation</label><input id="generation-file" type="file" accept=".json,.yaml,.yml,.md,.txt"><p class="help" id="generation-file-status" role="status">Read locally first · JSON, YAML, Markdown, or text · maximum 1 MiB for previews.</p></div><label for="generation-spec-text">Review or paste the specification</label><textarea id="generation-spec-text" class="mono" spellcheck="false" placeholder="Paste your specification, or choose a file above."></textarea><p class="help">Preview stays local. Generate draft sends this text to Groq after confirmation. Large specifications may exceed the initial generation limit; no full OpenAPI import parser is implemented.</p></div>
+          </div><div class="panel-foot"><button class="btn" id="preview-generation-button" type="submit" data-needs-ai-provider>Preview generation brief →</button><button class="btn primary" type="button" data-action="generate-draft" id="generate-draft-button">Generate draft with Groq →</button><p class="help" id="generate-draft-help">Add a Groq provider to generate; other provider profiles remain preview-only.</p></div></form>
+        </div><aside class="panel" id="generation-brief-panel"><div class="panel-head"><h2>Review your input brief</h2><span class="badge draft">LOCAL PREVIEW</span></div><div class="ai-preview-empty" id="generation-empty"><h3>Your brief will appear here.</h3><p>Preview the input without making any request. The console adds current published project context only when you explicitly generate. Credentials are never included in this brief.</p></div><pre class="code" id="generation-preview" hidden tabindex="0"></pre><div class="panel-foot"><span class="small muted" id="generation-preview-status">No brief prepared.</span><button class="btn" data-action="copy-generation-preview" id="copy-generation-preview" disabled>Copy brief</button></div></aside>
+        <aside class="panel" id="project-answer-panel" hidden><div class="panel-head"><h2>Project explanation</h2><span class="badge neutral">READ ONLY</span></div><div class="ai-preview-empty" id="project-answer-empty"><h3>Understand the design before changing it.</h3><p>Ask about endpoint inputs, validation, data relationships, tests, or design choices. The AI reads the existing project snapshot; it cannot edit or execute anything in this mode.</p></div><div id="project-answer-content" hidden><div class="panel-body"><p class="eyebrow">Question answered</p><p id="project-answered-question"></p><p class="help mono" id="project-answer-revision"></p></div><div class="panel-body project-answer" id="project-answer-text" tabindex="0"></div><div class="panel-body"><h3>Sources in the supplied snapshot</h3><ul class="project-answer-sources" id="project-answer-sources"></ul><h3>Limitations</h3><ul class="project-answer-sources" id="project-answer-limitations"></ul><p class="help" id="project-answer-warning"></p></div></div><div class="panel-foot"><span class="small muted" id="project-answer-status" role="status">No question sent.</span><button class="btn" id="copy-project-answer" data-action="copy-project-answer" disabled>Copy answer</button></div></aside></div>
+      </section>
+
+      <section class="view" id="data-view" aria-label="Sample data preview" hidden>
+        <div class="view-title"><div><h2>Sample data</h2><p>Describe the records you need and explore a local fixture preview.</p></div><span class="badge draft">FRONTEND PREVIEW</span></div>
+        <div class="ai-intro"><p>These are deterministic browser fixtures, not AI-generated records. No database is read, seeded, reset, or changed.</p><button class="btn" data-view="settings">Provider settings →</button></div>
+        <div class="layout-two"><div class="panel"><div class="panel-head"><h2>Prepare a dataset</h2></div><form id="ai-data-form"><div class="panel-body"><div class="notice error" id="ai-data-error" role="alert" hidden></div><div class="field"><label for="data-provider">Provider for the proposed AI brief</label><select id="data-provider" data-ai-provider required></select><p class="ai-provider-summary" id="data-provider-summary"></p></div><div class="field-row"><div class="field"><label for="ai-data-collection">Collection</label><input id="ai-data-collection" required value="items" placeholder="books"></div><div class="field"><label for="ai-data-count">Number of records</label><input id="ai-data-count" type="number" min="1" max="100" step="1" required value="5"></div></div><div class="field"><label for="ai-data-prompt">What kind of data do you need?</label><textarea id="ai-data-prompt" placeholder="For example: a varied catalog, including out-of-stock items and long names."></textarea></div><div class="field"><label for="ai-data-template">Example record · JSON object</label><textarea id="ai-data-template" class="mono" spellcheck="false" required>{
+  "name": "Sample item",
+  "price": 14.99,
+  "stock": 20
+}</textarea><p class="help">The local preview repeats this template with a unique _preview_id. It does not interpret your prompt or infer the actual database schema.</p></div></div><div class="panel-foot"><span class="small muted">Preview only · no “insert into live data” action.</span><button class="btn primary" type="submit" data-needs-ai-provider>Preview sample fixtures →</button></div></form></div><aside class="panel"><div class="panel-head"><h2>Dataset preview</h2><span class="badge neutral" id="ai-data-preview-count">0 records</span></div><div class="ai-preview-empty" id="ai-data-empty"><h3>No fixtures prepared.</h3><p>Configure a provider and use a record template to preview the future sample-data workflow.</p></div><pre class="code" id="ai-data-preview" hidden tabindex="0"></pre><details class="panel-body"><summary>Proposed AI brief · not sent</summary><pre class="code" id="ai-data-brief">No brief prepared.</pre></details><div class="panel-foot"><span class="small muted">Fixtures are held only in this page’s memory.</span><button class="btn" data-action="copy-data-preview" id="copy-data-preview" disabled>Copy fixtures</button></div></aside></div>
+      </section>
+
+      <section class="view" id="setup-view" hidden>
+        <div class="view-title"><div><h2>Connection &amp; help</h2><p>A single HTML dashboard for your trusted, local Reqlica backend.</p></div></div>
+        <div class="panel"><div class="panel-head"><h2>Start locally</h2><span class="badge neutral">NO BACKEND CHANGES</span></div><div class="panel-body"><p>From the repository root, start Reqlica in one terminal:</p><pre class="code section-gap">uv run reqlica start</pre><p class="section-gap">In another terminal, launch the server embedded in this HTML:</p><pre class="code section-gap" id="launch-command"></pre><div class="actions section-gap"><button class="btn" data-action="copy-launch">Copy launcher</button><a class="btn primary" href="http://127.0.0.1:8080/" id="local-link">Open local dashboard ↗</a></div><p class="help">The launcher serves this file and forwards /gateway and /console requests to the local APIs, avoiding browser CORS. It reads the root .env, binds only to 127.0.0.1, and stops with Ctrl+C. Set REQLICA_UI_PORT to change 8080. This is a development server, not a production deployment.</p></div></div>
+        <div class="layout-two section-gap">
+          <div class="panel"><div class="panel-head"><h2>API connections</h2><button class="btn" data-action="check-health">Check connections</button></div><form id="connection-form"><div class="panel-body"><div class="field"><label for="gateway-base">Gateway API base</label><input id="gateway-base" required placeholder="/gateway"><p class="help">Local bridge: /gateway. Direct: http://127.0.0.1:4000 (requires CORS or another proxy).</p></div><div class="field"><label for="console-base">Console API base</label><input id="console-base" required placeholder="/console"></div><p class="help">Only loopback HTTP origins are accepted. Connection preferences stay in this browser; no project data is stored in localStorage.</p><pre class="code section-gap" id="health-output">Not checked.</pre></div><div class="panel-foot"><button class="btn" type="button" data-action="reset-connections">Use embedded local bridge</button><button class="btn primary" type="submit">Save &amp; connect</button></div></form></div>
+          <div class="panel"><div class="panel-head"><h2>Available today</h2></div><div class="panel-body"><p>Project creation, discovery/details, confirmed deletion with or without files, worker start/stop, single-turn Groq generation into unexecuted drafts, legacy conversion, endpoint browsing, draft files/routes, validation, tests, disposable calls, OpenAPI, and activation of CLI-approved drafts.</p><h3 class="section-gap">Still CLI-only or planned</h3><p class="help">Approval, folder picking, persisted server-side provider profiles, additional LLM providers, AI data seeding, record browsing/reset, runtime logs, scenarios, import/export, conversation memory, automatic repair, and rollback are not implemented here.</p><div class="notice draft section-gap"><strong>Trusted local use only.</strong><p class="small">Management APIs are unauthenticated. Python handlers are not sandboxed. Do not expose this dashboard or the APIs to your network.</p></div></div></div>
+        </div>
+      </section>
+      <footer class="footer">Reqlica / Local workspace · Groq saves unexecuted drafts · endpoint-edit and data AI screens are previews · approval remains CLI-only</footer>
+    </div>
+  </main>
+</div>
+<dialog id="confirm-dialog" aria-labelledby="confirm-title"><div class="panel-head"><h2 id="confirm-title">Confirm action</h2></div><div class="panel-body"><p id="confirm-message"></p></div><div class="panel-foot"><button class="btn" id="confirm-cancel">Cancel</button><button class="btn danger" id="confirm-accept">Confirm</button></div></dialog>
+<dialog id="create-project-dialog" aria-labelledby="create-project-title">
+  <form id="create-project-form">
+    <div class="panel-head"><h2 id="create-project-title">Create a project</h2><button class="btn ghost" type="button" data-close="create-project-dialog" aria-label="Close project creation">×</button></div>
+    <div class="panel-body">
+      <div class="notice error" id="create-project-error" role="alert" tabindex="-1" hidden></div>
+      <div class="field"><label for="new-project-name">Project name</label><input id="new-project-name" required autocomplete="off" placeholder="Book API"></div>
+      <div class="field"><label for="new-project-directory">Project directory</label><input id="new-project-directory" required autocomplete="off" placeholder="~/reqlica/book-api" aria-describedby="new-project-help"><p class="help" id="new-project-help">A new or empty directory on the machine running Reqlica. Enter an absolute path or ~/path. Missing parent folders will be created. Existing files are never overwritten.</p></div>
+      <p class="small muted">Creates a versioned project with a working GET /hello endpoint, a starter test, and a SQLite database. Its worker stays idle until you start it or send a live request.</p>
+    </div>
+    <div class="panel-foot"><button class="btn" type="button" data-close="create-project-dialog">Cancel</button><button class="btn primary" type="submit">Create project →</button></div>
+  </form>
+</dialog>
+<dialog id="delete-project-dialog" aria-labelledby="delete-project-title">
+  <form id="delete-project-form">
+    <div class="panel-head"><h2 id="delete-project-title">Delete project</h2><button class="btn ghost" type="button" data-close="delete-project-dialog" aria-label="Close project deletion">×</button></div>
+    <div class="panel-body" style="max-height:65dvh;overflow:auto">
+      <div class="notice error" id="delete-project-error" role="alert" tabindex="-1" hidden></div>
+      <dl class="details-grid" id="delete-project-details"></dl>
+      <div class="notice draft section-gap" id="delete-project-warning" hidden></div>
+      <p class="help section-gap">By default, this stops the worker and unregisters the project. Its files, drafts, versions, and database are kept.</p>
+      <label class="check-label section-gap" style="white-space:normal"><input id="delete-project-files" type="checkbox">Also permanently delete the project directory and all its contents</label>
+      <div id="delete-directory-field" class="section-gap" hidden><div class="notice error"><strong>This cannot be undone.</strong><p class="small">All source versions, drafts, and live database records in the displayed directory will be erased. Other projects are not deleted.</p></div><label for="delete-confirm-directory">Type the exact directory shown above to confirm</label><input id="delete-confirm-directory" autocomplete="off" spellcheck="false"></div>
+    </div>
+    <div class="panel-foot"><button class="btn" type="button" data-close="delete-project-dialog">Cancel</button><button class="btn danger" id="delete-project-submit" type="submit">Unregister · keep files</button></div>
+  </form>
+</dialog>
+<dialog id="provider-dialog" class="ai-dialog" aria-labelledby="provider-dialog-title"><form id="provider-form">
+  <div class="panel-head"><h2 id="provider-dialog-title">Add LLM provider</h2><button class="btn ghost" type="button" data-close="provider-dialog" aria-label="Close provider editor">×</button></div>
+  <div class="panel-body"><div class="notice error" id="provider-error" role="alert" tabindex="-1" hidden></div>
+    <div class="field"><label for="provider-name">Display name</label><input id="provider-name" required maxlength="80" autocomplete="off" placeholder="My Groq profile"></div>
+    <div class="field"><label for="provider-kind">Provider type</label><select id="provider-kind"><option value="groq">Groq · endpoint generation</option><option value="ollama">Local model · Ollama · preview</option><option value="openai">OpenAI · preview</option><option value="anthropic">Anthropic · preview</option><option value="compatible">OpenAI-compatible API · preview</option></select></div>
+    <div class="field"><label for="provider-base-url">Base URL</label><input id="provider-base-url" type="url" required placeholder="https://api.groq.com/openai/v1"><p class="help">Saving does not connect. Real generation uses only Groq's fixed HTTPS origin, not a custom proxy. Other provider types are preview-only.</p></div>
+    <div class="field"><label for="provider-model">Model identifier</label><input id="provider-model" required autocomplete="off" placeholder="openai/gpt-oss-20b"><p class="help">Initial Groq generation supports openai/gpt-oss-20b and openai/gpt-oss-120b.</p></div>
+    <div class="field"><label for="provider-api-key">API key · optional with a server-side Groq key</label><div class="key-control"><input id="provider-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Uses server GROQ_API_KEY / GROQ_API when omitted"><button class="btn" type="button" data-action="toggle-provider-key" aria-pressed="false" id="toggle-provider-key">Show</button></div><p class="help">Keys stay in page memory, never browser storage or copied briefs. A Groq key is forwarded to the local console only when you confirm generation; the console uses it solely for Groq. Keep this app on loopback.</p></div>
+    <div class="notice draft"><p class="small">Saving a profile does not verify the endpoint, model availability, or API key.</p></div>
+  </div><div class="panel-foot"><button class="btn" type="button" data-close="provider-dialog">Cancel</button><button class="btn primary" type="submit">Save provider profile</button></div>
+</form></dialog>
+<dialog id="ai-endpoint-dialog" class="ai-dialog" aria-labelledby="ai-endpoint-title"><form id="ai-endpoint-form"><div class="panel-head"><h2 id="ai-endpoint-title">Modify endpoint with AI</h2><button class="btn ghost" type="button" data-close="ai-endpoint-dialog" aria-label="Close AI endpoint preview">×</button></div><div class="panel-body"><div class="ai-context"><span id="ai-endpoint-method" class="method"></span><code id="ai-endpoint-path"></code><span class="badge draft">UI PREVIEW</span></div><div class="notice error" id="ai-endpoint-error" role="alert" hidden></div><div class="field"><label for="endpoint-ai-provider">Provider</label><select id="endpoint-ai-provider" data-ai-provider required></select><p class="ai-provider-summary" id="endpoint-provider-summary"></p></div><div class="field"><label for="ai-endpoint-prompt">What should change?</label><textarea id="ai-endpoint-prompt" required placeholder="Add a search parameter while keeping existing pagination and response fields."></textarea></div><div class="notice draft"><p class="small">This creates a local change brief, not a code proposal. No real draft, handler, or route is modified.</p><button class="btn ghost" type="button" data-action="endpoint-provider-settings">Configure providers →</button></div><pre class="code" id="ai-endpoint-preview" hidden tabindex="0"></pre></div><div class="panel-foot"><button class="btn" type="button" id="copy-endpoint-preview" data-action="copy-endpoint-preview" disabled>Copy brief</button><button class="btn primary" type="submit" data-needs-ai-provider>Preview change brief →</button></div></form></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+'use strict';
+// Intent: a developer controlling real local workers, not a simulated reference.
+// Keep the original slate/green workbench, mono API identifiers, 4px spacing,
+// quiet panel borders, and one primary task per view. Native controls throughout.
+const $ = id => document.getElementById(id);
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pretty = value => typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+const launchCommand = `uv run python -c 'from pathlib import Path; p=Path("backend/reqlica/reqlicav1.html"); exec(p.read_text().split("<"+"!-- REQLICA_LOCAL_SERVER\\n",1)[1].split("\\nREQLICA_LOCAL_SERVER -->",1)[0])'`;
+const defaults = location.protocol === 'file:' ? {gateway:'http://127.0.0.1:4000',console:'http://127.0.0.1:3000'} : {gateway:'/gateway',console:'/console'};
+let config = {...defaults};
+try { config = {...config, ...JSON.parse(localStorage.getItem('reqlica.html.connections') || '{}')}; } catch {}
+const state = {projects:[], project:null, drafts:[], draft:null, draftRoutes:[], selectedRoute:0, schema:null, view:'projects', busy:false, loaded:false, editorPath:null, editorRevision:null, dirty:false, response:null, deletion:null};
+let direct = {gateway:'http://127.0.0.1:4000', console:'http://127.0.0.1:3000'}, toastTimer;
+const labels = {projects:'Projects',overview:'Overview',generate:'Generate API',endpoints:'Endpoints',drafts:'Drafts & checks',tester:'Request tester',data:'Sample data',settings:'Settings',setup:'Connection & help'};
+const providerPresets={groq:{name:'Groq',url:'https://api.groq.com/openai/v1',model:'openai/gpt-oss-20b',defaultModel:'openai/gpt-oss-20b'},ollama:{name:'Local model · Ollama',url:'http://localhost:11434',model:'Your installed model'},openai:{name:'OpenAI',url:'https://api.openai.com/v1',model:'Your OpenAI model identifier'},anthropic:{name:'Anthropic',url:'https://api.anthropic.com',model:'Your Anthropic model identifier'},compatible:{name:'OpenAI-compatible API',url:'http://localhost:1234/v1',model:'Your provider’s model identifier'}};
+const aiDefaultOptions={temperature:0.2,maxTokens:8192,includeTests:true,includeSchema:true,clarify:true};
+const aiStorageKey='reqlica.html.ai-preferences.v1';
+const providerKeys=new Map(), aiWorkspaces=new Map(); // Session memory only: never serialized.
+let aiStorageAvailable=true, aiPrefsDirty=false, providerEditingId=null, aiEndpointContext=null, endpointBrief=null;
+let aiConfig=loadAIConfig();
+const root = () => '/api/projects/' + state.project.id;
+const draftRoot = () => root() + '/drafts/' + state.draft.id;
+function toast(message) { $('toast').textContent=message; clearTimeout(toastTimer); toastTimer=setTimeout(() => $('toast').textContent='', 4500); }
+function errorMessage(error) { return error.message || String(error); }
+function showError(error, target='notice') { $(target).textContent=errorMessage(error); $(target).hidden=false; if(target==='notice') { $(target).tabIndex=-1; $(target).focus(); } }
+function clearError(target='notice') { $(target).hidden=true; $(target).textContent=''; }
+function validateBase(value) {
+  value=value.trim().replace(/\/+$/, '');
+  if (value === '/gateway' || value === '/console') return value;
+  const url=new URL(value);
+  if (url.protocol !== 'http:' || !['localhost','127.0.0.1','[::1]'].includes(url.hostname) || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw Error('Use /gateway, /console, or a loopback HTTP origin without a path or credentials.');
+  return url.origin;
+}
+function apiURL(service, path) { return validateBase(config[service]) + path; }
+async function transport(service, path, options={}) {
+  const controller=new AbortController(), timer=setTimeout(() => controller.abort(), 90000);
+  try {
+    const response=await fetch(apiURL(service,path), {...options, headers:{'X-Reqlica-UI':'1',...options.headers}, credentials:'omit', cache:'no-store', redirect:'manual', signal:controller.signal});
+    if (response.type === 'opaqueredirect') throw Error('The endpoint redirected. Use its canonical path (often a trailing slash).');
+    const text=await response.text(); let body=text;
+    try { body=JSON.parse(text); } catch {}
+    return {response,body,text};
+  } catch (error) {
+    if (error.name === 'AbortError') throw Error('Request timed out. The operation may still have completed; refresh state before retrying.');
+    if (error instanceof TypeError) throw Error('Could not reach '+service+'. Start Reqlica and use the embedded local server; direct/file:// access may be blocked by CORS.');
+    throw error;
+  } finally { clearTimeout(timer); }
+}
+async function api(service,path,method='GET',body,headers={}) {
+  const result=await transport(service,path,{method,headers:{...(body === undefined ? {} : {'Content-Type':'application/json'}),...headers},body:body === undefined ? undefined : JSON.stringify(body)});
+  if (!result.response.ok) {
+    const detail=result.body?.detail ?? result.body;
+    const error=Error('HTTP '+result.response.status+': '+pretty(detail)); error.status=result.response.status; throw error;
+  }
+  return result.body;
+}
+async function run(task) {
+  if (state.busy) return;
+  const focused=document.activeElement;
+  state.busy=true; clearError(); document.body.classList.add('busy'); $('main-content').setAttribute('aria-busy','true');
+  const disabled=new Map();
+  document.querySelectorAll('button,input,select,textarea').forEach(el => { disabled.set(el,el.disabled); el.disabled=true; });
+  try { await task(); } catch (error) { showError(error); }
+  finally {
+    state.busy=false; document.body.classList.remove('busy'); $('main-content').setAttribute('aria-busy','false');
+    disabled.forEach((was,el) => { if (el.isConnected) el.disabled=was; });
+    syncControls();
+    const dialog=document.querySelector('dialog[open]'), active=document.activeElement;
+    if(dialog && (active===dialog || !dialog.contains(active) || active.disabled)) {
+      const target=dialog.contains(focused) && !focused.disabled?focused:({ 'provider-dialog':$('provider-name'),'create-project-dialog':$('new-project-name'),'ai-endpoint-dialog':$('ai-endpoint-prompt') }[dialog.id] || dialog.querySelector('button:not(:disabled),input:not(:disabled),textarea:not(:disabled)'));
+      target?.focus({preventScroll:true});
+    } else if(active===document.body && focused?.isConnected && !focused.disabled) focused.focus({preventScroll:true});
+  }
+}
+function confirmAction(title,message) {
+  return new Promise(resolve => {
+    const dialog=$('confirm-dialog'); $('confirm-title').textContent=title; $('confirm-message').textContent=message;
+    // run() disables page controls, but confirmation must remain usable.
+    $('confirm-cancel').disabled=false; $('confirm-accept').disabled=false;
+    const close=() => { dialog.removeEventListener('close',close); resolve(dialog.returnValue === 'confirm'); };
+    dialog.returnValue='cancel'; dialog.addEventListener('close',close); dialog.showModal();
+  });
+}
+$('confirm-cancel').onclick=() => $('confirm-dialog').close('cancel');
+$('confirm-accept').onclick=() => $('confirm-dialog').close('confirm');
+function discardEditor() {
+  if (state.dirty && !window.confirm('Discard the unsaved source editor changes? They have not been sent to Reqlica.')) return false;
+  state.dirty=false; state.editorPath=null; state.editorRevision=null; return true;
+}
+function setView(view,record=true) {
+  if (!labels[view]) return;
+  if (!['projects','setup','settings'].includes(view) && !state.project) view='projects';
+  state.view=view;
+  document.querySelectorAll('.view').forEach(el => el.hidden=el.id !== view+'-view');
+  $('app').classList.toggle('selecting-project', !state.project || view === 'projects');
+  $('project-header').hidden=!state.project || ['projects','setup','settings'].includes(view);
+  $('back-projects').hidden=view === 'projects'; $('breadcrumb').textContent=labels[view];
+  document.querySelectorAll('[data-view]').forEach(el => { el.classList.toggle('active',el.dataset.view === view); if (el.dataset.view === view) el.setAttribute('aria-current','page'); else el.removeAttribute('aria-current'); });
+  if (view !== 'projects') $('mobile-view').value=view;
+  if (record) history.replaceState(null,'','#'+view);
+  if (view === 'endpoints') renderEndpoints();
+  if (view === 'tester') renderRequestRoutes();
+  if (view === 'settings') { renderProviderProfiles(); renderAIProviderChoices(); }
+  if (view === 'generate' || view === 'data') renderAIWorkspace();
+  syncControls();
+  const heading=$(view+'-view').querySelector('h1,h2');
+  if (heading) { heading.tabIndex=-1; heading.focus({preventScroll:true}); }
+  window.scrollTo(0,0);
+}
+function badge(status) { const kind=['running','passed','approved'].includes(status)?'':(['error','failed','timeout'].includes(status)?' error':' neutral'); return '<span class="badge'+kind+'"><span class="dot"></span>'+esc(status)+'</span>'; }
+function renderProjects() {
+  const search=$('project-search').value.toLowerCase(), running=$('running-only').checked;
+  const projects=state.projects.filter(p => (!running || p.status === 'running') && [p.name,p.id,p.directory].join(' ').toLowerCase().includes(search));
+  $('projects-summary').textContent=projects.length+' shown / '+state.projects.length+' registered';
+  $('project-grid').innerHTML=projects.map(p => `<article class="panel project-card"><div class="actions" style="justify-content:space-between"><span class="project-symbol">{ }</span>${badge(p.status)}</div><div><h3>${esc(p.name || p.id)}</h3><p class="small">${(p.endpoints || []).length} endpoints · ${p.active_version ? 'version '+esc(p.active_version.slice(0,8)) : 'legacy project'}</p></div><code class="folder">${esc(p.directory || 'Directory unavailable')}</code>${p.error?'<p class="small" style="color:var(--error)">'+esc(p.error)+'</p>':''}<div class="actions"><button class="btn" data-open-project="${esc(p.id)}">Open project →</button><button class="btn ghost" data-runtime-project="${esc(p.id)}">${p.status==='running'?'Stop':'Start'}</button><button class="btn ghost" style="color:var(--error)" data-delete-project="${esc(p.id)}">Delete…</button></div></article>`).join('') || `<div class="panel empty"><h2>${state.projects.length?'No matching projects':'No registered projects'}</h2><p>${state.projects.length?'Change the search or running filter.':'Create a new project to get a working starter API.'}</p>${state.projects.length?'':'<button class="btn primary" data-action="new-project">+ New project</button>'}</div>`;
+}
+function openProjectCreation() {
+  if(!discardEditor())return;
+  clearError('create-project-error'); $('create-project-dialog').showModal();
+}
+async function createProject() {
+  clearError('create-project-error');
+  const name=$('new-project-name').value.trim(), directory=$('new-project-directory').value.trim();
+  let created;
+  try {
+    if(!name)throw Error('Enter a project name.');
+    if(!directory.startsWith('/') && !directory.startsWith('~/'))throw Error('Enter an absolute directory or a path beginning with ~/.');
+    created=await api('gateway','/api/projects','POST',{name,directory});
+  } catch(error) {
+    if([404,405].includes(error.status))error=Error('Project creation is unavailable on this gateway. Restart Reqlica with the updated backend.');
+    showError(error,'create-project-error'); $('create-project-error').focus(); return;
+  }
+  // Keep the successful response even if a later detail/console refresh fails;
+  // retrying creation after a successful write would only produce a conflict.
+  state.projects.push(created); state.loaded=true; $('project-search').value=''; $('running-only').checked=false;
+  $('create-project-dialog').close(); $('create-project-form').reset(); renderProjects();
+  await openProject(created.id); toast('Project created. Its starter API is ready; the worker is idle.');
+}
+function renderDeletionTarget() {
+  const info=state.deletion; if(!info)return;
+  $('delete-project-details').innerHTML=[['Project',info.name || '(metadata unavailable)'],['Project ID',info.id],['Directory',info.directory || '(unavailable; unregister only)']].map(([k,v])=>'<dt>'+esc(k)+'</dt><dd><code>'+esc(v)+'</code></dd>').join('');
+  $('delete-project-warning').hidden=!info.error; $('delete-project-warning').textContent=info.error || '';
+}
+async function openProjectDeletion(id) {
+  const info=await api('gateway','/api/projects/'+id+'/deletion?delete_files=false');
+  state.deletion=info; $('delete-project-form').reset(); clearError('delete-project-error'); renderDeletionTarget();
+  $('delete-directory-field').hidden=true; $('delete-confirm-directory').required=false;
+  $('delete-project-dialog').showModal(); syncControls();
+}
+async function checkPermanentDeletion() {
+  clearError('delete-project-error'); $('delete-confirm-directory').value='';
+  if(!$('delete-project-files').checked){syncControls();return;}
+  state.deletion={...state.deletion,delete_files:false}; syncControls();
+  try {
+    state.deletion=await api('gateway','/api/projects/'+state.deletion.id+'/deletion?delete_files=true');
+    renderDeletionTarget();
+  } catch(error) { showError(error,'delete-project-error'); $('delete-project-error').focus(); }
+}
+async function deleteProject() {
+  const info=state.deletion, permanent=$('delete-project-files').checked;
+  clearError('delete-project-error'); if(!info)return;
+  try {
+    if(permanent && (!info.delete_files || $('delete-confirm-directory').value!==info.directory))throw Error('Recheck permanent deletion and type the exact displayed directory.');
+    if(state.project?.id===info.id && state.dirty && !window.confirm('This project has unsaved source edits. Continue removing the project?'))return;
+    await api('gateway','/api/projects/'+info.id,'DELETE',permanent?{delete_files:true,expected_directory:info.directory}:{delete_files:false});
+  } catch(error) {
+    state.deletion={...info,delete_files:false};
+    showError(error,'delete-project-error'); $('delete-project-error').focus(); return;
+  }
+  $('delete-project-dialog').close(); state.deletion=null; aiWorkspaces.delete(info.id);
+  if(state.project?.id===info.id){state.project=null;state.draft=null;state.drafts=[];state.draftRoutes=[];state.schema=null;state.dirty=false;state.editorPath=null;state.editorRevision=null;$('draft-workspace').hidden=true;}
+  state.projects=state.projects.filter(p=>p.id!==info.id); renderProjects(); setView('projects');
+  toast(permanent?'Project and its directory were permanently deleted.':'Project unregistered. Files, drafts, and database were kept.');
+  await loadProjects();
+}
+async function loadProjects() {
+  $('projects-summary').textContent='Loading projects…';
+  try {
+    const payload=await api('gateway','/api/projects');
+    if (!Array.isArray(payload.projects)) throw Error('Malformed project list from gateway.');
+    state.projects=payload.projects; state.loaded=true; $('connection-status').textContent='Gateway connected'; renderProjects();
+  } catch (error) {
+    $('projects-summary').textContent='Refresh failed'; $('connection-status').textContent='Gateway unavailable';
+    if (!state.loaded) $('project-grid').innerHTML='<div class="panel empty"><h2>Cannot load projects</h2><p>Check that Reqlica and the embedded local server are running.</p><button class="btn" data-view="setup">Connection &amp; help →</button></div>';
+    throw error;
+  }
+}
+function renderProject() {
+  const p=state.project; if (!p) return;
+  $('project-title').textContent=p.name || p.id; $('nav-project').textContent=p.name || p.id;
+  $('project-subtitle').textContent=(p.endpoints || []).length+' endpoints · '+(p.active_version?'version '+p.active_version.slice(0,8):'legacy layout');
+  $('runtime-status').outerHTML='<span id="runtime-status" class="badge'+(p.status==='running'?'':p.status==='error'?' error':' neutral')+'">'+esc(p.status)+'</span>';
+  $('runtime-button').textContent=p.status==='running'?'Stop API':'Start API';
+  $('base-url').textContent=p.url || direct.gateway+'/mock/'+p.id;
+  const rows=[['Project ID',p.id],['Directory',p.directory],['Status',p.status],['Worker PID',p.pid ?? 'Not running'],['Active version',p.active_version || 'None (legacy layout)']];
+  $('project-details').innerHTML=rows.map(([k,v])=>'<dt>'+esc(k)+'</dt><dd><code>'+esc(v)+'</code></dd>').join('');
+  $('project-error').hidden=!p.error; $('project-error').textContent=p.error || '';
+  $('convert-button').hidden=!!p.active_version;
+  $('published-docs').href=direct.gateway+root()+'/docs';
+  renderEndpoints(); syncControls();
+}
+async function openProject(id) {
+  if (!discardEditor()) return;
+  state.project=state.projects.find(p=>p.id===id) || null;
+  if (!state.project) throw Error('Project not found; refresh the project list.');
+  state.draft=null; state.drafts=[]; state.draftRoutes=[]; state.schema=null; state.selectedRoute=0;
+  $('draft-workspace').hidden=true; $('response-body').textContent='Send a request to inspect its real response.'; $('response-details').textContent='—'; $('response-status').textContent='Not sent'; $('response-time').textContent='—'; state.response=null;
+  renderProject(); renderDraftList(); setView('overview');
+  try { state.project=await api('gateway',root()+'/endpoints'); renderProject(); }
+  catch(error) { showError(error); }
+  await loadDrafts();
+}
+async function refreshProject() {
+  state.project=await api('gateway',root()+'/endpoints');
+  const index=state.projects.findIndex(p=>p.id===state.project.id); if(index>=0) state.projects[index]=state.project;
+  renderProject(); renderProjects();
+}
+async function changeRuntime(id) {
+  const p=state.projects.find(p=>p.id===id) || state.project, action=p.status==='running'?'stop':'start';
+  const updated=await api('gateway','/api/projects/'+id+'/'+action,'POST');
+  const index=state.projects.findIndex(p=>p.id===id); if(index>=0) state.projects[index]=updated;
+  if(state.project?.id===id) { state.project=updated; renderProject(); }
+  renderProjects(); toast(action==='start'?'Project worker started.':'Project stopped; files and data are kept.');
+}
+function renderEndpoints() {
+  const routes=state.project?.endpoints || [], search=$('route-search').value.toLowerCase();
+  if (!routes[state.selectedRoute]) state.selectedRoute=0;
+  $('route-count').textContent=routes.length+' routes';
+  $('route-list').innerHTML=routes.map((r,i)=>({r,i})).filter(({r})=>(r.method+' '+r.path).toLowerCase().includes(search)).map(({r,i})=>`<button class="route ${i===state.selectedRoute?'active':''}" data-route="${i}" aria-pressed="${i===state.selectedRoute}"><span class="method ${esc(r.method)}">${esc(r.method)}</span><code>${esc(r.path)}</code></button>`).join('') || '<div class="empty"><p>No matching routes.</p></div>';
+  const route=routes[state.selectedRoute]; $('test-endpoint').disabled=!route;
+  $('endpoint-title').textContent=route?route.method+' '+route.path:'No active endpoints';
+  $('endpoint-details').innerHTML=route?[['Method',route.method],['Path',route.path],['Handler',route.handler],['URL pattern',route.url || $('base-url').textContent+route.path]].map(([k,v])=>'<dt>'+esc(k)+'</dt><dd><code>'+esc(v)+'</code></dd>').join(''):'';
+  const schemaPath=route?.path.replace(/\{([^}:]+):[^}]+\}/g,'{$1}');
+  const operation=state.schema?.paths?.[schemaPath]?.[route?.method.toLowerCase()];
+  $('endpoint-schema').textContent=operation?pretty({operation,components:state.schema.components || {}}):state.schema?'No generated contract for this route in the active version.':'Load OpenAPI to inspect the generated contract. Contracts require validation and activation.';
+}
+async function loadDrafts() {
+  clearError('draft-error');
+  try { const result=await api('console',root()+'/drafts'); if(!Array.isArray(result.drafts)) throw Error('Malformed draft list.'); state.drafts=result.drafts; renderDraftList(); }
+  catch(error) { showError(error,'draft-error'); $('draft-list').innerHTML='<div class="empty"><p>Draft list unavailable. Check the console connection and retry.</p></div>'; }
+}
+function draftProgress(d) {
+  if(d.error) return 'error';
+  if(d.base_version !== state.project.active_version) return 'stale base';
+  if(d.approval?.revision === d.revision) return 'approved';
+  if([d.validation,d.test].some(c=>c && c.status !== 'passed')) return 'checks need attention';
+  return d.test?.status==='passed'?'tested':d.validation?.status==='passed'?'validated':'editing';
+}
+function renderDraftList() {
+  $('draft-list').innerHTML=state.drafts.map(d=>`<div class="draft-item ${d.id===state.draft?.id?'active':''}"><div><code>${esc(d.id)}</code><p class="help">${esc(d.error || 'Revision '+d.revision?.slice(0,12))}</p></div><div class="actions">${badge(draftProgress(d))}<button class="btn" data-open-draft="${esc(d.id)}" ${d.error?'disabled':''}>Open draft →</button></div></div>`).join('') || '<div class="empty"><h3>No drafts yet</h3><p>Create a draft from the active version to edit source and route definitions.</p></div>';
+}
+function updateDraft(d) {
+  state.draft=d; const index=state.drafts.findIndex(item=>item.id===d.id);
+  if(index>=0) state.drafts[index]=d; else state.drafts.push(d);
+  renderDraftList(); renderDraft();
+}
+async function loadDraftManifest() {
+  state.draftRoutes=[];
+  try {
+    const file=await api('console',draftRoot()+'/files?path=manifest.json');
+    if(file.revision!==state.draft.revision) throw Error('Draft changed while loading routes. Reload draft state before editing.');
+    const manifest=JSON.parse(file.content); state.draftRoutes=Array.isArray(manifest.endpoints)?manifest.endpoints:[];
+  } catch(error) { showError(error,'draft-error'); }
+  $('draft-route-select').innerHTML='<option value="">New route</option>'+state.draftRoutes.map((r,i)=>'<option value="'+i+'">'+esc(r.method+' '+r.path)+'</option>').join('');
+  renderRequestRoutes();
+}
+async function openDraft(id) {
+  if (!discardEditor()) return;
+  clearError('draft-error'); $('file-path').value=''; $('file-content').value='';
+  updateDraft(await api('console',root()+'/drafts/'+id));
+  await loadDraftManifest(); setView('drafts');
+}
+function eligible() {
+  const d=state.draft;
+  return !!d && d.base_version===state.project.active_version && d.validation?.status==='passed' && d.validation.revision===d.revision && d.test?.status==='passed' && d.test.revision===d.revision && d.test.tests_passed>0 && d.approval?.revision===d.revision;
+}
+function renderDraft() {
+  const d=state.draft; $('draft-workspace').hidden=!d; if(!d) return;
+  $('draft-heading').textContent='Draft '+d.id.slice(0,12)+' · '+draftProgress(d);
+  $('draft-revision').textContent='SHA-256 '+d.revision;
+  $('draft-base').textContent='Base version: '+d.base_version+(d.base_version!==state.project.active_version?' · STALE: create a new draft from the active version.':' · matches active version');
+  $('draft-docs').href=direct.console+draftRoot()+'/docs';
+  $('draft-files').innerHTML=d.files.map(path=>'<button type="button" class="btn '+(path===state.editorPath?'active':'')+'" data-file="'+esc(path)+'">'+esc(path)+'</button>').join('');
+  $('draft-changes').textContent=pretty(d.changes);
+  $('check-results').innerHTML=[['Validation',d.validation],['Tests',d.test]].map(([name,result])=>'<div><h3>'+name+'</h3>'+badge(result?.status || 'not run')+(result?.tests_run?'<p class="help">'+esc(result.tests_passed)+' / '+esc(result.tests_run)+' passed</p>':'')+'<p class="help">'+(result?(result.revision===d.revision?'Current revision':'STALE revision'):'Run on saved code')+'</p></div>').join('');
+  $('check-output').textContent=pretty({validation:d.validation,test:d.test});
+  $('approval-command').textContent='uv run reqlica draft approve '+state.project.id+' '+d.id+' --revision '+d.revision;
+  $('activation-help').textContent=eligible()?'This exact revision is checked and CLI-approved. Activation updates the published code; the backend rechecks eligibility.':'Activation requires a current base, passing validation and at least one passing test, and CLI approval of this exact revision.';
+  syncControls();
+}
+function syncControls() {
+  $('insert-request-example').disabled=state.busy || !selectedRequestRoute() || ($('request-target').value==='draft' && !state.draft);
+  $('activate-button').disabled=state.busy || state.dirty || !eligible();
+  $('editor-status').textContent=state.dirty?'UNSAVED CHANGES':'UNPUBLISHED';
+  $('runtime-button').disabled=state.busy || !state.project;
+  $('test-endpoint').disabled=state.busy || !state.project?.endpoints?.[state.selectedRoute];
+  document.querySelectorAll('[data-action="create-draft"]').forEach(el=>el.disabled=state.busy || !state.project?.active_version);
+  document.querySelectorAll('[data-action="validate"],[data-action="test"]').forEach(el=>el.disabled=state.busy || state.dirty || !state.draft);
+  const permanent=$('delete-project-files').checked;
+  $('delete-directory-field').hidden=!permanent; $('delete-confirm-directory').required=permanent;
+  $('delete-project-submit').textContent=permanent?'Permanently delete project':'Unregister · keep files';
+  $('delete-project-submit').disabled=state.busy || !state.deletion || (permanent && (!state.deletion.delete_files || $('delete-confirm-directory').value!==state.deletion.directory));
+  $('ai-edit-endpoint').disabled=state.busy || !state.project?.endpoints?.[state.selectedRoute];
+  document.querySelectorAll('[data-needs-ai-provider]').forEach(el=>el.disabled=state.busy || !aiConfig.providers.length);
+  document.querySelectorAll('[data-ai-project-feature]').forEach(el=>el.disabled=state.busy || !state.project);
+  $('copy-generation-preview').disabled=state.busy || !state.project || !aiWorkspace().generationPreview;
+  $('copy-data-preview').disabled=state.busy || !state.project || !aiWorkspace().dataPreview;
+  $('copy-endpoint-preview').disabled=state.busy || !endpointBrief;
+  $('ai-project-help').textContent=state.project?'AI settings are shared across projects. Generate API supports Groq explanations and drafts; separate endpoint-edit and data screens remain previews.':'Open a project to explore these screens. Provider settings are available without a project.';
+  const generationProvider=aiConfig.providers.find(p=>p.id===$('generation-provider').value);
+  const asking=aiWorkspace().task==='ask';
+  $('generate-draft-button').disabled=state.busy || generationProvider?.kind!=='groq' || !state.project || (!asking && !state.project.active_version);
+  $('generate-draft-help').textContent=generationProvider?.kind==='groq'?(asking?'One read-only answer from published project context. No drafts, execution, or changes. A missing browser key uses server GROQ_API_KEY / GROQ_API.':'One Groq request, then an unexecuted draft. A missing browser key uses server GROQ_API_KEY / GROQ_API. Typed contracts and tests are always requested.'):'Select a Groq profile for project questions or real generation. Other provider types still support local previews only.';
+  $('copy-project-answer').disabled=state.busy || !aiWorkspace().answer;
+}
+async function refreshDraft() {
+  const oldRevision=state.draft.revision;
+  updateDraft(await api('console',draftRoot())); await loadDraftManifest();
+  if (state.editorPath && oldRevision!==state.draft.revision) toast('Draft revision changed. Editor contents were kept; reload the file before saving over newer changes.');
+}
+async function readFile(path) {
+  if(!discardEditor()) return;
+  const file=await api('console',draftRoot()+'/files?path='+encodeURIComponent(path));
+  if(file.revision!==state.draft.revision) updateDraft(await api('console',draftRoot()));
+  state.editorPath=path; state.editorRevision=file.revision; $('file-path').value=path; $('file-content').value=file.content; state.dirty=false; renderDraft();
+}
+async function saveFile() {
+  if(!state.draft) throw Error('Select a draft first.');
+  const path=$('file-path').value.trim();
+  if(!path || path.startsWith('/') || path.split('/').includes('..')) throw Error('Use a safe project-relative file path.');
+  if(path!==state.editorPath && state.draft.files.includes(path)) throw Error('Load the existing file before overwriting it. Your editor text has been kept.');
+  const expected_revision=state.editorRevision || state.draft.revision;
+  const result=await api('console',draftRoot()+'/files?path='+encodeURIComponent(path),'PUT',{content:$('file-content').value,expected_revision});
+  state.editorPath=path; state.editorRevision=result.revision; state.dirty=false; updateDraft(result); await loadDraftManifest(); toast('File saved. Previous checks and approval must be renewed after edits.');
+}
+function requestRoutes() {
+  return ($('request-target').value==='draft'?state.draftRoutes:(state.project?.endpoints || [])).filter(r=>r.method!=='TRACE');
+}
+function selectedRequestRoute() {
+  return $('request-route').value===''?null:requestRoutes()[Number($('request-route').value)];
+}
+function renderRequestRoutes(preserve=true) {
+  const selected=preserve?$('request-route').selectedOptions[0]?.textContent:null;
+  const routes=requestRoutes();
+  $('request-route').innerHTML='<option value="">Custom request</option>'+routes.map((r,i)=>'<option value="'+i+'">'+esc(r.method+' '+r.path)+'</option>').join('');
+  const index=routes.findIndex(r=>r.method+' '+r.path===selected);
+  if(index>=0)$('request-route').value=String(index);
+  $('request-example-status').textContent='Choose a route shortcut to insert its example. Review sample values before sending; existing records and business rules are not inferred.';
+  $('request-headers-field').hidden=$('request-target').value==='draft';
+  $('request-help').textContent=$('request-target').value==='draft'?(state.draft?'Pinned draft '+state.draft.id.slice(0,12)+' · disposable data; headers/cookies are not forwarded.':'Select a draft in Drafts & checks first.'):'Real live request. Writes persist; idle workers start automatically. Replace every {path_parameter} before sending.';
+  syncControls();
+}
+// Request example helpers use saved OpenAPI only; never fetch reference URLs.
+function resolveExampleRef(value, document, seen=new Set()) {
+  if(!value || typeof value!=='object')return value;
+  if(!value.$ref)return value;
+  const ref=value.$ref;
+  if(typeof ref!=='string' || !ref.startsWith('#/') || seen.has(ref))throw Error('The contract has an unsupported or circular reference. Enter this example manually.');
+  const target=ref.slice(2).split('/').reduce((node,key)=>{
+    key=key.replace(/~1/g,'/').replace(/~0/g,'~');
+    return node && Object.hasOwn(node,key)?node[key]:undefined;
+  },document);
+  if(!target)throw Error('The contract has a missing schema reference. Reload or revalidate the contract.');
+  const {$ref,...siblings}=value;
+  return {...resolveExampleRef(target,document,new Set([...seen,ref])),...siblings};
+}
+function documentedExample(value, document) {
+  if(Object.hasOwn(value,'example'))return {found:true,value:value.example};
+  if(Array.isArray(value.examples) && value.examples.length)return {found:true,value:value.examples[0]};
+  if(value.examples && typeof value.examples==='object')for(const item of Object.values(value.examples)) {
+    const example=resolveExampleRef(item,document);
+    if(example && Object.hasOwn(example,'value'))return {found:true,value:example.value};
+  }
+  return {found:false};
+}
+function exampleValue(raw, document, depth=0) {
+  if(depth>8)throw Error('This schema is too deeply nested to create a safe sample. Enter the body manually.');
+  const schema=resolveExampleRef(raw,document) || {};
+  const explicit=documentedExample(schema,document);
+  if(explicit.found)return explicit.value;
+  if(Object.hasOwn(schema,'default'))return schema.default;
+  if(Object.hasOwn(schema,'const'))return schema.const;
+  if(schema.enum?.length)return schema.enum.find(v=>v!==null) ?? schema.enum[0];
+  const choices=schema.oneOf || schema.anyOf;
+  if(choices?.length)return exampleValue(choices.find(s=>s.type!=='null') || choices[0],document,depth+1);
+  if(schema.allOf?.length) {
+    const values=schema.allOf.map(s=>exampleValue(s,document,depth+1));
+    if(values.every(v=>v && typeof v==='object' && !Array.isArray(v))) {
+      const own=schema.properties?exampleValue({...schema,allOf:undefined},document,depth+1):{};
+      return Object.fromEntries([...values,own].flatMap(value=>Object.entries(value)));
+    }
+    throw Error('This combined schema needs a hand-written example. Inspect its OpenAPI contract.');
+  }
+  const type=Array.isArray(schema.type)?schema.type.find(t=>t!=='null'):schema.type;
+  if(type==='object' || schema.properties) {
+    const properties=Object.entries(schema.properties || {}).filter(([,s])=>!resolveExampleRef(s,document)?.readOnly);
+    if(properties.length>50)throw Error('This body has too many fields for an automatic example. Enter it manually.');
+    return Object.fromEntries(properties.map(([key,s])=>[key,exampleValue(s,document,depth+1)]));
+  }
+  if(type==='array') {
+    const count=schema.maxItems===0?0:Math.max(1,schema.minItems || 0);
+    if(count>5)throw Error('This array needs more than five items. Enter its example manually.');
+    return Array.from({length:count},()=>exampleValue(schema.items,document,depth+1));
+  }
+  if(type==='integer' || type==='number') {
+    const step=schema.multipleOf || (type==='integer'?1:0.1);
+    let value=schema.minimum ?? 1;
+    if(typeof schema.exclusiveMinimum==='number')value=Math.max(value,schema.exclusiveMinimum+step);
+    if(schema.maximum!==undefined)value=Math.min(value,schema.maximum);
+    if(typeof schema.exclusiveMaximum==='number')value=Math.min(value,schema.exclusiveMaximum-step);
+    if(type==='integer')value=Math.ceil(value);
+    if(schema.multipleOf)value=Math.ceil(value/step)*step;
+    return Number(value.toFixed(8));
+  }
+  if(type==='boolean')return true;
+  if(type==='null')return null;
+  const formats={'date':'2026-01-01','date-time':'2026-01-01T12:00:00Z','uuid':'00000000-0000-4000-8000-000000000001','email':'reader@example.com','uri':'https://example.com','url':'https://example.com','ipv4':'192.0.2.1','ipv6':'2001:db8::1'};
+  let value=formats[schema.format] || 'example';
+  if(schema.minLength>256)throw Error('This field requires a long value. Enter its example manually.');
+  value=value.padEnd(schema.minLength || 0,'x');
+  return schema.maxLength===undefined?value:value.slice(0,schema.maxLength);
+}
+function buildRequestExample(document, route) {
+  const pattern=route.path.replace(/\{([^}:]+):[^}]+\}/g,'{$1}');
+  const item=resolveExampleRef(document.paths?.[pattern],document);
+  const operation=item?.[route.method.toLowerCase()];
+  if(!operation)throw Error('No saved OpenAPI operation matches this route. Revalidate the draft or reload the published contract.');
+  const parameters=new Map();
+  for(const raw of [...(item.parameters || []),...(operation.parameters || [])]) {
+    const p=resolveExampleRef(raw,document);parameters.set(p.in+':'+p.name,p);
+  }
+  let path=route.path;
+  const query=new URLSearchParams(), notes=[];
+  for(const p of parameters.values()) {
+    // Draft /call already supplies this pin; it is not a user request header.
+    if(p.in==='header' && p.name?.toLowerCase()==='x-reqlica-expected-revision' && document['x-reqlica-draft-id'])continue;
+    if(!['path','query'].includes(p.in)) {
+      if(p.required)notes.push('Required '+p.in+' '+p.name+' must be supplied manually; headers are unchanged and draft calls do not forward headers/cookies.');
+      continue;
+    }
+    const explicit=documentedExample(p,document);
+    const value=explicit.found?explicit.value:exampleValue(p.schema,document);
+    // Optional FastAPI defaults of None mean omission, not the string "null".
+    if(value===null) {
+      if(p.in==='query' && !p.required)continue;
+      throw Error('A required parameter has a null example. Enter a concrete path/query value manually.');
+    }
+    if(value!==null && typeof value==='object' && (!Array.isArray(value) || value.some(v=>v!==null && typeof v==='object')))throw Error('A structured '+p.in+' parameter needs manual input. Inspect the OpenAPI contract.');
+    if(p.in==='path') {
+      if(p.style && p.style!=='simple')throw Error('This path parameter uses an unsupported example style. Enter it manually.');
+      path=path.replace(/\{([^}:]+)(?::[^}]+)?\}/g,(match,name)=>name===p.name?encodeURIComponent(String(value)):match);
+    } else {
+      if(p.style && p.style!=='form')throw Error('This query parameter uses an unsupported example style. Enter it manually.');
+      for(const entry of Array.isArray(value) && p.explode!==false?value:[value])query.append(p.name,String(entry));
+    }
+  }
+  if(/[{}]/.test(path))throw Error('The contract is missing a path parameter definition. Enter the path manually.');
+  if(query.size)path+='?'+query.toString();
+  let body='';
+  if(operation.requestBody) {
+    const request=resolveExampleRef(operation.requestBody,document);
+    const media=Object.entries(request.content || {}).find(([type])=>type==='application/json') || Object.entries(request.content || {}).find(([type])=>/^application\/[^;]+\+json$/.test(type));
+    if(!media)throw Error('This endpoint expects a non-JSON body, which this tester does not support. Use an external HTTP client.');
+    if(['GET','HEAD'].includes(route.method))throw Error('This tester cannot send a body with GET/HEAD. Use an external HTTP client.');
+    const explicit=documentedExample(media[1],document);
+    body=JSON.stringify(explicit.found?explicit.value:exampleValue(media[1].schema,document),null,2);
+  }
+  return {method:route.method,path,body,notes};
+}
+async function insertRequestExample() {
+  const route=selectedRequestRoute(), target=$('request-target').value;
+  if(!route)throw Error('Choose a route shortcut first.');
+  if(target==='draft' && !state.draft)throw Error('Open a draft first.');
+  $('request-example-status').textContent='Loading the saved '+(target==='draft'?'draft':'published')+' contract…';
+  try {
+    const document=target==='draft'
+      ?await api('console',draftRoot()+'/openapi.json?revision='+state.draft.revision)
+      :await api('gateway',root()+'/openapi.json');
+    const sample=buildRequestExample(document,route);
+    if(($('request-body').value.trim() || $('request-path').value!==route.path || $('request-method').value!==route.method) && !await confirmAction('Replace request inputs?', 'Replace the current method, path/query, and body with an example for '+route.method+' '+route.path+'? Headers will be kept. No request will be sent.')) {
+      $('request-example-status').textContent='Example insertion cancelled. Your request inputs were kept.';return;
+    }
+    $('request-method').value=sample.method;$('request-path').value=sample.path;$('request-body').value=sample.body;
+    $('request-example-status').textContent='Example inserted from the '+(target==='draft'?'pinned draft':'published')+' contract. Review values, IDs, and constraints before sending. No request was sent. '+sample.notes.join(' ');
+    toast('Example inserted. Review it, then send when ready.');
+  } catch(error) {
+    $('request-example-status').textContent='Example unavailable. Inputs kept. Drafts need validation of the saved revision; live APIs need a contract from validated activation.';
+    throw error;
+  }
+}
+function parseHeaders() {
+  const value=JSON.parse($('request-headers').value || '{}');
+  if(!value || Array.isArray(value) || typeof value!=='object') throw Error('Headers must be a JSON object of string values.');
+  const forbidden=/^(host|origin|referer|cookie|connection|content-length|transfer-encoding|upgrade|proxy-.*|sec-.*|x-reqlica-.*|x-forwarded-.*)$/i;
+  for(const [key,val] of Object.entries(value)) if(typeof val!=='string' || forbidden.test(key) || /[\r\n]/.test(key+val)) throw Error('Invalid or browser/proxy-controlled header: '+key);
+  return value;
+}
+function validRequestPath(path) {
+  if(!path.startsWith('/') || path.startsWith('//') || /[\\#\s{}]/.test(path) || /%(?:2e|2f|5c|00)/i.test(path) || path.split('?')[0].split('/').some(s=>s==='.' || s==='..')) throw Error('Use a project-relative path such as /books/123?limit=10. Replace all placeholders; full URLs, fragments, and traversal paths are not allowed.');
+  return path;
+}
+async function sendRequest() {
+  const target=$('request-target').value, method=$('request-method').value, path=validRequestPath($('request-path').value.trim()), raw=$('request-body').value.trim();
+  let body; if(raw) { try { body=JSON.parse(raw); } catch { throw Error('Request body is not valid JSON.'); } }
+  if(['GET','HEAD'].includes(method) && raw) throw Error('GET/HEAD requests cannot carry a body here. Clear the JSON body.');
+  if(target==='draft' && !state.draft) throw Error('Open a draft before sending a disposable call.');
+  if(target==='live' && !['GET','HEAD','OPTIONS'].includes(method) && !await confirmAction('Send a live write request?',method+' '+path+' will execute against persistent data for '+state.project.name+'.')) return;
+  const start=performance.now(); let result,status,details;
+  $('response-status').textContent='Sending…';
+  try {
+    if(target==='draft') {
+      const call=await api('console',draftRoot()+'/call','POST',{expected_revision:state.draft.revision,method,path,...(raw?{json_body:body}:{})});
+      result=Object.hasOwn(call,'body')?call.body:call; status=call.status==='passed'?String(call.status_code):'Runner '+call.status; details=call;
+    } else {
+      const headers=parseHeaders(); if(raw && !Object.keys(headers).some(k=>k.toLowerCase()==='content-type')) headers['Content-Type']='application/json';
+      const live=await transport('gateway','/mock/'+state.project.id+path,{method,headers,body:raw?JSON.stringify(body):undefined});
+      result=live.body; status=String(live.response.status)+' '+live.response.statusText; details=Object.fromEntries(live.response.headers.entries());
+    }
+    state.response=typeof result==='string'?result:pretty(result);
+    $('response-body').textContent=state.response || '(empty response body)'; $('response-details').textContent=pretty(details);
+    $('response-status').textContent=status; $('response-status').className='badge'+(/^[23]/.test(status)?'':' error');
+    $('response-time').textContent=Math.round(performance.now()-start)+' ms';
+    // Live requests may lazily start workers. Never turn a successful response into
+    // a failed request if the subsequent status refresh is unavailable.
+    if(target==='live') { try { await refreshProject(); } catch(error) { toast('Response received; status refresh failed: '+errorMessage(error)); } }
+  } catch(error) { $('response-status').textContent='Request failed'; $('response-status').className='badge error'; $('response-time').textContent=Math.round(performance.now()-start)+' ms'; throw error; }
+}
+async function copy(text) {
+  if(text===null || text===undefined) throw Error('There is no response to copy yet.');
+  try { await navigator.clipboard.writeText(text); toast('Copied to clipboard.'); } catch { window.prompt('Copy this text:',text); }
+}
+async function checkHealth() {
+  const results=await Promise.allSettled([api('console','/api/health'),api('gateway','/api/projects')]);
+  const output={console:results[0].status==='fulfilled'?results[0].value:errorMessage(results[0].reason),gateway:results[1].status==='fulfilled'?{status:'ok',projects:results[1].value.projects?.length}:errorMessage(results[1].reason)};
+  $('health-output').textContent=pretty(output); $('connection-status').textContent=results.every(r=>r.status==='fulfilled')?'Console + gateway connected':'Connection needs attention';
+}
+function validateProvider(profile) {
+  const name=String(profile.name || '').trim(), model=String(profile.model || '').trim(), kind=profile.kind;
+  if(!name || name.length>80)throw Error('Enter a display name of 1–80 characters.');
+  if(!Object.hasOwn(providerPresets,kind))throw Error('Choose a supported provider type.');
+  if(!model || model.length>200)throw Error('Enter a model identifier of 1–200 characters.');
+  let url; try {url=new URL(String(profile.baseUrl || '').trim());}catch{throw Error('Enter a valid provider base URL.');}
+  const loopback=['localhost','127.0.0.1','[::1]'].includes(url.hostname);
+  if(!['http:','https:'].includes(url.protocol) || (url.protocol==='http:' && !loopback) || url.username || url.password || url.search || url.hash)throw Error('Use HTTPS, or HTTP on loopback, without URL credentials, query parameters, or fragments.');
+  return {id:profile.id,name,kind,model,baseUrl:url.href.replace(/\/+$/,'')};
+}
+function loadAIConfig() {
+  const clean={providers:[],defaultProvider:'',defaults:{...aiDefaultOptions}};
+  try {
+    const saved=JSON.parse(localStorage.getItem(aiStorageKey) || '{}') || {};
+    for(const p of Array.isArray(saved?.providers)?saved.providers:[]) {
+      try {if(typeof p?.id!=='string' || !/^[\w-]{1,80}$/.test(p.id) || clean.providers.some(item=>item.id===p.id))continue;clean.providers.push(validateProvider(p));}catch{}
+    }
+    clean.defaultProvider=clean.providers.some(p=>p.id===saved.defaultProvider)?saved.defaultProvider:(clean.providers[0]?.id || '');
+    const options=saved?.defaults;
+    if(options && typeof options==='object') {
+      if(typeof options.temperature==='number' && Number.isFinite(options.temperature) && options.temperature>=0 && options.temperature<=2)clean.defaults.temperature=options.temperature;
+      if(Number.isInteger(options.maxTokens) && options.maxTokens>=256 && options.maxTokens<=32768 && options.maxTokens%256===0)clean.defaults.maxTokens=options.maxTokens;
+      for(const key of ['includeTests','includeSchema','clarify'])if(typeof options[key]==='boolean')clean.defaults[key]=options[key];
+    }
+  } catch(error) { if(error.name!=='SyntaxError')aiStorageAvailable=false; }
+  return clean;
+}
+function persistAIConfig() {
+  // Explicit whitelist: passwords, entered keys, prompts, files, and fixtures
+  // must never be included in localStorage or provider request previews.
+  const saved={providers:aiConfig.providers.map(p=>({id:p.id,name:p.name,kind:p.kind,model:p.model,baseUrl:p.baseUrl})),defaultProvider:aiConfig.defaultProvider,defaults:{...aiConfig.defaults}};
+  try {localStorage.setItem(aiStorageKey,JSON.stringify(saved));aiStorageAvailable=true;}catch{aiStorageAvailable=false;}
+  for(const workspace of aiWorkspaces.values())workspace.generationPreview=null;
+  renderProviderProfiles();
+}
+function renderProviderProfiles() {
+  $('provider-list').innerHTML=aiConfig.providers.map(p=>`<article class="provider-card"><div class="actions"><h3>${esc(p.name)}</h3><span class="badge ${p.id===aiConfig.defaultProvider?'':'neutral'}">${p.id===aiConfig.defaultProvider?'DEFAULT PROFILE':'SAVED PROFILE'}</span></div><dl class="details-grid"><dt>Type</dt><dd>${esc(providerPresets[p.kind].name)}</dd><dt>Model</dt><dd><code>${esc(p.model)}</code></dd><dt>Base URL</dt><dd><code>${esc(p.baseUrl)}</code></dd><dt>API key</dt><dd class="small muted">${providerKeys.has(p.id)?'Held in page memory only':'Not set for this page'}</dd></dl><p class="help">Not connected or verified.</p><div class="actions provider-actions"><button class="btn" data-edit-provider="${esc(p.id)}">Edit</button>${p.id!==aiConfig.defaultProvider?'<button class="btn" data-default-provider="'+esc(p.id)+'">Make default</button>':''}<button class="btn ghost" style="color:var(--error)" data-remove-provider="${esc(p.id)}">Remove</button></div></article>`).join('') || '<div class="provider-empty"><h3>No LLM providers yet</h3><p>Add a local model or API-compatible provider to explore the AI workflow.</p><button class="btn primary" data-action="add-provider">+ Add provider</button></div>';
+  $('ai-storage-status').textContent=aiStorageAvailable?'Non-secret provider profiles and defaults are saved in this browser only. API keys are never persisted.':'Browser storage is unavailable. Profiles and defaults will be lost on reload; keys are always memory-only.';
+}
+function renderAIProviderChoices() {
+  document.querySelectorAll('[data-ai-provider]').forEach(select=>{
+    const previous=select.value;
+    select.innerHTML=aiConfig.providers.length?aiConfig.providers.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name+' · '+p.model)+'</option>').join(''):'<option value="">Add a provider in Settings first</option>';
+    select.value=aiConfig.providers.some(p=>p.id===previous)?previous:aiConfig.defaultProvider;
+    if(select.id==='default-ai-provider' && !aiPrefsDirty)select.value=aiConfig.defaultProvider;
+  });
+  renderProviderSummaries(); syncControls();
+}
+function renderProviderSummaries() {
+  for(const [selectId,summaryId] of [['generation-provider','generation-provider-summary'],['data-provider','data-provider-summary'],['endpoint-ai-provider','endpoint-provider-summary']]) {
+    const p=aiConfig.providers.find(item=>item.id===$(selectId).value);
+    $(summaryId).textContent=p?p.model+' · '+p.baseUrl+(p.kind==='groq'?' · Groq questions and generation available; profile not verified':' · preview profile only'):'Configure a provider in Settings. No request is made until explicit confirmation.';
+  }
+}
+function fillAIDefaults() {
+  $('ai-temperature').value=aiConfig.defaults.temperature; $('ai-max-tokens').value=aiConfig.defaults.maxTokens;
+  $('ai-include-tests').checked=aiConfig.defaults.includeTests; $('ai-include-schema').checked=aiConfig.defaults.includeSchema; $('ai-clarify').checked=aiConfig.defaults.clarify;
+  aiPrefsDirty=false; $('ai-defaults-status').textContent='BROWSER ONLY'; renderAIProviderChoices();
+}
+function openProvider(id=null) {
+  providerEditingId=id; clearError('provider-error'); $('provider-form').reset();
+  const p=aiConfig.providers.find(item=>item.id===id);
+  $('provider-dialog-title').textContent=p?'Edit LLM provider':'Add LLM provider';
+  $('provider-name').value=p?.name || ''; $('provider-kind').value=p?.kind || 'groq';
+  $('provider-base-url').value=p?.baseUrl || providerPresets.groq.url; $('provider-model').value=p?.model || providerPresets.groq.defaultModel;
+  $('provider-model').placeholder=providerPresets[$('provider-kind').value].model;
+  $('provider-api-key').value=providerKeys.get(id) || ''; $('provider-api-key').type='password'; $('toggle-provider-key').textContent='Show'; $('toggle-provider-key').setAttribute('aria-pressed','false');
+  $('provider-dialog').showModal();
+}
+function saveProvider() {
+  clearError('provider-error');
+  try {
+    const id=providerEditingId || ('provider-'+(globalThis.crypto?.randomUUID?.() || Date.now().toString(36)+Math.random().toString(36).slice(2)));
+    const p=validateProvider({id,name:$('provider-name').value,kind:$('provider-kind').value,baseUrl:$('provider-base-url').value,model:$('provider-model').value});
+    const index=aiConfig.providers.findIndex(item=>item.id===id); if(index>=0)aiConfig.providers[index]=p; else aiConfig.providers.push(p);
+    const key=$('provider-api-key').value.trim(); if(key)providerKeys.set(id,key);else providerKeys.delete(id);
+    if(!aiConfig.defaultProvider)aiConfig.defaultProvider=id;
+    persistAIConfig();renderAIProviderChoices();$('provider-api-key').value='';$('provider-api-key').type='password';$('provider-dialog').close();toast(aiStorageAvailable?'Provider profile saved locally. No connection was made.':'Provider kept for this page only; browser storage is unavailable.');
+  } catch(error) {showError(error,'provider-error');$('provider-error').focus();}
+}
+async function removeProvider(id) {
+  const p=aiConfig.providers.find(item=>item.id===id); if(!p)return;
+  if(!await confirmAction('Remove provider profile?','Remove '+p.name+' from this browser and forget its in-memory key? Real project APIs, drafts, and data will not change.'))return;
+  aiConfig.providers=aiConfig.providers.filter(item=>item.id!==id);providerKeys.delete(id);
+  if(aiConfig.defaultProvider===id)aiConfig.defaultProvider=aiConfig.providers[0]?.id || '';
+  persistAIConfig();renderAIProviderChoices();toast('Provider profile removed from this browser.');
+}
+function saveAIDefaults() {
+  clearError('ai-defaults-error');
+  const temperature=Number($('ai-temperature').value), maxTokens=Number($('ai-max-tokens').value), provider=$('default-ai-provider').value;
+  if(!Number.isFinite(temperature) || temperature<0 || temperature>2 || !Number.isInteger(maxTokens) || maxTokens<256 || maxTokens>32768 || maxTokens%256!==0) {showError(Error('Use temperature 0–2 and tokens 256–32768 in steps of 256.'),'ai-defaults-error');return;}
+  if(provider && !aiConfig.providers.some(p=>p.id===provider)){showError(Error('Choose an existing provider.'),'ai-defaults-error');return;}
+  aiConfig.defaultProvider=provider; aiConfig.defaults={temperature,maxTokens,includeTests:$('ai-include-tests').checked,includeSchema:$('ai-include-schema').checked,clarify:$('ai-clarify').checked};
+  aiPrefsDirty=false;persistAIConfig();renderAIProviderChoices();$('ai-defaults-status').textContent=aiStorageAvailable?'SAVED LOCALLY':'PAGE SESSION ONLY';toast('AI preferences saved locally; no backend settings changed.');
+}
+function aiWorkspace() {
+  if(!state.project)return {};
+  if(!aiWorkspaces.has(state.project.id))aiWorkspaces.set(state.project.id,{task:'generate',question:'',answeredQuestion:'',answer:null,mode:'describe',description:'',spec:'',filename:'',generationProvider:'',generationPreview:null,generationResult:null,dataProvider:'',collection:'items',count:5,dataPrompt:'',template:'{\n  "name": "Sample item",\n  "price": 14.99,\n  "stock": 20\n}',dataPreview:null,dataBrief:null,endpointPrompts:{}});
+  return aiWorkspaces.get(state.project.id);
+}
+function generationMode(mode) {
+  if(!state.project)return;if(aiWorkspace().mode!==mode)aiWorkspace().generationPreview=null;aiWorkspace().mode=mode;
+  const asking=aiWorkspace().task==='ask';
+  $('generation-describe').hidden=asking || mode!=='describe';$('generation-upload').hidden=asking || mode!=='upload';
+  document.querySelectorAll('[data-generation-mode]').forEach(b=>{b.classList.toggle('active',b.dataset.generationMode===mode);b.setAttribute('aria-pressed',String(b.dataset.generationMode===mode));});
+  renderGenerationPreview();syncControls();
+}
+function projectAITask(task) {
+  if(!state.project || !['generate','ask'].includes(task))return;
+  const w=aiWorkspace();w.task=task;const asking=task==='ask';
+  document.querySelectorAll('[data-project-ai-task]').forEach(b=>{b.classList.toggle('active',b.dataset.projectAiTask===task);b.setAttribute('aria-pressed',String(b.dataset.projectAiTask===task));});
+  $('project-ai-input-title').textContent=asking?'Ask about this project':'Requirements';
+  $('project-question-input').hidden=!asking;$('generation-input-modes').hidden=asking;
+  $('generation-brief-panel').hidden=asking;$('project-answer-panel').hidden=!asking;
+  $('preview-generation-button').hidden=asking;$('generation-result').hidden=asking || !w.generationResult;
+  $('generate-draft-button').textContent=asking?'Ask project with Groq →':'Generate draft with Groq →';
+  clearError('generation-error');generationMode(w.mode);renderProjectAnswer();syncControls();
+}
+function renderProjectAnswer() {
+  const w=aiWorkspace(),answer=w.answer;
+  $('project-answer-empty').hidden=!!answer;$('project-answer-content').hidden=!answer;
+  $('project-answered-question').textContent=w.answeredQuestion || '';
+  $('project-answer-text').textContent=answer?.answer || '';
+  $('project-answer-revision').textContent=answer?'Published snapshot '+answer.context_revision:'';
+  $('project-answer-sources').innerHTML=answer?.sources.length?answer.sources.map(path=>'<li><code>'+esc(path)+'</code></li>').join(''):'<li class="small muted">No specific source cited.</li>';
+  $('project-answer-limitations').innerHTML=answer?.limitations.length?answer.limitations.map(note=>'<li>'+esc(note)+'</li>').join(''):'<li class="small muted">No additional limitations reported by the model; verify its interpretation against the source.</li>';
+  $('project-answer-warning').textContent=answer?.warning || '';
+  $('project-answer-status').textContent=answer?'Answer received · no project changes.':'No question sent.';
+}
+function renderGenerationPreview() {
+  const w=aiWorkspace();
+  $('generation-empty').hidden=!!w.generationPreview;$('generation-preview').hidden=!w.generationPreview;$('generation-preview').textContent=w.generationPreview?pretty(w.generationPreview):'';
+  $('generation-preview-status').textContent=w.generationPreview?'Local brief snapshot · generation result is separate.':'No current brief; preview again after changing inputs.';
+}
+function renderAIWorkspace() {
+  const w=aiWorkspace();renderAIProviderChoices();generationMode(w.mode);
+  $('generation-prompt').value=w.description;$('generation-spec-text').value=w.spec;$('generation-file').value='';
+  $('project-question').value=w.question;
+  $('generation-file-status').textContent=w.filename?'Loaded locally: '+w.filename+' · previews do not upload; generation shares selected text':'Read locally first · JSON, YAML, Markdown, or text · maximum 1 MiB for previews.';
+  $('generation-provider').value=aiConfig.providers.some(p=>p.id===w.generationProvider)?w.generationProvider:aiConfig.defaultProvider;
+  $('data-provider').value=aiConfig.providers.some(p=>p.id===w.dataProvider)?w.dataProvider:aiConfig.defaultProvider;
+  $('ai-data-collection').value=w.collection;$('ai-data-count').value=w.count;$('ai-data-prompt').value=w.dataPrompt;$('ai-data-template').value=w.template;
+  renderGenerationPreview();
+  const result=w.generationResult;$('generation-result').hidden=!result || w.task==='ask';
+  $('generation-result').innerHTML=result?'<strong>Draft saved · not executed or published</strong><p>'+esc(result.summary)+'</p><p class="help mono">Draft '+esc(result.draft.id)+' · '+esc(result.draft.revision)+'</p><ul>'+result.assumptions.map(a=>'<li>'+esc(a)+'</li>').join('')+'</ul>'+((result.output_warnings || []).length?'<div class="notice section-gap"><strong>Provider output normalized</strong><ul>'+result.output_warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul></div>':'')+'<p class="small">'+esc(result.warning)+'</p><button class="btn section-gap" data-action="review-generated-draft">Review generated draft →</button>':'';
+  $('ai-data-empty').hidden=!!w.dataPreview;$('ai-data-preview').hidden=!w.dataPreview;$('ai-data-preview').textContent=w.dataPreview?pretty(w.dataPreview):'';
+  $('ai-data-preview-count').textContent=(w.dataPreview?.length || 0)+' local records';$('ai-data-brief').textContent=w.dataBrief?pretty(w.dataBrief):'No brief prepared.';
+  projectAITask(w.task);renderProviderSummaries();syncControls();
+}
+function buildAIBrief(task,selectId,input) {
+  const p=aiConfig.providers.find(item=>item.id===$(selectId).value);if(!p)throw Error('Add and select a provider in Settings first.');
+  return {frontend_preview:true,execution:'not_connected',task,project_id:state.project.id,provider:{type:p.kind,name:p.name,base_url:p.baseUrl,model:p.model},generation_defaults:{...aiConfig.defaults},input};
+}
+async function readGenerationFile() {
+  clearError('generation-error');const file=$('generation-file').files[0];if(!file)return;
+  try {
+    if(file.size>1048576)throw Error('Choose a specification no larger than 1 MiB.');
+    if(!/\.(json|ya?ml|md|txt)$/i.test(file.name))throw Error('Choose JSON, YAML, Markdown, or a text file.');
+    const text=await file.text();if(!text.trim() || text.includes('\u0000'))throw Error('The file must contain readable nonempty text.');
+    if(/\.json$/i.test(file.name))try{JSON.parse(text);}catch{throw Error('The JSON file is invalid. Fix its syntax or paste a text specification.');}
+    const w=aiWorkspace();w.spec=text;w.filename=file.name;w.generationPreview=null;generationMode('upload');$('generation-spec-text').value=text;$('generation-file-status').textContent='Loaded locally: '+file.name+' · '+file.size+' bytes · generation shares selected text only after confirmation';
+  } catch(error) {showError(error,'generation-error');$('generation-file').value='';}
+}
+function generationRequirements() {
+  const w=aiWorkspace(),text=(w.mode==='describe'?w.description:w.spec).trim();
+  if(!text)throw Error(w.mode==='describe'?'Describe the API you want to prepare.':'Upload or paste a specification.');
+  if(new TextEncoder().encode(text).length>1048576)throw Error('Keep requirements or specifications within 1 MiB.');
+  if(w.mode==='upload' && /\.json$/i.test(w.filename))try{JSON.parse(text);}catch{throw Error('The edited JSON specification is invalid. Fix its syntax before previewing.');}
+  return text;
+}
+function previewGeneration() {
+  clearError('generation-error');
+  try {
+    const w=aiWorkspace(), text=generationRequirements();
+    w.generationProvider=$('generation-provider').value;w.generationPreview=buildAIBrief('generate_api','generation-provider',{source:w.mode,filename:w.mode==='upload'?w.filename || null:null,requirements:text});
+    renderAIWorkspace();toast('Generation brief previewed locally. No AI call or real draft was created.');
+  } catch(error) {showError(error,'generation-error');}
+}
+async function generateWithGroq() {
+  clearError('generation-error');
+  try {
+    const text=generationRequirements(), p=aiConfig.providers.find(item=>item.id===$('generation-provider').value);
+    if(!state.project?.active_version)throw Error('Convert the project to a versioned layout before generating.');
+    if(p?.kind!=='groq' || p.baseUrl!==providerPresets.groq.url)throw Error('Select a Groq profile using https://api.groq.com/openai/v1. Other providers are preview-only.');
+    if(!['openai/gpt-oss-20b','openai/gpt-oss-120b'].includes(p.model))throw Error('Initial generation supports openai/gpt-oss-20b or openai/gpt-oss-120b.');
+    if(text.length>32768)throw Error('Real generation accepts at most 32,768 characters. Shorten the specification; local previews accept more.');
+    if(!await confirmAction('Send project context to Groq?','Send these requirements, published Python/test source, project notes, and database definitions for '+state.project.name+' to '+p.model+' on Groq? No rows or environment files are included. This may use your provider quota. One request will save a new draft only; generated Python will not run, approve, or publish.'))return;
+    $('generate-draft-button').textContent='Generating once…';
+    const key=providerKeys.get(p.id), headers=key?{'X-Reqlica-Groq-Key':key}:{};
+    const result=await api('console',root()+'/generate','POST',{requirements:text,model:p.model,temperature:aiConfig.defaults.temperature,max_tokens:aiConfig.defaults.maxTokens},headers);
+    if(result.status!=='draft_created' || !/^[a-f0-9]{32}$/.test(result.draft?.id))throw Error('Unexpected generation response. Refresh drafts before retrying: a draft may already have been saved.');
+    aiWorkspace().generationResult=result;aiWorkspace().generationProvider=p.id;
+    aiWorkspace().generationPreview=buildAIBrief('generate_api','generation-provider',{source:aiWorkspace().mode,requirements:text});
+    if(!state.drafts.some(d=>d.id===result.draft.id))state.drafts.push(result.draft);renderDraftList();renderAIWorkspace();
+    toast('Generated draft saved. Review its source before running checks.');
+  } catch(error) {
+    if([404,405].includes(error.status))error=Error('Generation API unavailable. Restart the console with the updated backend.');
+    showError(error,'generation-error');$('generation-error').tabIndex=-1;$('generation-error').focus();
+  } finally {$('generate-draft-button').textContent='Generate draft with Groq →';}
+}
+async function askProjectWithGroq() {
+  clearError('generation-error');
+  const w=aiWorkspace();
+  try {
+    const question=w.question.trim(),p=aiConfig.providers.find(item=>item.id===$('generation-provider').value);
+    if(!question)throw Error('Ask a question about this project first.');
+    if(question.length>16384)throw Error('Keep the question within 16,384 characters.');
+    if(p?.kind!=='groq' || p.baseUrl!==providerPresets.groq.url)throw Error('Select a Groq profile using https://api.groq.com/openai/v1.');
+    if(!['openai/gpt-oss-20b','openai/gpt-oss-120b'].includes(p.model))throw Error('Project questions support openai/gpt-oss-20b or openai/gpt-oss-120b.');
+    if(!await confirmAction('Ask Groq about this project?', 'Send this question, published Python/test source, routes, project notes, and database definitions for '+state.project.name+' to '+p.model+' on Groq? No rows, other drafts, or environment files are included. This uses provider quota. Only an explanation will be returned—no code runs, drafts, or project changes. Each question is independent, without chat history.'))return;
+    $('generate-draft-button').textContent='Reading project context…';$('project-answer-status').textContent='Waiting for a read-only explanation…';
+    const key=providerKeys.get(p.id);
+    const answer=await api('console',root()+'/ask','POST',{question,model:p.model,temperature:aiConfig.defaults.temperature,max_tokens:aiConfig.defaults.maxTokens},key?{'X-Reqlica-Groq-Key':key}:{});
+    if(answer.status!=='answered' || typeof answer.answer!=='string' || !Array.isArray(answer.sources) || !Array.isArray(answer.limitations))throw Error('Unexpected project answer response. No project changes were requested.');
+    w.answer=answer;w.answeredQuestion=question;w.generationProvider=p.id;renderProjectAnswer();
+    toast('Project explained. No code or data changed.');
+  } catch(error) {
+    if([404,405].includes(error.status))error=Error('Project question API unavailable or project missing. Restart the console with the updated backend and refresh the project.');
+    $('project-answer-status').textContent='Question failed; your input and any previous answer were kept.';
+    showError(error,'generation-error');$('generation-error').tabIndex=-1;$('generation-error').focus();
+  } finally {$('generate-draft-button').textContent='Ask project with Groq →';}
+}
+function previewData() {
+  clearError('ai-data-error');
+  try {
+    const w=aiWorkspace(), count=Number($('ai-data-count').value), collection=$('ai-data-collection').value.trim(),raw=$('ai-data-template').value;
+    if(!collection)throw Error('Enter a collection name.');
+    if(!Number.isInteger(count) || count<1 || count>100)throw Error('Choose 1–100 whole records.');
+    if(new TextEncoder().encode(raw).length>16384)throw Error('Keep the record template within 16 KiB.');
+    let template;try{template=JSON.parse(raw);}catch{throw Error('Enter a valid JSON record template.');}
+    if(!template || typeof template!=='object' || Array.isArray(template))throw Error('The record template must be a JSON object.');
+    w.dataProvider=$('data-provider').value;w.dataBrief=buildAIBrief('generate_sample_data','data-provider',{collection,count,requirements:$('ai-data-prompt').value.trim(),record_template:template});
+    w.dataPreview=Array.from({length:count},(_,i)=>({...template,_preview_id:'preview_'+String(i+1).padStart(3,'0')}));
+    renderAIWorkspace();toast('Local template fixtures prepared. No AI call or database write occurred.');
+  } catch(error) {showError(error,'ai-data-error');}
+}
+function openAIEndpoint() {
+  const route=state.project?.endpoints?.[state.selectedRoute];if(!route)throw Error('Select an active endpoint first.');
+  aiEndpointContext={projectId:state.project.id,endpoint:{method:route.method,path:route.path,handler:route.handler}};endpointBrief=null;
+  $('ai-endpoint-method').textContent=route.method;$('ai-endpoint-method').className='method '+route.method;$('ai-endpoint-path').textContent=route.path;
+  $('ai-endpoint-prompt').value=aiWorkspace().endpointPrompts[route.method+' '+route.path] || '';clearError('ai-endpoint-error');
+  $('ai-endpoint-preview').hidden=true;$('ai-endpoint-preview').textContent='';renderAIProviderChoices();$('endpoint-ai-provider').value=aiConfig.defaultProvider;renderProviderSummaries();
+  $('ai-endpoint-dialog').showModal();syncControls();
+}
+function previewEndpoint() {
+  clearError('ai-endpoint-error');
+  try {
+    const prompt=$('ai-endpoint-prompt').value.trim();if(!prompt)throw Error('Describe the behavior you want to change.');
+    if(aiEndpointContext?.projectId!==state.project?.id)throw Error('Project context changed; reopen the endpoint editor.');
+    const route=aiEndpointContext.endpoint;aiWorkspace().endpointPrompts[route.method+' '+route.path]=prompt;
+    endpointBrief=buildAIBrief('modify_endpoint','endpoint-ai-provider',{endpoint:{...route},requirements:prompt});
+    $('ai-endpoint-preview').textContent=pretty(endpointBrief);$('ai-endpoint-preview').hidden=false;syncControls();toast('Change brief prepared locally. No handler or draft was edited.');
+  } catch(error) {showError(error,'ai-endpoint-error');}
+}
+const actions={
+  'generate-draft':()=>aiWorkspace().task==='ask'?askProjectWithGroq():generateWithGroq(),
+  'copy-project-answer':()=>copy(aiWorkspace().answer?.answer),
+  'review-generated-draft':async()=>{const result=aiWorkspace().generationResult;if(result){await refreshProject();await openDraft(result.draft.id);}},
+  'add-provider':()=>openProvider(),
+  'toggle-provider-key':()=>{const show=$('provider-api-key').type==='password';$('provider-api-key').type=show?'text':'password';$('toggle-provider-key').textContent=show?'Hide':'Show';$('toggle-provider-key').setAttribute('aria-pressed',String(show));},
+  'reset-ai-defaults':()=>{aiConfig.defaults={...aiDefaultOptions};aiConfig.defaultProvider=aiConfig.providers[0]?.id || '';persistAIConfig();fillAIDefaults();toast('AI defaults reset in this browser.');},
+  'ai-edit-endpoint':openAIEndpoint,
+  'endpoint-provider-settings':()=>{$('ai-endpoint-dialog').close();setView('settings');},
+  'copy-generation-preview':()=>copy(pretty(aiWorkspace().generationPreview)),
+  'copy-data-preview':()=>copy(pretty(aiWorkspace().dataPreview)),
+  'copy-endpoint-preview':()=>copy(pretty(endpointBrief)),
+  'new-project':openProjectCreation,
+  'delete-project':()=>openProjectDeletion(state.project.id),
+  'refresh-projects':loadProjects,
+  'refresh-project':async()=>{await refreshProject(); await loadDrafts();},
+  runtime:()=>changeRuntime(state.project.id),
+  'copy-url':()=>copy($('base-url').textContent),
+  'load-schema':async()=>{state.schema=await api('gateway',root()+'/openapi.json'); renderEndpoints(); toast('Published OpenAPI loaded.');},
+  'test-endpoint':()=>{const route=state.project.endpoints[state.selectedRoute]; if(route.method==='TRACE')throw Error('Browsers forbid TRACE requests. Use an external HTTP client for this route.'); $('request-target').value='live'; setView('tester'); $('request-route').value=String(requestRoutes().findIndex(r=>r.method===route.method && r.path===route.path)); $('request-method').value=route.method; $('request-path').value=route.path;},
+  'insert-request-example':insertRequestExample,
+  'refresh-drafts':loadDrafts,
+  'create-draft':async()=>{if(!discardEditor())return; const d=await api('console',root()+'/drafts','POST'); await openDraft(d.id); toast('Draft created from the active version.');},
+  'refresh-draft':refreshDraft,
+  'draft-schema':async()=>{const schema=await api('console',draftRoot()+'/openapi.json?revision='+state.draft.revision); $('check-output').textContent=pretty(schema);},
+  'test-draft':()=>{$('request-target').value='draft'; setView('tester');},
+  validate:()=>runCheck('validate'), test:()=>runCheck('test'),
+  'copy-approval':()=>copy($('approval-command').textContent),
+  activate:async()=>{if(!eligible() || state.dirty) throw Error('Refresh the draft and obtain approval of the exact checked revision first.'); if(!await confirmAction('Activate approved draft?','Publish revision '+state.draft.revision+' for '+state.project.name+'? The gateway may briefly reject requests while switching versions.'))return; state.project=await api('console',root()+'/activate','POST',{draft_id:state.draft.id,expected_revision:state.draft.revision}); state.schema=null; renderProject(); await loadProjects(); await loadDrafts(); renderDraft(); toast('Approved draft activated.');},
+  convert:async()=>{if(state.project.status==='running') throw Error('Stop the legacy project before converting it.'); if(!await confirmAction('Convert legacy project?','Convert this idle/stopped project to a versioned layout so drafts can be created.'))return; state.project=await api('console',root()+'/convert','POST'); renderProject(); await loadProjects(); await loadDrafts(); toast('Project converted to versioned storage.');},
+  'delete-file':async()=>{const path=$('file-path').value.trim(); if(path!==state.editorPath || !state.draft?.files.includes(path)) throw Error('Load the saved file before deleting it.'); if(!await confirmAction('Delete draft file?','Remove '+path+' from the draft? Unsaved editor changes will be discarded. Live code and data are not deleted.'))return; const d=await api('console',draftRoot()+'/files?path='+encodeURIComponent(path),'DELETE',{expected_revision:state.editorRevision}); state.editorPath=null; state.editorRevision=null; state.dirty=false; $('file-path').value=''; $('file-content').value=''; updateDraft(d); await loadDraftManifest();},
+  'remove-route':async()=>{if(!state.draft)throw Error('Select a draft first.'); const method=$('route-method').value,path=$('route-path').value.trim(); if(!await confirmAction('Remove draft route?','Remove '+method+' '+path+' from the draft manifest? The source file and persistent records are kept.'))return; updateDraft(await api('console',draftRoot()+'/endpoints','DELETE',{expected_revision:state.draft.revision,method,path})); await loadDraftManifest();},
+  'copy-response':()=>copy(state.response),
+  'copy-launch':()=>copy(launchCommand),
+  'check-health':checkHealth,
+  'reset-connections':async()=>{if(!discardEditor())return;config={gateway:'/gateway',console:'/console'};state.project=null;state.draft=null;state.drafts=[];state.projects=[];state.loaded=false;saveConnections();setView('setup');await checkHealth();},
+};
+async function runCheck(command) {
+  const result=await api('console',draftRoot()+'/'+command,'POST',{expected_revision:state.draft.revision});
+  await refreshDraft(); $('check-output').textContent=pretty(result); toast(command+': '+result.status+' (saved revision)');
+}
+function saveConnections() {
+  try { localStorage.setItem('reqlica.html.connections',JSON.stringify(config)); } catch {}
+  $('gateway-base').value=config.gateway; $('console-base').value=config.console;
+  if(config.gateway.startsWith('http')) direct.gateway=config.gateway;
+  if(config.console.startsWith('http')) direct.console=config.console;
+  if(state.project)renderProject();
+}
+document.addEventListener('click',event=>{
+  const button=event.target.closest('button'); if(!button || button.disabled || state.busy)return;
+  const data=button.dataset;
+  if(data.view) { clearError(); setView(data.view); return; }
+  if(data.close) { $(data.close).close(); return; }
+  if(data.action && actions[data.action]) run(actions[data.action]);
+  else if(data.projectAiTask)projectAITask(data.projectAiTask);
+  else if(data.generationMode) generationMode(data.generationMode);
+  else if(data.editProvider)run(()=>openProvider(data.editProvider));
+  else if(data.removeProvider)run(()=>removeProvider(data.removeProvider));
+  else if(data.defaultProvider)run(()=>{aiConfig.defaultProvider=data.defaultProvider;persistAIConfig();renderAIProviderChoices();toast('Default provider profile updated. No connection was made.');});
+  else if(data.openProject) run(()=>openProject(data.openProject));
+  else if(data.runtimeProject) run(()=>changeRuntime(data.runtimeProject));
+  else if(data.deleteProject) run(()=>openProjectDeletion(data.deleteProject));
+  else if(data.openDraft) run(()=>openDraft(data.openDraft));
+  else if(data.file) run(()=>readFile(data.file));
+  else if(data.route!==undefined) { state.selectedRoute=Number(data.route); renderEndpoints(); }
+});
+$('project-search').oninput=renderProjects; $('running-only').onchange=renderProjects;
+$('provider-form').onsubmit=event=>{event.preventDefault();run(saveProvider);};
+$('provider-dialog').addEventListener('close',()=>{$('provider-api-key').value='';$('provider-api-key').type='password';});
+$('provider-kind').onchange=()=>{
+  const next=providerPresets[$('provider-kind').value], urls=Object.values(providerPresets).map(p=>p.url),names=Object.values(providerPresets).map(p=>p.name);
+  if(!$('provider-name').value.trim() || names.includes($('provider-name').value.trim()))$('provider-name').value=next.name;
+  if(!$('provider-base-url').value.trim() || urls.includes($('provider-base-url').value.trim().replace(/\/+$/,'')))$('provider-base-url').value=next.url;
+  if(!$('provider-model').value.trim() || $('provider-model').value===providerPresets.groq.defaultModel)$('provider-model').value=next.defaultModel || '';
+  $('provider-model').placeholder=next.model;
+};
+$('ai-defaults-form').onsubmit=event=>{event.preventDefault();run(saveAIDefaults);};
+for(const eventName of ['input','change'])$('ai-defaults-form').addEventListener(eventName,()=>{aiPrefsDirty=true;$('ai-defaults-status').textContent='UNSAVED PREFERENCES';});
+document.querySelectorAll('[data-ai-provider]').forEach(select=>select.addEventListener('change',()=>{
+  if(state.project){if(select.id==='generation-provider'){aiWorkspace().generationProvider=select.value;aiWorkspace().generationPreview=null;renderGenerationPreview();}if(select.id==='data-provider')aiWorkspace().dataProvider=select.value;}
+  renderProviderSummaries();
+  syncControls();
+}));
+for(const [id,key] of [['generation-prompt','description'],['generation-spec-text','spec'],['ai-data-collection','collection'],['ai-data-count','count'],['ai-data-prompt','dataPrompt'],['ai-data-template','template']])$(id).addEventListener('input',()=>{if(state.project){aiWorkspace()[key]=$(id).value;if(['description','spec'].includes(key)){aiWorkspace().generationPreview=null;renderGenerationPreview();syncControls();}}});
+$('project-question').oninput=()=>{if(state.project)aiWorkspace().question=$('project-question').value;};
+$('generate-form').onsubmit=event=>{event.preventDefault();run(aiWorkspace().task==='ask'?askProjectWithGroq:previewGeneration);};
+$('generation-file').onchange=()=>run(readGenerationFile);
+$('ai-data-form').onsubmit=event=>{event.preventDefault();run(previewData);};
+$('ai-endpoint-form').onsubmit=event=>{event.preventDefault();run(previewEndpoint);};
+$('ai-endpoint-prompt').oninput=()=>{if(state.project && aiEndpointContext?.projectId===state.project.id){const r=aiEndpointContext.endpoint;aiWorkspace().endpointPrompts[r.method+' '+r.path]=$('ai-endpoint-prompt').value;}};
+$('create-project-form').onsubmit=event=>{event.preventDefault();run(createProject);};
+$('delete-project-form').onsubmit=event=>{event.preventDefault();run(deleteProject);};
+$('delete-project-files').onchange=()=>run(checkPermanentDeletion);
+$('delete-confirm-directory').oninput=syncControls;
+$('route-search').oninput=renderEndpoints; $('mobile-view').onchange=event=>setView(event.target.value);
+$('file-path').oninput=$('file-content').oninput=()=>{state.dirty=true; syncControls();};
+$('file-form').onsubmit=event=>{event.preventDefault(); run(saveFile);};
+$('route-form').onsubmit=event=>{event.preventDefault(); run(async()=>{if(!state.draft)throw Error('Select a draft first.'); const endpoint={method:$('route-method').value,path:$('route-path').value.trim(),handler:$('route-handler').value.trim()}; updateDraft(await api('console',draftRoot()+'/endpoints','PUT',{endpoint,expected_revision:state.draft.revision})); await loadDraftManifest(); toast('Route definition saved to draft.');});};
+$('draft-route-select').onchange=event=>{const route=state.draftRoutes[Number(event.target.value)]; if(event.target.value!=='' && route){$('route-method').value=route.method;$('route-path').value=route.path;$('route-handler').value=route.handler;}else{$('route-path').value='';$('route-handler').value='';}};
+$('request-target').onchange=()=>renderRequestRoutes(false);
+$('request-route').onchange=()=>{const route=selectedRequestRoute(); if(route){$('request-method').value=route.method;$('request-path').value=route.path;} $('request-example-status').textContent='Insert an example from the selected route’s OpenAPI. Review all sample values before sending.';syncControls();};
+$('request-form').onsubmit=event=>{event.preventDefault(); run(sendRequest);};
+$('connection-form').onsubmit=event=>{event.preventDefault(); run(async()=>{const next={gateway:validateBase($('gateway-base').value),console:validateBase($('console-base').value)}; if(!discardEditor())return; config=next; state.project=null;state.draft=null;state.drafts=[];state.projects=[];state.loaded=false;saveConnections(); await checkHealth(); await loadProjects(); setView('projects');});};
+$('theme-toggle').onclick=()=>{const light=document.documentElement.dataset.theme!=='light';document.documentElement.dataset.theme=light?'light':'dark';$('theme-toggle').textContent=light?'☾':'☼';$('theme-toggle').setAttribute('aria-label',light?'Switch to dark theme':'Switch to light theme');};
+window.addEventListener('beforeunload',event=>{if(state.dirty || aiPrefsDirty){event.preventDefault();event.returnValue='';}});
+$('launch-command').textContent=launchCommand; $('launch-notice').hidden=location.protocol!=='file:';
+$('gateway-base').value=config.gateway; $('console-base').value=config.console;
+renderProviderProfiles();fillAIDefaults();
+async function initialize() {
+  try {
+    const response=await fetch('/bridge-info',{cache:'no-store',credentials:'omit'});
+    if(response.ok){const info=await response.json();direct={gateway:info.gateway,console:info.console};$('local-link').href=location.origin+'/';}
+  } catch {}
+  if(config.gateway.startsWith('http'))direct.gateway=config.gateway;
+  if(config.console.startsWith('http'))direct.console=config.console;
+  await checkHealth(); await loadProjects();
+}
+if(location.protocol==='file:') setView('setup',false); else run(initialize);
+</script>
+<!-- REQLICA_LOCAL_SERVER
+# Embedded only to keep this dashboard a single-file deliverable. Extract and
+# execute with the launcher shown above. Never bind this trusted-code tool publicly.
+import http.client
+import ipaddress
+import json
+import os
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit
+
+from dotenv import load_dotenv
+
+html_path = p.resolve()
+load_dotenv(html_path.parents[2] / ".env")
+ui_port = int(os.environ.get("REQLICA_UI_PORT", "8080"))
+
+def backend_address(prefix, default_port):
+    host = os.environ.get(prefix + "_HOST", "127.0.0.1")
+    if host in {"0.0.0.0", "::"}:
+        host = "::1" if host == "::" else "127.0.0.1"
+    if host != "localhost" and not ipaddress.ip_address(host).is_loopback:
+        raise ValueError("The embedded UI only connects to loopback backends")
+    port = int(os.environ.get(prefix + "_PORT", str(default_port)))
+    authority = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+    return host, port, "http://" + authority
+
+targets = {
+    "gateway": backend_address("MOCK", 4000),
+    "console": backend_address("CONSOLE", 3000),
+}
+allowed_hosts = {f"127.0.0.1:{ui_port}", f"localhost:{ui_port}"}
+allowed_origins = {"http://" + host for host in allowed_hosts}
+hop_headers = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade", "content-length"}
+
+class Handler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def reply(self, status, body, content_type="application/json"):
+        if not isinstance(body, bytes):
+            body = json.dumps(body).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def dispatch(self):
+        if self.headers.get("Host") not in allowed_hosts:
+            self.close_connection = True
+            return self.reply(403, {"detail": "Loopback Host required"})
+        origin = self.headers.get("Origin")
+        if origin and origin not in allowed_origins:
+            self.close_connection = True
+            return self.reply(403, {"detail": "Cross-origin access denied"})
+        if self.headers.get("Sec-Fetch-Site") == "cross-site":
+            self.close_connection = True
+            return self.reply(403, {"detail": "Cross-site access denied"})
+        path = urlsplit(self.path)
+        if path.scheme or path.netloc:
+            return self.reply(400, {"detail": "Absolute request targets are not allowed"})
+        if path.path == "/" and self.command in {"GET", "HEAD"}:
+            return self.reply(200, html_path.read_bytes(), "text/html; charset=utf-8")
+        if path.path == "/bridge-info" and self.command == "GET":
+            return self.reply(200, {key: value[2] for key, value in targets.items()})
+        parts = path.path.split("/", 2)
+        if len(parts) != 3 or parts[1] not in targets:
+            return self.reply(404, {"detail": "Unknown local dashboard route"})
+        if self.headers.get("X-Reqlica-UI") != "1":
+            self.close_connection = True
+            return self.reply(403, {"detail": "Dashboard request header required"})
+        service, upstream_path = parts[1], "/" + parts[2]
+        if not (upstream_path.startswith("/api/") or service == "gateway" and upstream_path.startswith("/mock/")):
+            return self.reply(404, {"detail": "Only project API and mock paths are forwarded"})
+        if self.headers.get("Transfer-Encoding") or len(self.headers.get_all("Content-Length", [])) > 1:
+            self.close_connection = True
+            return self.reply(400, {"detail": "Ambiguous request body framing"})
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            self.close_connection = True
+            return self.reply(400, {"detail": "Invalid Content-Length"})
+        if not 0 <= length <= 2 * 1024 * 1024:
+            self.close_connection = True
+            return self.reply(413, {"detail": "Dashboard request bodies are limited to 2 MiB"})
+        self.connection.settimeout(95)
+        body = self.rfile.read(length) if length else None
+        if body is not None and len(body) != length:
+            self.close_connection = True
+            return self.reply(400, {"detail": "Incomplete request body"})
+        host, port, base = targets[service]
+        connection = http.client.HTTPConnection(host, port, timeout=80)
+        excluded = hop_headers | {"host", "cookie", "origin", "referer", "x-reqlica-ui", "accept-encoding"}
+        excluded |= {item.strip().lower() for item in self.headers.get("Connection", "").split(",")}
+        headers = {key: value for key, value in self.headers.items() if key.lower() not in excluded and not key.lower().startswith(("sec-", "x-forwarded-"))}
+        headers["Accept-Encoding"] = "identity"
+        target = upstream_path + ("?" + path.query if path.query else "")
+        try:
+            connection.request(self.command, target, body=body, headers=headers)
+            response = connection.getresponse()
+            payload = response.read(16 * 1024 * 1024 + 1)
+            if len(payload) > 16 * 1024 * 1024:
+                return self.reply(502, {"detail": "Upstream response exceeds dashboard's 16 MiB display limit"})
+            self.send_response(response.status)
+            response_excluded = hop_headers | {"set-cookie", "access-control-allow-origin", "cache-control"}
+            response_excluded |= {item.strip().lower() for item in (response.getheader("Connection") or "").split(",")}
+            for key, value in response.getheaders():
+                if key.lower() not in response_excluded:
+                    # Stay on the same local bridge for mock trailing-slash redirects.
+                    if key.lower() == "location":
+                        parsed = urlsplit(value)
+                        if value.startswith("/") and not value.startswith("//"):
+                            value = "/" + service + value
+                        elif parsed.scheme + "://" + parsed.netloc == base:
+                            value = "/" + service + parsed.path + ("?" + parsed.query if parsed.query else "")
+                    self.send_header(key, value)
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(payload)
+        except (OSError, http.client.HTTPException) as error:
+            self.reply(502, {"detail": f"Could not reach {service} at {base}: {error}. Start Reqlica first."})
+        finally:
+            connection.close()
+
+    do_GET = do_HEAD = do_POST = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = dispatch
+
+    def log_message(self, format, *args):
+        # Avoid logging query strings, source code, headers, or request bodies.
+        pass
+
+server = ThreadingHTTPServer(("127.0.0.1", ui_port), Handler)
+server.daemon_threads = True
+print(f"Reqlica HTML dashboard: http://127.0.0.1:{ui_port}/", flush=True)
+print("Local-only development bridge. Stop with Ctrl+C.", flush=True)
+try:
+    server.serve_forever()
+except KeyboardInterrupt:
+    pass
+finally:
+    server.server_close()
+REQLICA_LOCAL_SERVER -->
+</body>
+</html>

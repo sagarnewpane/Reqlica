@@ -13,8 +13,10 @@ workers, persistent SQLite data, and a draft/test/approval/version workflow thro
 the CLI and management APIs. AI clients can now create and check endpoint drafts
 through the console's built-in HTTP MCP server.
 
-An embedded AI generator, the dashboard, database migrations, reset, and import/export
-are not implemented yet. See the [roadmap](docs/roadmap.md) for planned work.
+The standalone HTML dashboard now supports initial single-turn Groq endpoint
+generation into unpublished drafts; see the [generation guide](docs/generation.md).
+The packaged Next.js dashboard, database migrations, reset, and import/export
+remain planned. See the [roadmap](docs/roadmap.md).
 
 ## Quick Start
 
@@ -54,6 +56,25 @@ uv run reqlica project endpoints <project-id>
 uv run reqlica project stop <project-id>
 uv run reqlica project start <project-id>
 ```
+
+The gateway also accepts `POST /api/projects` with
+`{"directory": "/absolute/path/to/books", "name": "Book API"}` and returns the
+created idle project with HTTP `201`. The standalone
+`backend/reqlica/reqlicav1.html` dashboard can create and delete projects; its
+**Connection & help** section includes the local server launcher.
+
+In **Request tester**, choose a route shortcut and click **Insert example** to
+fill its path/query and JSON body from saved OpenAPI examples, defaults, or types.
+This never sends the request and keeps custom headers. Review sample values and
+record IDs before sending. Drafts need current validation; live contracts become
+available after validated activation. Missing contracts leave inputs unchanged.
+
+The same **Generate API** screen also has **Ask about project**: ask how endpoints
+are designed, which inputs they accept, or how the project fits together. Groq
+reads the published code, tests, notes, routes, and database definitions and returns
+an explanation with source references. It creates no drafts and runs no code;
+switch explicitly to **Generate draft** to request changes. See
+[`docs/generation.md`](docs/generation.md) for context/privacy details.
 
 Remove a project through the running gateway (confirmation required):
 

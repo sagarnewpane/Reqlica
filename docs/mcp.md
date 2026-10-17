@@ -5,9 +5,11 @@
 Changing `CONSOLE_HOST` or `CONSOLE_PORT` also changes the MCP address.
 
 Connect an AI client using **Streamable HTTP** and that URL. MCP uses JSON-RPC
-tool discovery and calls, not one REST URL per tool. No AI model or provider runs
-inside Reqlica: the connected AI reads requirements and uses these tools to save
-and check generated Python.
+tool discovery and calls, not one REST URL per tool. In this MCP workflow, the
+connected AI reads requirements and uses tools to save and check generated Python.
+Separately, the console's [single-turn Groq generator](generation.md) reuses the
+same project-context and draft helpers directly; it does not expose local MCP to
+Groq or run a tool-execution loop.
 
 **Trusted local use only:** MCP is unauthenticated, like the management API.
 Keep the console on loopback; do not publish it to the internet or an untrusted

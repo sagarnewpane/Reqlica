@@ -23,7 +23,9 @@ OpenAPI provides routes, schemas, and documented responses, but does not supply
 every business rule. Missing behavior must appear as a proposal for review.
 Once an endpoint is active, requests execute Python directly without another AI
 call. The draft/check/approval/activation backend and initial AI-facing MCP tools
-already exist; an embedded AI generator and dashboard integration do not.
+already exist. Initial single-turn Groq generation and standalone HTML draft
+review now exist; conversation memory, automatic repair, broader provider support,
+and the packaged Next.js dashboard remain planned. See [generation](generation.md).
 
 ## Planned Capabilities
 
@@ -96,7 +98,7 @@ approval is a workflow boundary, not authentication against another local proces
 1. CLI startup, console, project storage, and the shared mock server. Implemented.
 2. A manually written endpoint in its own project worker. Implemented.
 3. Persistent data, drafts, testing, and version activation. Implemented for stable schemas.
-4. AI generation through MCP, starting with one simple endpoint. Initial HTTP tools implemented; broader generation integration remains planned.
+4. AI generation through MCP, starting with one simple endpoint. HTTP tools and initial single-turn Groq generation into reviewed drafts implemented; broader generation integration remains planned.
 5. Stateful workflows, authentication, failures, rate limits, and inspection.
 6. Reset, export/import, installation instructions, and a working demo.
 

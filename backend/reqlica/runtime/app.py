@@ -4,12 +4,14 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+from threading import Lock
 
 import httpx
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Response
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from reqlica.projects.store import create_project as create_project_files
 from reqlica.runtime.schema_routes import router as schema_router
 from reqlica.runtime.worker import (
     ProjectActivatingError,
@@ -47,6 +49,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Reqlica Mock Server", lifespan=lifespan)
 app.include_router(schema_router)
+_creation_lock = Lock()
 
 
 def _filter_proxy_headers(
@@ -105,6 +108,58 @@ def list_projects(request: Request, running: bool = False) -> dict:
             if not running or project["status"] == "running"
         ]
     }
+
+
+class ProjectCreation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    directory: str = Field(
+        min_length=1,
+        description="New or empty server-side absolute directory; ~/ paths are expanded.",
+    )
+    name: str | None = Field(
+        default=None, min_length=1, description="Defaults to the directory's basename."
+    )
+
+    @field_validator("directory")
+    @classmethod
+    def absolute_directory(cls, value: str) -> str:
+        value = value.strip()
+        if not value or "\x00" in value:
+            raise ValueError("Provide a new or empty absolute project directory")
+        try:
+            directory = Path(value).expanduser()
+        except RuntimeError as error:
+            raise ValueError("Could not expand the project directory") from error
+        if not directory.is_absolute():
+            raise ValueError("Project directory must be absolute (or start with ~/)")
+        return str(directory)
+
+    @field_validator("name")
+    @classmethod
+    def nonblank_name(cls, value: str | None) -> str | None:
+        if value is not None:
+            value = value.strip()
+            if not value:
+                raise ValueError("Project name cannot be blank")
+        return value
+
+
+@app.post("/api/projects", tags=["Projects"], status_code=201)
+def create_project(request: Request, body: ProjectCreation) -> dict:
+    """Scaffold and register a project on the server's filesystem; leave it idle."""
+    try:
+        # Serialize HTTP creation so concurrent requests for the same empty
+        # directory cannot interleave scaffolding or roll back each other's files.
+        with _creation_lock:
+            project = create_project_files(Path(body.directory), body.name)
+    except PermissionError as error:
+        raise HTTPException(403, str(error)) from error
+    except (ValueError, FileExistsError, NotADirectoryError) as error:
+        raise HTTPException(409, str(error)) from error
+    except OSError as error:
+        raise HTTPException(500, str(error)) from error
+    return _manage_project(request, project.id)
 
 
 def _manage_project(
