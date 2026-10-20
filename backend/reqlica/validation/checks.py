@@ -382,7 +382,20 @@ def call_draft_endpoint(
     method: str,
     path: str,
     json_body=None,
+    headers: dict[str, str] | None = None,
 ) -> dict:
+    import re
+
+    headers = headers or {}
+    forbidden = re.compile(r"^(host|origin|referer|cookie|connection|content-length|transfer-encoding|upgrade|proxy-.*|sec-.*|x-reqlica-.*|x-forwarded-.*)$", re.I)
+    if len(headers) > 100 or any(
+        not re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", key)
+        or forbidden.fullmatch(key)
+        or not isinstance(value, str)
+        or "\r" in value or "\n" in value
+        for key, value in headers.items()
+    ):
+        raise ValueError("Invalid or reserved request header")
     parsed = urlsplit(path)
     if (
         not path.startswith("/")
@@ -412,4 +425,5 @@ def call_draft_endpoint(
         method=method,
         path=path,
         json_body=json_body,
+        headers=headers,
     )

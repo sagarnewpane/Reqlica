@@ -263,6 +263,22 @@ class DatabaseTest(unittest.TestCase):
         self.assertEqual(database.execute("SELECT value FROM counter").fetchone()[0], 1)
         self.assertEqual(content_digest(code_directory(self.project)), live_revision)
 
+    def test_draft_calls_forward_auth_and_custom_headers(self):
+        self.write(
+            "endpoints/hello.py",
+            "from fastapi import Request\ndef hello(request: Request):\n"
+            "    return {k: request.headers.get(k) for k in ('authorization', 'x-tenant')}\n",
+        )
+        result = call_draft_endpoint(
+            *self.arguments(), "GET", "/hello",
+            headers={"Authorization": "Bearer test-token", "X-Tenant": "sample"},
+        )
+        self.assertEqual(result["status_code"], 200, result)
+        self.assertEqual(result["body"], {"authorization": "Bearer test-token", "x-tenant": "sample"})
+        for headers in ({"Host": "evil"}, {"X-Reqlica-UI": "1"}, {"Authorization": "bad\r\nvalue"}):
+            with self.subTest(headers=headers), self.assertRaises(ValueError):
+                call_draft_endpoint(*self.arguments(), "GET", "/hello", headers=headers)
+
     def test_call_paths_are_relative_and_redirects_are_not_followed(self):
         for path in (
             "https://example.com/hello",

@@ -23,7 +23,7 @@ test('failure summaries show causes without interpreting logs as HTML and ignore
 test('repair history offers escaped diagnoses, changed files, diffs and blockers',()=>{
   const {context:c}=fixture();
   const markup=c.repairAttemptsMarkup([{status:'repaired',summary:'Fixed <b>injection</b>',changed_files:['endpoints/auth.py'],diff:'- <script>old</script>\n+ request: Request',test:{status:'passed',tests_passed:10,tests_run:10}},{status:'needs_information',summary:'Need a decision',blockers:['Choose <key> name']}]);
-  assert.match(markup,/10 \/ 10 tests passed/);assert.match(markup,/data-file="endpoints\/auth.py"/);assert.match(markup,/Review implementation diff/);assert.match(markup,/&lt;key&gt;/);assert.doesNotMatch(markup,/<script>|<b>/);
+  assert.match(markup,/10 \/ 10 tests passed/);assert.match(markup,/data-file="endpoints\/auth.py"/);assert.match(markup,/Review repair diff/);assert.match(markup,/&lt;key&gt;/);assert.doesNotMatch(markup,/<script>|<b>/);
 });
 test('clarification cards expose answer progress and preserve safe editable inputs',()=>{
   const {context:c}=fixture();

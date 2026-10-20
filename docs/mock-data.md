@@ -103,3 +103,36 @@ insertion rechecks constraints and schema inside its write transaction.
   Nothing is stored with provider profiles/chat history. Successful SQLite inserts
   persist independently of draft activation. The APIs remain trusted-local and
   unauthenticated; keep the console/gateway on loopback.
+
+## Chained live requests
+
+The Mock data page accepts a JSON array of up to 50 named request steps. Each
+step has `name`, `method`, `path`, and optional `body` and `headers`. For example:
+
+```json
+[
+  {"name":"user","method":"POST","path":"/users","body":{"name":"Sample"}},
+  {"name":"post","method":"POST","path":"/posts","body":{"user_id":"{{user.id}}","title":"Hello"}}
+]
+```
+
+References resolve from earlier JSON response bodies. A whole-value reference
+preserves its JSON type; path substitutions are URL encoded. Requests run in
+order against live project data with shared project headers. Execution stops on
+an HTTP error, missing reference, or network error. Completed writes remain;
+there is no transaction across requests and no automatic retry.
+
+Selecting a SQLite table fills the example field from its writable columns,
+omitting automatic integer primary keys. Edit placeholders and foreign-key IDs
+before generating or inserting data; the example does not read existing rows.
+
+Settings → Shared request headers saves a bearer token and arbitrary allowed
+headers per project in browser local storage. Request-specific headers override
+defaults case-insensitively. These defaults apply to live API calls, disposable draft calls, and
+chains, not provider or management calls. Clear the fields
+and save to remove defaults. Browser storage is unencrypted.
+
+Provider API keys now persist with browser profiles, including across reloads.
+Clear a provider key and save, or remove the profile, to delete it. Project
+runtime environment values persist separately in `.reqlica/environment.json`;
+values remain write-only and are loaded on worker start/restart.

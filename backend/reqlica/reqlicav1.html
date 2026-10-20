@@ -126,14 +126,15 @@
           <div class="field-row"><div class="field"><label for="request-target">Target</label><select id="request-target"><option value="live">Live API · persistent data</option><option value="draft">Selected draft · disposable data</option></select></div><div class="field"><label for="request-route">Route shortcut</label><select id="request-route"><option value="">Custom request</option></select></div></div>
           <div class="actions"><button class="btn" type="button" id="insert-request-example" data-action="insert-request-example" aria-describedby="request-example-status" disabled>Insert example</button><span class="small muted">From OpenAPI · does not send</span></div>
           <p class="help" id="request-example-status" role="status">Choose a route shortcut to insert its example. Review sample values before sending; existing records and business rules are not inferred.</p>
-          <div class="field-row section-gap"><div class="field"><label for="request-method">Method</label><select id="request-method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>HEAD</option></select></div><div class="field"><label for="request-path">Path and query string</label><input id="request-path" required value="/hello" placeholder="/books/123?limit=10"></div></div><div class="field" id="request-headers-field"><label for="request-headers">Headers · JSON object</label><textarea id="request-headers" class="mono" spellcheck="false">{}</textarea><p class="help">Optional authorization/content-type headers. Browser-controlled and proxy-internal headers cannot be overridden.</p></div><div class="field"><label for="request-body">JSON body · optional</label><textarea id="request-body" class="mono" spellcheck="false" placeholder='{"title": "Example"}'></textarea></div><p class="help" id="request-help"></p></div><div class="panel-foot"><span class="small muted">Redirects are not followed by the local bridge.</span><button class="btn primary" type="submit">Send request →</button></div></form><div class="response-meta"><span class="badge neutral" id="response-status" role="status">Not sent</span><span class="muted small" id="response-time">—</span><button class="btn ghost" data-action="copy-response">Copy response</button></div><pre class="code" id="response-body" tabindex="0">Send a request to inspect its real response.</pre><details class="panel-body"><summary>Response headers / draft runner details</summary><pre class="code" id="response-details">—</pre></details></div><aside><div class="notice draft"><strong>Live requests can change real data.</strong><p class="small">POST, PUT, PATCH, and DELETE run against persistent project data. A request to an idle project starts its worker; a stopped project must be started explicitly.</p></div><div class="notice"><strong>Draft calls are disposable.</strong><p class="small">Select a draft in Drafts &amp; checks first. Calls pin its revision and accept JSON bodies, but do not forward custom headers or cookies. Each call gets a fresh disposable data copy. A call never counts as validation or a test.</p></div><div class="notice"><strong>No scenario API yet.</strong><p class="small">Artificial delays, forced errors, seeding/reset, and server request logs are not implemented. This page does not fake them.</p></div></aside></div>
+          <div class="field-row section-gap"><div class="field"><label for="request-method">Method</label><select id="request-method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>HEAD</option></select></div><div class="field"><label for="request-path">Path and query string</label><input id="request-path" required value="/hello" placeholder="/books/123?limit=10"></div></div><div class="field" id="request-headers-field"><label for="request-headers">Headers · JSON object</label><textarea id="request-headers" class="mono" spellcheck="false">{}</textarea><p class="help">Optional authorization/content-type headers. Browser-controlled and proxy-internal headers cannot be overridden.</p></div><div class="field"><label for="request-body">JSON body · optional</label><textarea id="request-body" class="mono" spellcheck="false" placeholder='{"title": "Example"}'></textarea></div><p class="help" id="request-help"></p></div><div class="panel-foot"><span class="small muted">Redirects are not followed by the local bridge.</span><button class="btn primary" type="submit">Send request →</button></div></form><div class="response-meta"><span class="badge neutral" id="response-status" role="status">Not sent</span><span class="muted small" id="response-time">—</span><button class="btn ghost" data-action="copy-response">Copy response</button></div><pre class="code" id="response-body" tabindex="0">Send a request to inspect its real response.</pre><details class="panel-body"><summary>Response headers / draft runner details</summary><pre class="code" id="response-details">—</pre></details></div><aside><div class="notice draft"><strong>Live requests can change real data.</strong><p class="small">POST, PUT, PATCH, and DELETE run against persistent project data. A request to an idle project starts its worker; a stopped project must be started explicitly.</p></div><div class="notice"><strong>Draft calls are disposable.</strong><p class="small">Select a draft in Drafts &amp; checks first. Calls pin its revision and accept JSON bodies, and forward configured request headers. Each call gets a fresh disposable data copy. A call never counts as validation or a test.</p></div><div class="notice"><strong>No scenario API yet.</strong><p class="small">Artificial delays, forced errors, seeding/reset, and server request logs are not implemented. This page does not fake them.</p></div></aside></div>
       </section>
 
       <section class="view" id="settings-view" aria-label="Settings" hidden>
         <div class="view-title"><div><div class="eyebrow">Workspace preferences</div><h2>Settings</h2><p class="settings-description">Project runtime variables are stored locally per project. AI profiles and defaults belong to this browser.</p></div><span class="badge neutral">LOCAL SETTINGS</span></div>
         <details class="ai-context-details"><summary>Supported AI features</summary><div><p>Groq, OpenAI, and OpenAI-compatible APIs support clarification, project chat, endpoint generation/editing, bounded failed-draft repair, and mock records. Saving a profile makes no network call. Sharing context and executing repair checks require confirmation; Ollama and Anthropic profiles remain preview-only.</p></div></details>
+        <div class="panel section-gap"><div class="panel-head"><h2>Shared request headers</h2><span class="badge draft">PER PROJECT</span></div><div class="panel-body"><p class="help">Saved in this browser, unencrypted. Applied to requests and mock-data chains for this project. Request headers override these defaults. Also applied to disposable draft calls.</p><div class="field"><label for="shared-jwt">Bearer token · optional</label><input id="shared-jwt" type="password" autocomplete="off" spellcheck="false" placeholder="Paste a JWT or other bearer token"></div><div class="field"><label for="shared-headers">Default headers · JSON object</label><textarea id="shared-headers" class="mono" spellcheck="false">{}</textarea></div><button class="btn primary" data-action="save-shared-headers">Save headers</button><p id="shared-headers-status" class="help" role="status"></p></div></div>
         <div class="panel section-gap" id="project-environment-panel"><div class="panel-head"><div><h2>Project environment</h2><p class="help" id="environment-project-name">Open a project to configure its runtime variables.</p></div><span class="badge draft">PER PROJECT</span></div><div class="panel-body"><div class="notice error" id="environment-error" role="alert" hidden></div>
-          <p id="environment-status" class="feature-status" role="status">Values are write-only and are never sent to AI.</p><div id="environment-list" class="variable-list section-gap"></div>
+          <p id="environment-status" class="feature-status" role="status">Values persist on disk across reloads and restarts; they are write-only and never sent to AI.</p><div id="environment-list" class="variable-list section-gap"></div>
           <form id="environment-form" class="section-gap" autocomplete="off"><div class="feature-head"><div><h3 id="environment-edit-heading">Add a project variable</h3><p class="help">Use the exact name from your code. Saved values cannot be revealed.</p></div><button class="btn ghost" type="button" id="cancel-environment-edit" data-action="cancel-environment-edit" aria-label="Cancel variable replacement" hidden>Cancel</button></div>
             <div class="field-row"><div class="field"><label for="environment-name">Variable name</label><input id="environment-name" placeholder="JWT_SECRET" pattern="[A-Za-z_][A-Za-z0-9_]{0,63}" maxlength="64" required autocomplete="off" spellcheck="false"></div><div class="field"><label for="environment-value">New value</label><input id="environment-value" type="password" autocomplete="new-password" spellcheck="false" placeholder="Enter a value, or generate a secure key"></div></div>
             <div class="actions"><button class="btn primary" type="submit" id="save-environment">Save value…</button><button class="btn" type="button" id="generate-environment" data-action="generate-environment">Generate secure key…</button></div>
@@ -173,6 +174,10 @@
           <div class="field"><label for="ai-data-template">Example record / field hints</label><textarea id="ai-data-template" class="mono" spellcheck="false">{"name":"Sample item","price":14.99,"stock":20}</textarea></div>
         </div><div class="panel-foot"><button class="btn" type="button" data-action="template-data">Use template</button><button class="btn primary" type="submit" id="generate-data-button">Generate records →</button></div></form></div>
         <aside class="panel"><div class="panel-head"><h2>Review records</h2><span class="badge neutral" id="ai-data-preview-count">0 records</span></div><div class="chat-empty" id="ai-data-empty"><h3>Your data starts here.</h3><p>Generate records or use your template, then edit any values before saving.</p></div><div class="panel-body" id="data-preview-workspace" hidden><label for="ai-data-preview">JSON records · editable</label><textarea id="ai-data-preview" class="source" spellcheck="false" rows="14"></textarea><p class="help" id="data-preview-status" role="status"></p><div class="notice error section-gap" id="data-validation-error" role="alert" hidden></div><details class="section-gap"><summary>Batch details</summary><pre class="code" id="ai-data-brief">No records prepared.</pre></details></div><div class="panel-foot"><div class="actions"><button class="btn ghost" data-action="copy-data-preview" id="copy-data-preview" disabled>Copy JSON</button><button class="btn" data-action="download-data" id="download-data-button" disabled>Download</button><button class="btn" data-action="validate-data" id="validate-data-button" disabled>Validate records</button></div><button class="btn primary" data-action="insert-data" id="insert-data-button" hidden disabled>Insert records…</button></div></aside></div>
+        <div class="panel section-gap"><div class="panel-head"><h2>Chained requests</h2><span class="badge draft">LIVE API</span></div><div class="panel-body"><p class="help">Run up to 50 requests in order. Reference earlier JSON responses with {{stepName.field}} in bodies, paths, or headers. A whole body value preserves its JSON type. Shared headers apply to every step. Stops on the first failure; completed writes remain and are never retried automatically.</p><label for="request-chain">Request steps · JSON array</label><textarea id="request-chain" class="source" rows="12" spellcheck="false">[
+  {"name":"user","method":"POST","path":"/users","body":{"name":"Sample user"}},
+  {"name":"post","method":"POST","path":"/posts","body":{"user_id":"{{user.id}}","title":"Sample post"}}
+]</textarea><div class="actions section-gap"><button class="btn primary" data-action="run-request-chain">Run chain…</button></div><pre class="code section-gap" id="request-chain-results" role="status">No chain run yet.</pre></div></div>
       </section>
 
       <section class="view" id="setup-view" hidden>
@@ -222,7 +227,7 @@
     <div class="field"><label for="provider-base-url">Base URL</label><input id="provider-base-url" type="url" required placeholder="https://api.groq.com/openai/v1"><p class="help">Enter the API base, for example https://provider.example/v1. A trailing /chat/completions is removed automatically. Saving does not connect.</p></div>
     <div class="field"><label for="provider-model">Model identifier</label><input id="provider-model" required autocomplete="off" placeholder="openai/gpt-oss-20b"><p class="help">Initial Groq generation supports openai/gpt-oss-20b and openai/gpt-oss-120b.</p></div>
     <div class="field"><label for="provider-reasoning">Reasoning</label><select id="provider-reasoning" aria-describedby="provider-reasoning-help"><option value="default">Provider default</option></select><button class="btn ghost" type="button" id="load-reasoning-options">Check model support</button><p class="help" id="provider-reasoning-help" role="status">Check support to see this model's controls. OpenRouter checks use its public catalog; no API key or project content is sent.</p></div>
-    <div class="field"><label for="provider-api-key">API key · optional with a server-side Groq key</label><div class="key-control"><input id="provider-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Uses server GROQ_API_KEY / GROQ_API when omitted"><button class="btn" type="button" data-action="toggle-provider-key" aria-pressed="false" id="toggle-provider-key">Show</button></div><p class="help">Keys stay in page memory, never browser storage or copied briefs. The key is forwarded through the local console to this profile’s API base only when you confirm a request. Server Groq keys are never reused for other providers. Keep this app on loopback.</p></div>
+    <div class="field"><label for="provider-api-key">API key · optional with a server-side Groq key</label><div class="key-control"><input id="provider-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Uses server GROQ_API_KEY / GROQ_API when omitted"><button class="btn" type="button" data-action="toggle-provider-key" aria-pressed="false" id="toggle-provider-key">Show</button></div><p class="help">Keys persist in this browser’s local storage, unencrypted, and are excluded from copied briefs. Clear the key and save to forget it. The key is forwarded through the local console to this profile’s API base only when you confirm a request. Server Groq keys are never reused for other providers. Keep this app on loopback.</p></div>
     <div class="notice draft"><p class="small">Saving a profile does not verify the endpoint, model availability, or API key.</p></div>
   </div><div class="panel-foot"><button class="btn" type="button" data-close="provider-dialog">Cancel</button><button class="btn primary" type="submit">Save provider profile</button></div>
 </form></dialog>
@@ -246,7 +251,7 @@ const labels = {projects:'Projects',overview:'Overview',generate:'Generate API',
 const providerPresets={groq:{name:'Groq',url:'https://api.groq.com/openai/v1',model:'openai/gpt-oss-20b',defaultModel:'openai/gpt-oss-20b'},ollama:{name:'Local model · Ollama',url:'http://localhost:11434',model:'Your installed model'},openai:{name:'OpenAI',url:'https://api.openai.com/v1',model:'Your OpenAI model identifier'},anthropic:{name:'Anthropic',url:'https://api.anthropic.com',model:'Your Anthropic model identifier'},compatible:{name:'OpenAI-compatible API',url:'http://localhost:1234/v1',model:'Your provider’s model identifier'}};
 const aiDefaultOptions={temperature:0,maxTokens:8192,timeoutSeconds:300,includeTests:true,includeSchema:true,clarify:true};
 const aiStorageKey='reqlica.html.ai-preferences.v1';
-const providerKeys=new Map(), aiWorkspaces=new Map(); // Keys stay in memory; only completed chat turns use sessionStorage.
+const providerKeys=new Map(), aiWorkspaces=new Map(); // Provider keys persist with profiles; chat turns use sessionStorage.
 const chatLimits={storedTurns:20,storedBytes:512*1024,requestTurns:8,requestBytes:48*1024};
 let chatStorageAvailable=true;
 let aiStorageAvailable=true, aiPrefsDirty=false, providerEditingId=null, aiEndpointContext=null, endpointBrief=null;
@@ -526,6 +531,7 @@ async function openProject(id) {
   state.draft=null; state.drafts=[]; state.draftRoutes=[]; state.schema=null; state.selectedRoute=0;
   state.environment=null;$('environment-value').value='';$('environment-name').value='';clearError('environment-error');
   $('draft-workspace').hidden=true; $('response-body').textContent='Send a request to inspect its real response.'; $('response-details').textContent='—'; $('response-status').textContent='Not sent'; $('response-time').textContent='—'; state.response=null;
+  loadSharedHeaders();
   renderProject(); renderDraftList(); setView('overview');
   try { state.project=await api('gateway',root()+'/endpoints'); renderProject(); }
   catch(error) { showError(error); }
@@ -772,8 +778,8 @@ function renderRequestRoutes(preserve=true) {
   const index=routes.findIndex(r=>r.method+' '+r.path===selected);
   if(index>=0)$('request-route').value=String(index);
   $('request-example-status').textContent='Choose a route shortcut to insert its example. Review sample values before sending; existing records and business rules are not inferred.';
-  $('request-headers-field').hidden=$('request-target').value==='draft';
-  $('request-help').textContent=$('request-target').value==='draft'?(state.draft?'Draft '+draftName(state.draft)+' · '+state.draft.id.slice(0,8)+' · disposable data; headers/cookies are not forwarded.':'Select a draft in Drafts & checks first.'):'Real live request. Writes persist; idle workers start automatically. Replace every {path_parameter} before sending.';
+  $('request-headers-field').hidden=false;
+  $('request-help').textContent=$('request-target').value==='draft'?(state.draft?'Draft '+draftName(state.draft)+' · '+state.draft.id.slice(0,8)+' · disposable data; configured headers are forwarded.':'Select a draft in Drafts & checks first.'):'Real live request. Writes persist; idle workers start automatically. Replace every {path_parameter} before sending.';
   syncControls();
 }
 // Request example helpers use saved OpenAPI only; never fetch reference URLs.
@@ -861,7 +867,7 @@ function buildRequestExample(document, route) {
     // Draft /call already supplies this pin; it is not a user request header.
     if(p.in==='header' && p.name?.toLowerCase()==='x-reqlica-expected-revision' && document['x-reqlica-draft-id'])continue;
     if(!['path','query'].includes(p.in)) {
-      if(p.required)notes.push('Required '+p.in+' '+p.name+' must be supplied manually; headers are unchanged and draft calls do not forward headers/cookies.');
+      if(p.required)notes.push('Required '+p.in+' '+p.name+' must be supplied manually; headers are unchanged and headers apply to live and draft calls.');
       continue;
     }
     const explicit=documentedExample(p,document);
@@ -914,13 +920,38 @@ async function insertRequestExample() {
     throw error;
   }
 }
-function parseHeaders() {
-  const value=JSON.parse($('request-headers').value || '{}');
+function validateHeaders(value) {
   if(!value || Array.isArray(value) || typeof value!=='object') throw Error('Headers must be a JSON object of string values.');
   const forbidden=/^(host|origin|referer|cookie|connection|content-length|transfer-encoding|upgrade|proxy-.*|sec-.*|x-reqlica-.*|x-forwarded-.*)$/i;
-  for(const [key,val] of Object.entries(value)) if(typeof val!=='string' || forbidden.test(key) || /[\r\n]/.test(key+val)) throw Error('Invalid or browser/proxy-controlled header: '+key);
+  for(const [key,val] of Object.entries(value)) if(typeof val!=='string' || !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(key) || forbidden.test(key) || /[\r\n]/.test(key+val)) throw Error('Invalid or browser/proxy-controlled header: '+key);
   return value;
 }
+function sharedHeadersKey() { return 'reqlica.html.headers.v1.'+state.project.id; }
+function loadSharedHeaders() {
+  let saved={};try{saved=JSON.parse(localStorage.getItem(sharedHeadersKey()) || '{}');}catch{}
+  $('shared-jwt').value=typeof saved?.jwt==='string'?saved.jwt:'';
+  $('shared-headers').value=pretty(saved?.headers || {});
+  $('shared-headers-status').textContent='';
+  $('request-headers').value='{}';
+  $('request-chain-results').textContent='No chain run yet.';
+}
+function savedSharedHeaders() {
+  const saved=JSON.parse(localStorage.getItem(sharedHeadersKey()) || '{}');
+  const headers=validateHeaders(saved.headers || {});
+  return mergeHeaders(headers,saved.jwt?{Authorization:'Bearer '+saved.jwt}:{});
+}
+function mergeHeaders(...sources) {
+  const merged={};for(const source of sources)for(const [key,value] of Object.entries(validateHeaders(source)))merged[key.toLowerCase()]=value;
+  return merged;
+}
+function saveSharedHeaders() {
+  if(!state.project)throw Error('Open a project first.');
+  const headers=validateHeaders(JSON.parse($('shared-headers').value || '{}')),jwt=$('shared-jwt').value.trim().replace(/^Bearer\s+/i,'');
+  if(jwt)validateHeaders({Authorization:'Bearer '+jwt});
+  localStorage.setItem(sharedHeadersKey(),JSON.stringify({headers,jwt}));
+  $('shared-headers-status').textContent='Saved for '+state.project.name+'. Clear both fields and save to remove defaults.';
+}
+function parseHeaders() {return mergeHeaders(savedSharedHeaders(),JSON.parse($('request-headers').value || '{}'));}
 function validRequestPath(path) {
   if(!path.startsWith('/') || path.startsWith('//') || /[\\#\s{}]/.test(path) || /%(?:2e|2f|5c|00)/i.test(path) || path.split('?')[0].split('/').some(s=>s==='.' || s==='..')) throw Error('Use a project-relative path such as /books/123?limit=10. Replace all placeholders; full URLs, fragments, and traversal paths are not allowed.');
   return path;
@@ -935,7 +966,7 @@ async function sendRequest() {
   $('response-status').textContent='Sending…';
   try {
     if(target==='draft') {
-      const call=await api('console',draftRoot()+'/call','POST',{expected_revision:state.draft.revision,method,path,...(raw?{json_body:body}:{})});
+      const call=await api('console',draftRoot()+'/call','POST',{expected_revision:state.draft.revision,method,path,headers:parseHeaders(),...(raw?{json_body:body}:{})});
       result=Object.hasOwn(call,'body')?call.body:call; status=call.status==='passed'?String(call.status_code):'Runner '+call.status; details=call;
     } else {
       const headers=parseHeaders(); if(raw && !Object.keys(headers).some(k=>k.toLowerCase()==='content-type')) headers['Content-Type']='application/json';
@@ -976,7 +1007,7 @@ function loadAIConfig() {
   try {
     const saved=JSON.parse(localStorage.getItem(aiStorageKey) || '{}') || {};
     for(const p of Array.isArray(saved?.providers)?saved.providers:[]) {
-      try {if(typeof p?.id!=='string' || !/^[\w-]{1,80}$/.test(p.id) || clean.providers.some(item=>item.id===p.id))continue;clean.providers.push(validateProvider(p));}catch{}
+      try {if(typeof p?.id!=='string' || !/^[\w-]{1,80}$/.test(p.id) || clean.providers.some(item=>item.id===p.id))continue;clean.providers.push(validateProvider(p));if(typeof p.apiKey==='string' && p.apiKey)providerKeys.set(p.id,p.apiKey);}catch{}
     }
     clean.defaultProvider=clean.providers.some(p=>p.id===saved.defaultProvider)?saved.defaultProvider:(clean.providers[0]?.id || '');
     const options=saved?.defaults;
@@ -990,16 +1021,15 @@ function loadAIConfig() {
   return clean;
 }
 function persistAIConfig() {
-  // Explicit whitelist: passwords, entered keys, prompts, files, and fixtures
-  // must never be included in localStorage or provider request previews.
-  const saved={providers:aiConfig.providers.map(p=>({id:p.id,name:p.name,kind:p.kind,model:p.model,baseUrl:p.baseUrl,reasoning:p.reasoning || 'default'})),defaultProvider:aiConfig.defaultProvider,defaults:{...aiConfig.defaults}};
+  // Explicit whitelist: keys are saved locally, never included in AI briefs.
+  const saved={providers:aiConfig.providers.map(p=>({id:p.id,name:p.name,kind:p.kind,model:p.model,baseUrl:p.baseUrl,reasoning:p.reasoning || 'default',apiKey:providerKeys.get(p.id) || ''})),defaultProvider:aiConfig.defaultProvider,defaults:{...aiConfig.defaults}};
   try {localStorage.setItem(aiStorageKey,JSON.stringify(saved));aiStorageAvailable=true;}catch{aiStorageAvailable=false;}
   for(const workspace of aiWorkspaces.values()){workspace.generationPreview=null;workspace.chatConsent=null;}
   renderProviderProfiles();
 }
 function renderProviderProfiles() {
-  $('provider-list').innerHTML=aiConfig.providers.map(p=>`<article class="provider-card"><div class="actions"><h3>${esc(p.name)}</h3><span class="badge ${p.id===aiConfig.defaultProvider?'':'neutral'}">${p.id===aiConfig.defaultProvider?'DEFAULT PROFILE':'SAVED PROFILE'}</span></div><dl class="details-grid"><dt>Type</dt><dd>${esc(providerPresets[p.kind].name)}</dd><dt>Model</dt><dd><code>${esc(p.model)}</code></dd><dt>Reasoning</dt><dd>${esc(p.reasoning || "default")}</dd><dt>Base URL</dt><dd><code>${esc(p.baseUrl)}</code></dd><dt>API key</dt><dd class="small muted">${providerKeys.has(p.id)?'Held in page memory only':'Not set for this page'}</dd></dl><p class="help">Not connected or verified.</p><div class="actions provider-actions"><button class="btn" data-edit-provider="${esc(p.id)}">Edit</button>${p.id!==aiConfig.defaultProvider?'<button class="btn" data-default-provider="'+esc(p.id)+'">Make default</button>':''}<button class="btn ghost" style="color:var(--error)" data-remove-provider="${esc(p.id)}">Remove</button></div></article>`).join('') || '<div class="provider-empty"><h3>No LLM providers yet</h3><p>Add a local model or API-compatible provider to explore the AI workflow.</p><button class="btn primary" data-action="add-provider">+ Add provider</button></div>';
-  $('ai-storage-status').textContent=aiStorageAvailable?'Non-secret provider profiles and defaults are saved in this browser only. API keys are never persisted.':'Browser storage is unavailable. Profiles and defaults will be lost on reload; keys are always memory-only.';
+  $('provider-list').innerHTML=aiConfig.providers.map(p=>`<article class="provider-card"><div class="actions"><h3>${esc(p.name)}</h3><span class="badge ${p.id===aiConfig.defaultProvider?'':'neutral'}">${p.id===aiConfig.defaultProvider?'DEFAULT PROFILE':'SAVED PROFILE'}</span></div><dl class="details-grid"><dt>Type</dt><dd>${esc(providerPresets[p.kind].name)}</dd><dt>Model</dt><dd><code>${esc(p.model)}</code></dd><dt>Reasoning</dt><dd>${esc(p.reasoning || "default")}</dd><dt>Base URL</dt><dd><code>${esc(p.baseUrl)}</code></dd><dt>API key</dt><dd class="small muted">${providerKeys.has(p.id)?'Saved in this browser':'Not configured'}</dd></dl><p class="help">Not connected or verified.</p><div class="actions provider-actions"><button class="btn" data-edit-provider="${esc(p.id)}">Edit</button>${p.id!==aiConfig.defaultProvider?'<button class="btn" data-default-provider="'+esc(p.id)+'">Make default</button>':''}<button class="btn ghost" style="color:var(--error)" data-remove-provider="${esc(p.id)}">Remove</button></div></article>`).join('') || '<div class="provider-empty"><h3>No LLM providers yet</h3><p>Add a local model or API-compatible provider to explore the AI workflow.</p><button class="btn primary" data-action="add-provider">+ Add provider</button></div>';
+  $('ai-storage-status').textContent=aiStorageAvailable?'Provider profiles, API keys, and defaults persist in this browser (unencrypted).':'Browser storage is unavailable. Profiles, keys, and defaults will be lost on reload.';
 }
 function renderAIProviderChoices() {
   document.querySelectorAll('[data-ai-provider]').forEach(select=>{
@@ -1073,7 +1103,7 @@ function saveProvider() {
 }
 async function removeProvider(id) {
   const p=aiConfig.providers.find(item=>item.id===id); if(!p)return;
-  if(!await confirmAction('Remove provider profile?','Remove '+p.name+' from this browser and forget its in-memory key? Real project APIs, drafts, and data will not change.'))return;
+  if(!await confirmAction('Remove provider profile?','Remove '+p.name+' from this browser and delete its saved key? Real project APIs, drafts, and data will not change.'))return;
   aiConfig.providers=aiConfig.providers.filter(item=>item.id!==id);providerKeys.delete(id);
   if(aiConfig.defaultProvider===id)aiConfig.defaultProvider=aiConfig.providers[0]?.id || '';
   persistAIConfig();renderAIProviderChoices();toast('Provider profile removed from this browser.');
@@ -1376,6 +1406,75 @@ function renderDataWorkspace() {
   $('data-preview-status').textContent=w.dataImportResult?'Inserted '+w.dataImportResult.inserted_count+' records into '+w.dataImportResult.table:validation?.status==='passed'?'Validated'+(w.dataTarget==='sqlite'?' for '+w.dataTable:' as JSON')+' · ready to review':hasData?'Preview only · edit values, then validate before inserting.':'';
   if(validation?.status==='failed')showError(Error(validation.message),'data-validation-error');
 }
+function resolveChainValue(value,results,pathMode=false) {
+  const lookup=reference=>{
+    let current=results;
+    for(const key of reference.split('.')) {
+      if(['__proto__','prototype','constructor'].includes(key) || current===null || typeof current!=='object' || !Object.hasOwn(current,key))throw Error('Missing chain response reference: '+reference);
+      current=current[key];
+    }
+    return current;
+  };
+  if(typeof value==='string') {
+    const whole=value.match(/^\{\{([\w.-]+)\}\}$/);
+    if(whole && !pathMode)return structuredClone(lookup(whole[1]));
+    return value.replace(/\{\{([\w.-]+)\}\}/g,(_,ref)=>{
+      const resolved=lookup(ref);
+      if(resolved!==null && typeof resolved==='object')throw Error('Use scalar references inside strings: '+ref);
+      return pathMode?encodeURIComponent(String(resolved)):String(resolved);
+    });
+  }
+  if(Array.isArray(value))return value.map(item=>resolveChainValue(item,results));
+  if(value && typeof value==='object')return Object.fromEntries(Object.entries(value).map(([key,item])=>[key,resolveChainValue(item,results)]));
+  return value;
+}
+function parseRequestChain(raw) {
+  if(new TextEncoder().encode(raw).length>128*1024)throw Error('Keep the chain within 128 KiB.');
+  const steps=JSON.parse(raw),names=new Set();
+  if(!Array.isArray(steps) || !steps.length || steps.length>50)throw Error('Provide 1–50 request steps.');
+  for(const step of steps) {
+    if(!step || !/^[A-Za-z][A-Za-z0-9_]*$/.test(step.name) || ['constructor','prototype','__proto__'].includes(step.name) || names.has(step.name))throw Error('Each step needs a unique name using letters, numbers, and underscores.');
+    names.add(step.name);
+    if(!['GET','POST','PUT','PATCH','DELETE','OPTIONS','HEAD'].includes(step.method) || typeof step.path!=='string')throw Error('Each step needs a method and project-relative path.');
+    validRequestPath(step.path.replace(/\{\{[\w.-]+\}\}/g,'example'));
+    if(['GET','HEAD'].includes(step.method) && step.body!==undefined)throw Error('GET/HEAD steps cannot carry a body.');
+    validateHeaders(step.headers || {});
+  }
+  return steps;
+}
+async function runRequestChain() {
+  if(!state.project)throw Error('Open a project first.');
+  const steps=parseRequestChain($('request-chain').value),projectId=state.project.id,defaults=savedSharedHeaders();
+  if(!await confirmAction('Run '+steps.length+' live requests?', 'Run this chain against '+state.project.name+'? Completed writes persist even if a later step fails.'))return;
+  const results=Object.create(null),report=[];
+  for(const step of steps) {
+    try {
+      const path=validRequestPath(resolveChainValue(step.path,results,true));
+      const headers=mergeHeaders(defaults,resolveChainValue(step.headers || {},results));
+      const body=resolveChainValue(step.body,results);
+      if(body!==undefined && !Object.hasOwn(headers,'content-type'))headers['content-type']='application/json';
+      const result=await transport('gateway','/mock/'+projectId+path,{method:step.method,headers,body:body===undefined?undefined:JSON.stringify(body)});
+      report.push({name:step.name,status:result.response.status,response:result.body});
+      if(!result.response.ok)break;
+      results[step.name]=result.body;
+    } catch(error) {report.push({name:step.name,error:errorMessage(error)});break;}
+    finally {$('request-chain-results').textContent=pretty(report);}
+  }
+}
+function tableExample(table) {
+  const record={};
+  for(const column of table?.columns || []) {
+    if(column.hidden || (column.pk && table.columns.filter(c=>c.pk).length===1 && !/WITHOUT\s+ROWID/i.test(table.sql || '') && /^INTEGER$/i.test(column.type || '')))continue;
+    const type=(column.type || '').toUpperCase();
+    record[column.name]=/INT|REAL|FLOA|DOUB|NUM|DEC/.test(type)?1:/BOOL/.test(type)?true:/BLOB/.test(type)?null:'example';
+  }
+  return record;
+}
+function fillTableExample() {
+  const w=aiWorkspace(),table=w.dataSchema?.tables.find(t=>t.name===w.dataTable);
+  if(!table)return;
+  w.template=pretty(tableExample(table));$('ai-data-template').value=w.template;
+}
 async function loadDataSchema() {
   clearError('ai-data-error');
   try {
@@ -1528,7 +1627,7 @@ function renderEnvironment() {
   $('environment-project-name').textContent=p?'Runtime variables for '+p.name+' · independent of browser AI profiles.':'Open a project to configure its runtime variables.';
   $('environment-form').hidden=!p;$('environment-list').hidden=!p;
   const needsRestart=p?.status==='running' && metadata && p.environment_revision!==metadata.revision;
-  $('environment-status').textContent=!p?'Values are write-only and are never sent to AI.':!metadata?'Reload variable names to configure this project.':needsRestart?'Settings changed · restart the running API to use the new values. Rerun draft checks before approval.':(metadata.names.length?metadata.names.length+' configured variable(s).':'No project variables configured.')+' Values are never shown or sent to AI.';
+  $('environment-status').textContent=!p?'Values persist on disk across reloads and restarts; they are write-only and never sent to AI.':!metadata?'Reload variable names to configure this project.':needsRestart?'Settings changed · restart the running API to use the new values. Rerun draft checks before approval.':(metadata.names.length?metadata.names.length+' configured variable(s).':'No project variables configured.')+' Values are never shown or sent to AI.';
   $('environment-status').dataset.tone=needsRestart?'warning':metadata?.names.length?'success':'neutral';
   $('environment-list').innerHTML=(metadata?.names || []).map(name=>'<div class="variable-row"><div class="variable-identity"><code>'+esc(name)+'</code><p>Saved privately · value hidden</p></div><div class="actions"><button class="btn" type="button" data-replace-environment="'+esc(name)+'">Replace</button><button class="btn ghost" type="button" data-remove-environment="'+esc(name)+'">Remove…</button></div></div>').join('') || (metadata?'<div class="variable-empty"><strong>No runtime variables yet</strong><p>Add the exact variable name expected by your code, then save a value or generate a secure key.</p></div>':'');
 }
@@ -1579,6 +1678,8 @@ async function restartEnvironment() {
   } catch(error){showError(error,'environment-error');try{await refreshProject();}catch{}}
 }
 const actions={
+  'save-shared-headers':saveSharedHeaders,
+  'run-request-chain':runRequestChain,
   'reload-environment':async()=>{await loadEnvironment();if(state.draft)await refreshDraft();},
   'generate-environment':()=>saveEnvironment(true),
   'restart-environment':restartEnvironment,
@@ -1810,7 +1911,7 @@ $('repair-requirements').addEventListener('input',syncControls);
 document.addEventListener('input',event=>{const id=event.target.dataset.clarificationAnswer;if(id){const [scope,key]=id.split(':'),review=activeClarification(scope);if(review)review.answers[key]=event.target.value;syncControls();}});
 document.addEventListener('change',event=>{const id=event.target.dataset.clarificationOption;if(id && event.target.value){const [scope,key]=id.split(':'),review=activeClarification(scope);if(review){review.answers[key]=event.target.value;document.getElementById('clarification-'+scope+'-'+key).value=event.target.value;syncControls();}}});
 $('data-target').onchange=()=>run(async()=>{const w=aiWorkspace();w.dataTemplates=w.dataTemplates || {json:w.template,sqlite:'{}'};w.dataTemplates[w.dataTarget]=w.template;w.dataTarget=$('data-target').value;w.template=w.dataTemplates[w.dataTarget];$('ai-data-template').value=w.template;w.dataValidation=null;w.dataImportResult=null;if(w.dataTarget==='sqlite')await loadDataSchema();renderDataWorkspace();syncControls();});
-$('data-table').onchange=()=>{const w=aiWorkspace();w.dataTable=$('data-table').value;w.dataValidation=null;w.dataImportResult=null;renderDataWorkspace();syncControls();};
+$('data-table').onchange=()=>{const w=aiWorkspace();w.dataTable=$('data-table').value;fillTableExample();w.dataValidation=null;w.dataImportResult=null;renderDataWorkspace();syncControls();};
 $('ai-data-preview').oninput=()=>{const w=aiWorkspace();w.dataRawPreview=$('ai-data-preview').value;w.dataValidation=null;w.dataImportResult=null;$('data-preview-status').textContent='Edited records · validate before inserting.';$('ai-data-preview-count').textContent='Edited';clearError('data-validation-error');syncControls();};
 $('ai-endpoint-prompt').oninput=()=>{if(state.project && aiEndpointContext?.projectId===state.project.id){const r=aiEndpointContext.endpoint;aiWorkspace().endpointPrompts[r.method+' '+r.path]=$('ai-endpoint-prompt').value;}};
 $('create-project-form').onsubmit=event=>{event.preventDefault();run(createProject);};

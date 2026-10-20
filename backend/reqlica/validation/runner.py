@@ -61,6 +61,7 @@ def run(job: dict) -> dict:
                 job["method"],
                 job["path"],
                 json=job.get("json_body"),
+                headers=job.get("headers", {}),
                 follow_redirects=False,
             )
             body = response.text[:OUTPUT_LIMIT]

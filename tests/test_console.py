@@ -190,6 +190,7 @@ class DraftConsoleTests(unittest.TestCase):
                     "method": "POST",
                     "path": "/hello",
                     "json_body": {"data": [1]},
+                    "headers": {"Authorization": "Bearer test-token"},
                 },
             )
         self.assertEqual(response.json(), payload)
@@ -200,6 +201,7 @@ class DraftConsoleTests(unittest.TestCase):
             "POST",
             "/hello",
             {"data": [1]},
+            {"Authorization": "Bearer test-token"},
         )
         self.assertIsNone(self.client.get(self.route).json()["approval"])
 

@@ -514,7 +514,8 @@ def call_draft_endpoint(
     method: str,
     path: str,
     json_body=None,
+    headers: dict[str, str] | None = None,
 ) -> dict:
     from reqlica.validation.checks import call_draft_endpoint as call
 
-    return call(project_id, draft_id, expected_revision, method, path, json_body)
+    return call(project_id, draft_id, expected_revision, method, path, json_body, headers)
