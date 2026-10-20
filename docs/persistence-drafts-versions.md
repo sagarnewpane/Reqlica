@@ -24,8 +24,9 @@ The current process/locking implementation requires a POSIX system (macOS or
 Linux); Windows is not supported by this backend workflow.
 
 Approval is a deliberate human workflow step, not protection against another
-local process acting as the same user. There is no approval HTTP endpoint.
-Future agents and MCP tools must not expose approval or auto-approve changes.
+local process acting as the same user. The local dashboard exposes explicit approval
+through HTTP; it is not an authentication boundary. MCP tools do not expose approval,
+and agents must not auto-approve changes.
 
 ## Storage
 
@@ -150,6 +151,17 @@ The runner configures SDK database access before importing project code; this
 test writes only to the disposable copy when run through `draft test`.
 
 ## Explicit Approval
+
+In **Drafts & checks**, review the saved files and passing validation/test results,
+then select **Approve checked revision…** and confirm the displayed revision.
+Unsaved edits, failed or stale checks, and a stale base disable the UI action.
+Approval does not publish: use **Activate approved revision** separately after
+any required database setup is ready. CLI approval remains available below.
+
+`POST /api/projects/{project_id}/drafts/{draft_id}/approve` requires
+`{"expected_revision":"<sha>","confirm":true}`. Confirmation must be the literal
+JSON boolean `true`. The backend uses the same revision and passing-check guards
+as the CLI; missing confirmation is rejected and stale revisions fail.
 
 ```bash
 uv run reqlica draft approve <project-id> <draft-id> --revision <sha>
@@ -331,3 +343,35 @@ Supported route methods are `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`,
 Handlers support ordinary FastAPI parameters, Pydantic models, `Request`, and
 `Response`. Keep existing starter behavior/tests when adding new handlers, or
 update the tests deliberately when replacing that behavior.
+
+## Draft names, timestamps, and deletion
+
+The dashboard lists drafts by most recent update, with a readable name, creation
+and update times in the browser's timezone, a short ID, and check status. Open a
+draft to edit its name (1–100 characters, single line). Generated drafts use the
+AI proposal summary as their initial name. Names need not be unique; IDs remain
+the stable identity.
+
+New draft metadata includes `name`, `created_at`, and `updated_at` as UTC ISO-8601
+timestamps. Updates include source edits, checks, approval, repair, and renaming.
+A rename does not change the content revision or invalidate passing checks and
+approval. Reading an unchanged draft does not update its timestamp. Older drafts
+use a fallback name and the state file's modification time for `updated_at`;
+`created_at` is null and displayed as “Not recorded” because the original time
+cannot be recovered reliably.
+
+- `POST /api/projects/{project_id}/drafts` accepts an optional `{ "name": "JWT auth" }`
+  body. Existing calls without a body still work.
+- `PATCH /api/projects/{project_id}/drafts/{draft_id}` accepts `name` and
+  `expected_revision` to rename a draft.
+- `DELETE /api/projects/{project_id}/drafts/{draft_id}` accepts
+  `expected_revision` and literal `confirm: true`. It permanently removes that
+  draft's source directory, metadata/check reports, and draft OpenAPI artifacts.
+  It does not delete published versions, live database tables/records, project
+  variables, or other drafts. A stale revision returns 409; a missing draft 404.
+
+The dashboard confirms deletion with the draft's name/ID and warns about unsaved
+edits if that draft is open. Cancellation or server failure preserves the editor.
+After deletion it clears only that draft's selection and preview state. The
+existing `reqlica draft delete` CLI command still deletes an individual source
+file; it does not delete a whole draft.

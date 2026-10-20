@@ -24,8 +24,15 @@ every business rule. Missing behavior must appear as a proposal for review.
 Once an endpoint is active, requests execute Python directly without another AI
 call. The draft/check/approval/activation backend and initial AI-facing MCP tools
 already exist. Initial single-turn Groq generation and standalone HTML draft
-review now exist; conversation memory, automatic repair, broader provider support,
-and the packaged Next.js dashboard remain planned. See [generation](generation.md).
+review now exist; read-only project chat has bounded tab-scoped history. Durable
+server-side conversations, unattended/background repair, broader provider support,
+and the packaged Next.js dashboard remain planned. Additive database setup is now
+available through versioned plans, disposable checks, and explicitly confirmed,
+backed-up live application. Confirmed bounded draft repair/retesting is available.
+Clarification-first generation and private per-project
+environment settings/key generation are available; secret values are excluded
+from model input. See [generation](generation.md) and
+[database setup](database-setup.md).
 
 ## Planned Capabilities
 
@@ -40,7 +47,8 @@ and the packaged Next.js dashboard remain planned. See [generation](generation.m
 - Per-route/test-user rate limits with `429` responses.
 - Endpoint/data browsing, request/response inspection, runtime errors, and logs.
 - Baseline data and scenario-state reset.
-- Database migrations and recovery for schema-changing updates.
+- Alter/rebuild/drop migrations and recovery for schema-changing updates; additive
+  new-table setup with pre-change backups is implemented.
 - Project moving/import, complete export bundles, and OpenAPI export.
 - Configurable browser CORS behavior.
 - A packaged dashboard, installation guide, working demo, and open-weight model support.
@@ -76,7 +84,7 @@ See the [MCP guide](mcp.md) for connection details and the initial workflow.
 | `get_api_schema` | Inspect generated revision-linked OpenAPI contracts, with separate draft/published Swagger pages. | Implemented; incomplete contracts currently warn |
 | `create_draft` | Create an editable project version. | Implemented |
 | `upsert_endpoint` | Add or replace a handler's route definition. | Implemented |
-| `write_draft_file` | Save source and tests; migration/seed workflows remain planned. | Implemented |
+| `write_draft_file` | Save source, tests, and declarative database/schema.json plans; live setup uses a separate confirmed console action. | Implemented |
 | `remove_endpoint` | Remove a draft route. | Implemented |
 | `validate_draft` | Check syntax, imports, and route definitions. | Implemented |
 | `test_draft` | Run tests with separate data. | Implemented |

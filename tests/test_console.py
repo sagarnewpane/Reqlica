@@ -218,16 +218,16 @@ class DraftConsoleTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), payload)
 
-    def test_revision_is_required_and_approval_is_not_exposed(self):
+    def test_revision_and_explicit_approval_confirmation_are_required(self):
         for command in ("validate", "test", "call"):
             response = self.client.post(self.route + "/" + command, json={})
             self.assertEqual(response.status_code, 422)
         response = self.client.post(
             self.route + "/approve", json={"expected_revision": self.draft["revision"]}
         )
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 422)
         paths = self.client.get("/openapi.json").json()["paths"]
-        self.assertFalse(any("approve" in path for path in paths))
+        self.assertTrue(any("approve" in path for path in paths))
 
     def test_activation_and_conversion_forward_to_configured_gateway(self):
         payload = {

@@ -17,11 +17,16 @@ from reqlica.generation import provider
 from reqlica.generation.errors import GenerationError
 from reqlica.generation.prompts import build_messages
 from reqlica.generation.schemas import (
+    EndpointEditRequest,
     GenerationRequest,
     ProjectAnswer,
     ProjectQuestionRequest,
 )
-from reqlica.generation.service import generate_endpoints
+from reqlica.generation.service import (
+    edit_endpoint,
+    endpoint_source,
+    generate_endpoints,
+)
 from reqlica.projects import drafts
 from reqlica.projects.store import create_project
 from reqlica.projects.versions import code_directory, content_digest
@@ -61,6 +66,18 @@ def proposal():
                 "handler": "endpoints/greetings.py:greet",
             }
         ],
+    }
+
+
+def clarification():
+    return {
+        "summary": "Login cannot check stored credentials: the database has no users table.",
+        "assumptions": [
+            "Which table and columns should map usernames to password hashes?",
+            "Which password hashing scheme will those records use? Table creation is a separate prerequisite.",
+        ],
+        "files": [],
+        "endpoints": [],
     }
 
 
@@ -116,6 +133,10 @@ class GenerationTests(GenerationFixture, unittest.TestCase):
         self.assertIsNone(result["draft"]["test"])
         self.assertIsNone(result["draft"]["approval"])
         self.assertEqual(result["checks"], "not_run")
+        self.assertEqual(
+            result["draft"]["generation"]["requirements"], self.request.requirements
+        )
+        self.assertIsNone(result["draft"]["generation"]["clarification"])
         self.assertEqual(content_digest(code_directory(self.project)), before)
         self.assertEqual(
             (self.project.directory / "data.sqlite").read_bytes(), database
@@ -152,6 +173,15 @@ class GenerationTests(GenerationFixture, unittest.TestCase):
         result = self.generate()
         self.assertIsNone(result["draft"]["validation"])
         self.assertIsNone(result["draft"]["test"])
+
+    def test_prompt_explains_dependency_injection_and_exact_error_contracts(self):
+        _, messages = build_messages(self.project.id, self.request)
+        prompt = messages[0]["content"]
+        self.assertIn("Never assign request = Depends()", prompt)
+        self.assertIn('Header(alias="Authorization")', prompt)
+        self.assertIn("HTTPException(detail={...})", prompt)
+        self.assertIn("return JSONResponse(status_code=...", prompt)
+        self.assertIn("do not change tests", prompt)
 
     def test_human_can_validate_test_and_call_generated_endpoint_after_review(self):
         result = self.generate()
@@ -206,10 +236,10 @@ class GenerationTests(GenerationFixture, unittest.TestCase):
         plan = proposal()
         plan["approval"] = True
         cases.append(("approval injection", plan))
-        plan = proposal()
-        plan["files"] = []
-        plan["endpoints"] = []
-        cases.append(("no implementation", plan))
+        for missing in ("files", "endpoints"):
+            plan = proposal()
+            plan[missing] = []
+            cases.append(("partial implementation without " + missing, plan))
         for name, plan in cases:
             with self.subTest(name=name):
                 self.complete.return_value = (json.dumps(plan), None)
@@ -217,11 +247,96 @@ class GenerationTests(GenerationFixture, unittest.TestCase):
                     self.generate()
                 self.assertEqual(drafts.list_drafts(self.project.id), {"drafts": []})
 
-    def test_malformed_json_is_not_repaired_or_retried(self):
-        self.complete.return_value = ("```json\n{}\n```", None)
+    def test_malformed_json_regeneration_is_bounded(self):
+        self.complete.return_value = ('{"summary":"unfinished', None)
+        with self.assertRaises(GenerationError) as failure:
+            self.generate()
+        self.assertEqual(failure.exception.detail["attempts"], 2)
+        self.assertEqual(failure.exception.detail["code"], "malformed_json")
+        self.assertEqual(self.complete.call_count, 2)
+        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
+
+    def test_malformed_json_regenerates_and_counts_both_attempts(self):
+        self.complete.side_effect = [
+            ('{"summary":"private-broken-output', {"total_tokens": 100}),
+            (json.dumps(proposal()), {"total_tokens": 200}),
+        ]
+        result = self.generate()
+        self.assertEqual(self.complete.call_count, 2)
+        self.assertEqual(result["provider"]["usage"]["total_tokens"], 300)
+        self.assertIn("Repaired", result["output_warnings"][0])
+        messages = self.complete.call_args.args[0]
+        self.assertEqual(
+            json.loads(messages[-1]["content"])["failed_proposal"],
+            '{"summary":"private-broken-output',
+        )
+        self.assertEqual(messages[-1]["role"], "user")
+        self.assertIn("untrusted data", messages[-2]["content"])
+        self.assertEqual(len(drafts.list_drafts(self.project.id)["drafts"]), 1)
+
+    def test_single_markdown_wrapper_preserves_source_without_retry(self):
+        self.complete.return_value = ("```json\n" + json.dumps(proposal()) + "\n```", None)
+        result = self.generate()
+        self.complete.assert_called_once()
+        directory = drafts.draft_directory(self.project, result["draft"]["id"])
+        self.assertEqual((directory / "endpoints/greetings.py").read_text(), HANDLER)
+        self.assertIn("code fence", result["output_warnings"][0])
+
+    def test_failed_regeneration_still_requires_complete_schema(self):
+        self.complete.side_effect = [('{"files":', None), ("{}", None)]
         with self.assertRaises(GenerationError):
             self.generate()
+        self.assertEqual(self.complete.call_count, 2)
+        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
+
+    def test_root_schema_mismatch_is_corrected_with_specific_feedback(self):
+        self.complete.side_effect = [
+            ("null", {"total_tokens": 50}),
+            (json.dumps(proposal()), {"total_tokens": 100}),
+        ]
+        result = self.generate()
+        self.assertEqual(result["status"], "draft_created")
+        self.assertEqual(result["provider"]["usage"]["total_tokens"], 150)
+        messages = self.complete.call_args.args[0]
+        self.assertIn("expected a JSON object", messages[-2]["content"])
+        self.assertEqual(json.loads(messages[-1]["content"])["failed_proposal"], "null")
+        self.assertEqual(self.complete.call_count, 2)
+
+    def test_clarification_preserves_explanation_without_saving_or_executing(self):
+        before = content_digest(code_directory(self.project))
+        database = (self.project.directory / "data.sqlite").read_bytes()
+        self.complete.return_value = (
+            json.dumps(clarification()),
+            {"total_tokens": 123},
+        )
+        result = self.generate()
+        self.assertEqual(result["status"], "needs_information")
+        self.assertEqual(result["summary"], clarification()["summary"])
+        self.assertEqual(result["assumptions"], clarification()["assumptions"])
+        self.assertEqual(result["context_revision"], before)
+        self.assertEqual(result["checks"], "not_run")
+        self.assertNotIn("draft", result)
+        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
+        self.assertEqual(content_digest(code_directory(self.project)), before)
+        self.assertEqual(
+            (self.project.directory / "data.sqlite").read_bytes(), database
+        )
         self.complete.assert_called_once()
+
+    def test_empty_proposals_still_require_valid_bounded_metadata(self):
+        cases = [
+            {**clarification(), "summary": " "},
+            {**clarification(), "summary": "x" * 8193},
+            {**clarification(), "assumptions": ["x"] * 51},
+            {**clarification(), "assumptions": ["x" * 4097]},
+            {**clarification(), "files": "not an array"},
+            {**clarification(), "unexpected": "field"},
+        ]
+        for plan in cases:
+            with self.subTest(plan=str(plan)[:100]):
+                self.complete.return_value = (json.dumps(plan), None)
+                with self.assertRaises(GenerationError):
+                    self.generate()
         self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
 
     def test_split_handler_and_test_arrays_are_combined_without_losing_code(self):
@@ -442,6 +557,20 @@ class GenerationHTTPTests(GenerationFixture, unittest.TestCase):
         self.assertNotIn("secret-header-key", json.dumps(messages))
         self.assertIsNone(response.json()["draft"]["test"])
 
+    def test_http_clarification_is_200_not_created_and_does_not_echo_key(self):
+        self.complete.return_value = (json.dumps(clarification()), None)
+        response = self.client.post(
+            self.route,
+            json={"requirements": "Check login credentials in the database"},
+            headers={"X-Reqlica-Groq-Key": "private-clarification-key"},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        self.assertEqual(response.json()["status"], "needs_information")
+        self.assertNotIn("private-clarification-key", response.text)
+        self.assertNotIn("draft", response.json())
+        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
+
     def test_http_input_resource_and_provider_errors(self):
         for body in (
             {},
@@ -481,6 +610,136 @@ class GenerationHTTPTests(GenerationFixture, unittest.TestCase):
         self.assertTrue(result["output_warnings"])
         self.assertIsNone(result["draft"]["test"])
         self.complete.assert_called_once()
+
+
+class EndpointEditingTests(GenerationFixture, unittest.TestCase):
+    def test_edit_regenerates_malformed_json_once(self):
+        plan = self.edit_proposal()
+        self.complete.side_effect = [('{"files":', None), (json.dumps(plan), None)]
+        result = edit_endpoint(self.project.id, self.edit_request())
+        self.assertEqual(self.complete.call_count, 2)
+        self.assertEqual(result["operation"], "endpoint_edit")
+        self.assertIn("Repaired", result["output_warnings"][0])
+        self.assertEqual(len(drafts.list_drafts(self.project.id)["drafts"]), 1)
+
+    def edit_request(self):
+        source = endpoint_source(self.project.id, "GET", "/hello")
+        return EndpointEditRequest(
+            requirements="Make the greeting accept a reader name",
+            endpoint=source["endpoint"],
+            expected_revision=source["revision"],
+        )
+
+    def edit_proposal(self):
+        plan = proposal()
+        plan["endpoints"][0]["path"] = "/hello"
+        self.complete.return_value = (json.dumps(plan), None)
+        return plan
+
+    def test_source_is_read_without_creating_drafts_or_executing_handlers(self):
+        source = endpoint_source(self.project.id, "GET", "/hello")
+        self.assertEqual(source["path"], "endpoints/hello.py")
+        self.assertIn("def hello", source["content"])
+        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
+        self.complete.assert_not_called()
+
+    def test_edit_clarification_returns_model_reason_without_route_or_draft(self):
+        self.complete.return_value = (json.dumps(clarification()), None)
+        request = self.edit_request()
+        result = edit_endpoint(self.project.id, request)
+        self.assertEqual(result["status"], "needs_information")
+        self.assertEqual(result["operation"], "endpoint_edit")
+        self.assertEqual(result["edited_endpoint"], request.endpoint.model_dump())
+        self.assertEqual(result["summary"], clarification()["summary"])
+        self.assertEqual(result["assumptions"], clarification()["assumptions"])
+        self.assertNotIn("draft", result)
+        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
+        self.complete.assert_called_once()
+        prompt = self.complete.call_args.args[0][0]["content"]
+        self.assertIn("BOTH files", prompt)
+
+    def test_http_edit_clarification_is_200_and_exposes_no_draft(self):
+        self.complete.return_value = (json.dumps(clarification()), None)
+        with TestClient(create_app()) as client:
+            response = client.post(
+                f"/api/projects/{self.project.id}/edit-endpoint",
+                json=self.edit_request().model_dump(),
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        self.assertEqual(response.json()["status"], "needs_information")
+        self.assertNotIn("draft", response.json())
+        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
+
+    def test_ai_edit_saves_only_selected_registration_to_a_fresh_unexecuted_draft(self):
+        other = drafts.create_draft(self.project.id)
+        before = content_digest(code_directory(self.project))
+        self.edit_proposal()
+        result = edit_endpoint(self.project.id, self.edit_request())
+        self.assertEqual(result["operation"], "endpoint_edit")
+        self.assertNotEqual(result["draft"]["id"], other["id"])
+        self.assertEqual(content_digest(code_directory(self.project)), before)
+        self.assertEqual(drafts.inspect_draft(self.project.id, other["id"]), other)
+        self.assertIsNone(result["draft"]["validation"])
+        self.assertIsNone(result["draft"]["approval"])
+        self.assertEqual([e["path"] for e in result["endpoints"]], ["/hello"])
+        messages = self.complete.call_args.args[0]
+        self.assertEqual(
+            json.loads(messages[1]["content"])["edit_target"]["path"], "/hello"
+        )
+        self.complete.assert_called_once()
+
+    def test_stale_source_or_unknown_route_fails_before_provider(self):
+        request = self.edit_request()
+        (code_directory(self.project) / "endpoints/hello.py").write_text(
+            "# newer source"
+        )
+        with self.assertRaisesRegex(ValueError, "Published code changed"):
+            edit_endpoint(self.project.id, request)
+        self.complete.assert_not_called()
+        with self.assertRaises(FileNotFoundError):
+            endpoint_source(self.project.id, "GET", "/missing")
+
+    def test_model_cannot_rename_or_add_unrelated_routes(self):
+        for route_path in ("/renamed", "/unrelated"):
+            plan = self.edit_proposal()
+            plan["endpoints"][0]["path"] = route_path
+            self.complete.return_value = (json.dumps(plan), None)
+            with self.assertRaisesRegex(GenerationError, "preserve the selected"):
+                edit_endpoint(self.project.id, self.edit_request())
+        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
+
+    def test_protected_shared_handlers_cannot_be_rewritten(self):
+        directory = code_directory(self.project)
+        (directory / "endpoints/greetings.py").write_text(HANDLER)
+        manifest = json.loads((directory / "manifest.json").read_text())
+        manifest["endpoints"].append(proposal()["endpoints"][0])
+        (directory / "manifest.json").write_text(json.dumps(manifest))
+        plan = self.edit_proposal()
+        plan["files"][0]["content"] = HANDLER.replace("Hello, ", "Changed, ")
+        self.complete.return_value = (json.dumps(plan), None)
+        with self.assertRaisesRegex(GenerationError, "unrelated route handler"):
+            edit_endpoint(self.project.id, self.edit_request())
+        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
+
+    def test_http_edit_and_source_use_real_revision_guards(self):
+        self.edit_proposal()
+        with TestClient(create_app()) as client:
+            source = client.get(
+                f"/api/projects/{self.project.id}/endpoint-source?method=GET&path=/hello"
+            )
+            self.assertEqual(source.status_code, 200)
+            self.assertEqual(source.headers["cache-control"], "no-store")
+            response = client.post(
+                f"/api/projects/{self.project.id}/edit-endpoint",
+                json=self.edit_request().model_dump(),
+                headers={"X-Reqlica-Groq-Key": "private-edit-key"},
+            )
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertNotIn("private-edit-key", response.text)
+        self.assertEqual(
+            self.complete.call_args.args[2].get_secret_value(), "private-edit-key"
+        )
 
 
 class GroqProviderTests(unittest.TestCase):
@@ -526,6 +785,7 @@ class GroqProviderTests(unittest.TestCase):
         self.enterContext(
             patch("reqlica.generation.provider.OpenAI", side_effect=factory)
         )
+        self.enterContext(patch("reqlica.generation.output_format.openrouter_model", return_value=None))
 
     def complete(self):
         return provider.complete(
@@ -542,10 +802,76 @@ class GroqProviderTests(unittest.TestCase):
         )
         self.assertEqual(self.options["max_retries"], 0)
         body = json.loads(self.requests[0].content)
-        self.assertEqual(body["messages"], self.messages)
+        self.assertEqual(body["messages"][:-1], self.messages)
+        self.assertIn("Serialization example", body["messages"][-1]["content"])
+        self.assertEqual(body["messages"][-1]["role"], "system")
+        self.assertEqual(body["temperature"], 0)
+        self.assertEqual(body["seed"], 42)
         self.assertTrue(body["response_format"]["json_schema"]["strict"])
         self.assertNotIn("tools", body)
         self.assertNotIn("private-provider-key", self.requests[0].content.decode())
+
+    def test_compatible_uses_configured_origin_model_and_explicit_key(self):
+        request = GenerationRequest(
+            requirements="Catalog", provider="compatible", model="custom-model",
+            base_url="https://provider.example/api/v1/chat/completions/",
+        )
+        with patch.dict(os.environ, {"GROQ_API_KEY": "server-groq-secret"}):
+            provider.complete(self.messages, request, SecretStr("custom-provider-key"))
+        sent = self.requests[0]
+        self.assertEqual(str(sent.url), "https://provider.example/api/v1/chat/completions")
+        self.assertEqual(sent.headers["authorization"], "Bearer custom-provider-key")
+        body = json.loads(sent.content)
+        self.assertEqual(body["model"], "custom-model")
+        self.assertEqual(body["max_tokens"], request.max_tokens)
+        self.assertEqual(body["response_format"]["type"], "json_schema")
+        self.assertNotIn("reasoning_effort", body)
+        self.assertNotIn("seed", body)
+        self.assertIn("schema", body["messages"][-1]["content"])
+        self.assertNotIn("server-groq-secret", sent.content.decode())
+        self.assertEqual(len(self.requests), 1)
+
+    def test_custom_provider_never_falls_back_to_server_groq_key(self):
+        request = GenerationRequest(
+            requirements="Catalog", provider="compatible", model="custom-model",
+            base_url="https://provider.example/v1",
+        )
+        with patch.dict(os.environ, {"GROQ_API_KEY": "server-secret"}):
+            with self.assertRaises(GenerationError) as raised:
+                provider.complete(self.messages, request)
+        self.assertIn("selected provider", str(raised.exception))
+        self.assertEqual(self.requests, [])
+
+    def test_compatible_errors_name_selected_provider(self):
+        self.status = 401
+        request = GenerationRequest(
+            requirements="Catalog", provider="compatible", model="custom-model",
+            base_url="https://provider.example/v1",
+        )
+        with self.assertRaises(GenerationError) as raised:
+            provider.complete(self.messages, request, SecretStr("custom-key"))
+        self.assertIn("OpenAI-compatible provider", str(raised.exception))
+        self.assertNotIn("Groq", str(raised.exception))
+
+    def test_provider_urls_and_models_are_validated(self):
+        from pydantic import ValidationError
+        for url in (
+            "http://provider.example/v1", "file:///tmp/model", "https://name:pass@example.com/v1",
+            "https://example.com/v1?key=private", "https://example.com/v1#private",
+        ):
+            with self.subTest(url=url), self.assertRaises(ValidationError):
+                GenerationRequest(requirements="Test", provider="compatible", model="custom", base_url=url)
+        with self.assertRaises(ValidationError):
+            GenerationRequest(requirements="Test", base_url="https://provider.example/v1")
+        local = GenerationRequest(requirements="Test", provider="compatible", model="local", base_url="http://localhost:1234/v1/chat/completions")
+        self.assertEqual(local.base_url, "http://localhost:1234/v1")
+
+    def test_explicit_temperature_is_preserved_with_fixed_seed(self):
+        self.request = self.request.model_copy(update={"temperature": 0.7})
+        self.complete()
+        body = json.loads(self.requests[0].content)
+        self.assertEqual(body["temperature"], 0.7)
+        self.assertEqual(body["seed"], 42)
 
     def test_missing_credentials_fail_before_network(self):
         with self.assertRaises(GenerationError) as raised:
@@ -575,7 +901,8 @@ class GroqProviderTests(unittest.TestCase):
         self.assertEqual(
             set(schema["schema"]["properties"]), {"answer", "sources", "limitations"}
         )
-        self.assertEqual(body["messages"], self.messages)
+        self.assertEqual(body["messages"][:-1], self.messages)
+        self.assertIn("RFC 8259", body["messages"][-1]["content"])
 
     def test_existing_groq_environment_name_is_supported(self):
         with patch.dict(os.environ, {"GROQ_API": "legacy-env-key"}):
@@ -589,6 +916,7 @@ class GroqProviderTests(unittest.TestCase):
             (401, 502),
             (403, 502),
             (400, 502),
+            (413, 413),
             (429, 503),
             (500, 502),
         ):
@@ -613,6 +941,62 @@ class GroqProviderTests(unittest.TestCase):
                     self.complete()
                 self.assertEqual(raised.exception.status_code, expected)
                 self.assertEqual(len(self.requests), 1)
+
+    def test_configurable_response_timeout_is_local_transport_configuration(self):
+        for seconds in [30, 100, 300, 600]:
+            request = self.request.model_copy(update={"timeout_seconds": seconds})
+            provider.complete(self.messages, request, SecretStr("private-provider-key"))
+            self.assertEqual(self.options["timeout"].read, seconds)
+            self.assertEqual(self.options["timeout"].connect, 10)
+            self.assertEqual(self.requests[-1].extensions["timeout"]["read"], seconds)
+            self.assertEqual(self.options["max_retries"], 0)
+            self.assertNotIn("timeout_seconds", json.loads(self.requests[-1].content))
+
+    def test_reasoning_choices_reach_correct_provider_wire_fields(self):
+        cases = [("compatible", "nvidia/test", "off", {"enabled": False}), ("compatible", "minimax/test", "low", {"effort": "low"}), ("openai", "gpt-5.2", "off", "none"), ("openai", "gpt-5.2", "low", "low")]
+        for kind, model, mode, expected in cases:
+            request = GenerationRequest(requirements="x", provider=kind, model=model, base_url="https://openrouter.ai/api/v1" if kind == "compatible" else None, reasoning_mode=mode)
+            with patch("reqlica.generation.reasoning._openrouter_model", return_value={"mandatory": False, "supported_efforts": ["low"]}), patch("reqlica.generation.output_format.openrouter_model", return_value={"supported_parameters": ["structured_outputs"]}):
+                provider.complete(self.messages, request, SecretStr("private-provider-key"))
+            body = json.loads(self.requests[-1].content)
+            self.assertNotIn("reasoning_mode", body)
+            if kind == "compatible":
+                self.assertEqual(body["reasoning"], expected)
+                self.assertNotIn("reasoning_effort", body)
+            else:
+                self.assertEqual(body["reasoning_effort"], expected)
+                self.assertEqual(body["max_completion_tokens"], request.max_tokens)
+                if mode == "low":
+                    self.assertNotIn("temperature", body)
+
+    def test_openrouter_structured_routing_merges_reasoning_and_preserves_schema(self):
+        request = GenerationRequest(requirements="x", provider="compatible", model="test-model", base_url="https://openrouter.ai/api/v1", reasoning_mode="off")
+        with patch("reqlica.generation.output_format.openrouter_model", return_value={"supported_parameters": ["structured_outputs"]}), patch("reqlica.generation.reasoning._openrouter_model", return_value={"mandatory": False}):
+            provider.complete(self.messages, request, SecretStr("private-provider-key"))
+        body = json.loads(self.requests[-1].content)
+        self.assertEqual(body["reasoning"], {"enabled": False})
+        self.assertEqual(body["provider"], {"require_parameters": True})
+        self.assertTrue(body["response_format"]["json_schema"]["strict"])
+        self.assertEqual(self.options["max_retries"], 0)
+        for parameters, expected in ((["response_format"], "json_object"), ([], None)):
+            with patch("reqlica.generation.output_format.openrouter_model", return_value={"supported_parameters": parameters}), patch("reqlica.generation.reasoning._openrouter_model", return_value={"mandatory": False}):
+                provider.complete(self.messages, request, SecretStr("private-provider-key"))
+            body = json.loads(self.requests[-1].content)
+            self.assertEqual(body.get("response_format", {}).get("type"), expected)
+            self.assertIn('"$defs"', body["messages"][-1]["content"])
+            self.assertEqual(body["provider"], {"require_parameters": True})
+        self.assertEqual(len(self.requests), 3)
+
+    def test_oversized_request_explains_provider_limits_without_echoing_body(self):
+        self.status = 413
+        self.payload = {"error": {"message": "private-provider-key private source"}}
+        with self.assertRaises(GenerationError) as raised:
+            self.complete()
+        self.assertEqual(raised.exception.status_code, 413)
+        self.assertIn("Lower Max output tokens", str(raised.exception))
+        self.assertIn("model/account", str(raised.exception))
+        self.assertNotIn("private", str(raised.exception))
+        self.assertEqual(len(self.requests), 1)
 
     def test_bad_requests_have_actionable_reasons_without_raw_provider_content(self):
         cases = [
@@ -672,6 +1056,64 @@ class GroqProviderTests(unittest.TestCase):
                 self.assertIn("HTTP 400", str(raised.exception))
                 self.assertNotIn("private", str(raised.exception))
                 self.assertEqual(len(self.requests), 1)
+
+    def test_schema_failure_reports_known_paths_without_generated_values(self):
+        from reqlica.generation.schemas import ClarificationReview
+
+        self.status = 400
+        self.payload = {"error": {
+            "code": "json_validate_failed",
+            "message": "private-provider-key",
+            "failed_generation": json.dumps({
+                "summary": "private-project-source",
+                "questions": [{
+                    "id": "choice", "kind": "behavior", "question": "Choose?",
+                    "options": ["One", "Two", None],
+                    "private-field-name": "private-value",
+                }],
+            }),
+        }}
+        with self.assertRaises(GenerationError) as raised:
+            provider.complete(
+                self.messages, self.request, SecretStr("private-provider-key"),
+                response_model=ClarificationReview,
+            )
+        detail = raised.exception.detail
+        self.assertIn("questions.0.options.2: expected a string", detail["message"])
+        self.assertNotIn("private", json.dumps(detail))
+        self.assertNotIn("select openai", detail["message"])
+        self.assertEqual(detail["diagnostics"]["max_output_tokens"], self.request.max_tokens)
+        self.assertEqual(detail["diagnostics"]["provider_status"], 400)
+        self.assertEqual(len(self.requests), 1)
+
+    def test_strict_schema_and_local_validation_reject_invalid_options(self):
+        from reqlica.generation.schemas import ClarificationReview
+        from pydantic import ValidationError
+
+        wire = ClarificationReview.model_json_schema()
+        option = wire["$defs"]["ClarificationQuestion"]["properties"]["options"]
+        self.assertEqual(option["items"]["type"], "string")
+        self.assertEqual(option["items"]["pattern"], r"\S")
+        self.assertEqual(option["items"]["maxLength"], 512)
+        self.assertEqual(option["maxItems"], 6)
+        self.assertFalse(wire["additionalProperties"])
+        self.assertEqual(wire["required"], ["summary", "questions"])
+        for value in (None, [], {}, "", " ", "x" * 513):
+            with self.subTest(value=value), self.assertRaises(ValidationError):
+                ClarificationReview.model_validate({
+                    "summary": "Ready", "questions": [{
+                        "id": "choice", "kind": "behavior", "question": "Choose?",
+                        "options": [value],
+                    }],
+                })
+
+    def test_output_limit_is_distinct_from_schema_failure(self):
+        self.payload["choices"][0]["finish_reason"] = "length"
+        with self.assertRaises(GenerationError) as raised:
+            self.complete()
+        self.assertEqual(raised.exception.detail["code"], "output_token_limit")
+        self.assertIn("8192-token output limit", str(raised.exception))
+        self.assertNotIn("JSON schema", str(raised.exception))
 
     def test_truncated_empty_and_refused_responses_are_not_accepted(self):
         for kind in ("truncated", "empty", "refused", "oversized"):

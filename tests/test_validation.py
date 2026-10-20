@@ -112,6 +112,45 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(result["tests_run"], 0)
         self.assertEqual(result["tests_passed"], 0)
 
+    def test_undefined_names_in_unexecuted_handler_branches_fail_before_import(self):
+        marker = self.root / "imported"
+        self.write(
+            "endpoints/hello.py",
+            f"from pathlib import Path\nPath({str(marker)!r}).touch()\n"
+            "def hello():\n    return missing_response\n",
+        )
+        result = validate_draft(*self.arguments())
+        self.assertEqual(result["status"], "failed", result)
+        self.assertEqual(result["source_issues"][0]["line"], 4)
+        self.assertIn("missing_response", result["output"])
+        self.assertFalse(marker.exists())
+
+    def test_async_tests_must_actually_execute_their_assertions(self):
+        for base, status in (("TestCase", "error"), ("IsolatedAsyncioTestCase", "failed")):
+            with self.subTest(base=base):
+                self.write(
+                    "tests/test_hello.py",
+                    f"import unittest\nclass AsyncTests(unittest.{base}):\n"
+                    "    async def test_failure(self):\n        self.fail('executed async assertion')\n",
+                )
+                result = test_draft(*self.arguments())
+                self.assertEqual(result["status"], status, result)
+                self.assertEqual(result["tests_passed"], 0)
+                self.assertIn(
+                    "does not await" if base == "TestCase" else "executed async assertion",
+                    result["output"],
+                )
+
+    def test_returned_boolean_is_not_a_passing_assertion(self):
+        self.write(
+            "tests/test_hello.py",
+            "import unittest\nclass InvalidTest(unittest.TestCase):\n"
+            "    def test_boolean(self): return False\n",
+        )
+        result = test_draft(*self.arguments())
+        self.assertEqual(result["status"], "failed", result)
+        self.assertEqual(result["tests_passed"], 0)
+
     def test_skips_and_expected_failures_require_an_ordinary_success(self):
         skipped = "    @unittest.skip('not exercised')\n    def test_skip(self):\n        self.fail()\n"
         expected_failure = "    @unittest.expectedFailure\n    def test_expected_failure(self):\n        self.fail()\n"

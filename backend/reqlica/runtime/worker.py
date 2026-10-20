@@ -17,14 +17,21 @@ from types import ModuleType
 
 import uvicorn
 from fastapi import FastAPI
+from reqlica.projects.environment import read_environment, redact_output
 from reqlica.projects.store import Manifest, Project, get_project, list_project_ids
 from reqlica.projects.versions import code_directory, project_lock
+from reqlica.runtime.dependencies import dependency_message
 from reqlica.runtime.sdk import configure_database
 
 
 def build_app(directory: Path, database: Path | None = None) -> FastAPI:
     """Build a worker app; this function is only called in the worker process."""
     directory = directory.resolve()
+    from reqlica.projects.schema_plan import require_database_ready
+
+    require_database_ready(
+        directory, database if database is not None else directory / "data.sqlite"
+    )
     configure_database(database if database is not None else directory / "data.sqlite")
     manifest_file = directory / "manifest.json"
     manifest = Manifest.model_validate_json(manifest_file.read_text())
@@ -108,7 +115,10 @@ def _run_worker(
         os._exit(1)
 
     threading.Thread(target=watch_parent, daemon=True).start()
+    project_values = {}
     try:
+        _, project_values = read_environment(database.parent)
+        os.environ.update(project_values)
         from reqlica.runtime.activation import database_guard
 
         with database_guard(database.parent):
@@ -127,7 +137,12 @@ def _run_worker(
     except (Exception, SystemExit, KeyboardInterrupt) as exc:  # noqa: BLE001
         # Handler code can fail arbitrarily; report startup errors to the gateway.
         try:
-            startup_sender.send((False, f"{type(exc).__name__}: {exc}"))
+            detail = (
+                dependency_message(exc.name)
+                if isinstance(exc, ModuleNotFoundError)
+                else f"{type(exc).__name__}: {exc}"
+            )
+            startup_sender.send((False, redact_output(detail, project_values)))
         except (BrokenPipeError, EOFError, OSError):
             pass
     finally:
@@ -142,6 +157,7 @@ class Worker:
     project: Project
     manifest: Manifest | None = None
     closed: bool = False
+    environment_revision: str | None = None
 
 
 class ProjectStoppedError(RuntimeError):
@@ -399,9 +415,13 @@ class WorkerManager:
             "endpoints": manifest.model_dump(mode="json")["endpoints"],
             "error": error,
             "active_version": project.active_version,
+            "environment_revision": worker.environment_revision
+            if worker is not None
+            else None,
         }
 
     def _start_worker(self, project: Project) -> Worker:
+        environment_revision, project_values = read_environment(project.directory)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
             # Reserve the port before spawning, so another process cannot take it.
             listener.bind(("127.0.0.1", 0))
@@ -420,7 +440,9 @@ class WorkerManager:
                 ),
                 daemon=True,
             )
-            worker = Worker(process, port, project)
+            worker = Worker(
+                process, port, project, environment_revision=environment_revision
+            )
             try:
                 process.start()
                 startup_sender.close()
@@ -436,7 +458,7 @@ class WorkerManager:
                     ) from exc
                 if not started:
                     raise RuntimeError(
-                        f"Worker startup failed for project {project.id}: {startup_detail}"
+                        f"Worker startup failed for project {project.id}: {redact_output(str(startup_detail), project_values)}"
                     )
                 if not process.is_alive():
                     raise RuntimeError(

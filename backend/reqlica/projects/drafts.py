@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from uuid import uuid4
@@ -48,6 +49,19 @@ def _state_path(project: Project, draft_id: str) -> Path:
     return _contained(project.directory, f".reqlica/drafts/{draft_id}.json")
 
 
+def _save_state(project: Project, draft_id: str, state: dict) -> None:
+    state["updated_at"] = datetime.now(UTC).isoformat()
+    atomic_write_json(_state_path(project, draft_id), state)
+
+
+def _draft_name(name: str) -> str:
+    if not isinstance(name, str) or not name.strip() or len(name.strip()) > 100:
+        raise ValueError("Draft name must contain 1 to 100 characters")
+    if any(ord(char) < 32 or ord(char) == 127 for char in name):
+        raise ValueError("Draft name must be a single line without control characters")
+    return name.strip()
+
+
 def _state(
     project: Project, draft_id: str, expected_revision: str | None = None
 ) -> dict:
@@ -55,13 +69,29 @@ def _state(
     state = json.loads(_state_path(project, draft_id).read_text(encoding="utf-8"))
     if state["id"] != draft_id:
         raise ValueError("Draft state ID does not match")
+    state.setdefault("name", f"Draft {draft_id[:8]}")
+    # Legacy drafts have no reliable creation timestamp. Do not invent one.
+    state.setdefault("created_at", None)
+    state.setdefault(
+        "updated_at",
+        datetime.fromtimestamp(_state_path(project, draft_id).stat().st_mtime, UTC).isoformat(),
+    )
     # project.json marks legacy roots for snapshot helpers, never draft code.
     if (directory / "project.json").exists():
         raise ValueError("Draft code cannot contain reserved project.json")
     revision = content_digest(directory)
-    if state["revision"] != revision:
+    from reqlica.projects.environment import EMPTY_REVISION, read_environment
+
+    environment_revision, _ = read_environment(project.directory)
+    environment_changed = any(
+        state.get(name)
+        and state[name].get("environment_revision", EMPTY_REVISION)
+        != environment_revision
+        for name in ("validation", "test")
+    )
+    if state["revision"] != revision or environment_changed:
         state.update(revision=revision, validation=None, test=None, approval=None)
-        atomic_write_json(_state_path(project, draft_id), state)
+        _save_state(project, draft_id, state)
     if expected_revision is not None and revision != expected_revision:
         raise ValueError("Draft revision conflict; inspect the current draft")
     return state
@@ -96,7 +126,9 @@ def _inspect(project: Project, draft_id: str, state: dict) -> dict:
     }
 
 
-def create_draft(project_id: str) -> dict:
+def create_draft(project_id: str, name: str | None = None) -> dict:
+    if name is not None:
+        name = _draft_name(name)
     project = get_project(project_id)
     with project_lock(project.directory):
         project = get_project(project_id)
@@ -107,6 +139,8 @@ def create_draft(project_id: str) -> dict:
         revision = snapshot_code(code_directory(project), directory)
         state = {
             "id": draft_id,
+            "name": name if name is not None else f"Draft {draft_id[:8]}",
+            "created_at": datetime.now(UTC).isoformat(),
             "revision": revision,
             "base_version": project.active_version,
             "validation": None,
@@ -115,7 +149,7 @@ def create_draft(project_id: str) -> dict:
         }
         state_path = _state_path(project, draft_id)
         state_path.parent.mkdir(parents=True, exist_ok=True)
-        atomic_write_json(state_path, state)
+        _save_state(project, draft_id, state)
         return _inspect(project, draft_id, state)
 
 
@@ -124,6 +158,36 @@ def inspect_draft(project_id: str, draft_id: str) -> dict:
     with project_lock(project.directory):
         project = get_project(project_id)
         return _inspect(project, draft_id, _state(project, draft_id))
+
+
+def rename_draft(project_id: str, draft_id: str, name: str, expected_revision: str) -> dict:
+    name = _draft_name(name)
+    project = get_project(project_id)
+    with project_lock(project.directory):
+        state = _state(project, draft_id, expected_revision)
+        if state["name"] != name:
+            state["name"] = name
+            _save_state(project, draft_id, state)
+        return _inspect(project, draft_id, state)
+
+
+def delete_draft(project_id: str, draft_id: str, expected_revision: str, *, confirm: bool) -> dict:
+    """Delete unpublished source and its checks; published versions are independent copies."""
+    if confirm is not True:
+        raise ValueError("Explicit confirmation is required to delete a draft")
+    project = get_project(project_id)
+    with project_lock(project.directory):
+        state = _state(project, draft_id, expected_revision)
+        directory = draft_directory(project, draft_id)
+        schema = _contained(project.directory, f".reqlica/openapi/drafts/{draft_id}")
+        # Validate every path before removing anything. rmtree never follows
+        # nested symlinks; the code digest above also rejects unsafe draft entries.
+        state_path = _state_path(project, draft_id)
+        if schema.exists():
+            shutil.rmtree(schema)
+        shutil.rmtree(directory)
+        state_path.unlink()
+        return {"status": "deleted", "id": draft_id, "name": state["name"]}
 
 
 def _draft_summary(project: Project, state: dict, updated_at: float) -> dict:
@@ -162,6 +226,17 @@ def _draft_summary(project: Project, state: dict, updated_at: float) -> dict:
     if approval is not None and not isinstance(approval, dict):
         raise ValueError("Invalid draft approval metadata")
     approved = passed and (approval or {}).get("revision") == state["revision"]
+    database_ready = True
+    if approved:
+        from reqlica.projects.schema_plan import require_database_ready
+
+        try:
+            require_database_ready(
+                draft_directory(project, state["id"]),
+                _contained(project.directory, "data.sqlite"),
+            )
+        except (OSError, ValueError):
+            database_ready = False
     failed = any(
         result and result.get("status") in {"failed", "error", "timeout"}
         for result in (validation, test)
@@ -186,11 +261,14 @@ def _draft_summary(project: Project, state: dict, updated_at: float) -> dict:
         progress = "editing"
     return {
         "id": state["id"],
+        "name": state["name"],
+        "created_at": state["created_at"],
+        "updated_at": state["updated_at"],
         "revision": state["revision"],
         "base_version": state["base_version"],
         "base_is_current": current,
         "progress": progress,
-        "eligible_for_activation": bool(current and approved),
+        "eligible_for_activation": bool(current and approved and database_ready),
         "state_updated_at": datetime.fromtimestamp(updated_at, UTC).isoformat(),
         "file_count": len(state["files"]),
         "changes": state["changes"],
@@ -277,7 +355,7 @@ def _finish_edit(project: Project, draft_id: str, state: dict) -> dict:
         test=None,
         approval=None,
     )
-    atomic_write_json(_state_path(project, draft_id), state)
+    _save_state(project, draft_id, state)
     return _inspect(project, draft_id, state)
 
 
@@ -391,7 +469,7 @@ def approve_draft(project_id: str, draft_id: str, expected_revision: str) -> dic
         state = _state(project, draft_id, expected_revision)
         _require_checks(state)
         state["approval"] = {"revision": state["revision"]}
-        atomic_write_json(_state_path(project, draft_id), state)
+        _save_state(project, draft_id, state)
         return _inspect(project, draft_id, state)
 
 
@@ -408,6 +486,12 @@ def require_approved(project_id: str, draft_id: str, expected_revision: str) -> 
             raise ValueError("Explicit approval is required for this revision")
         if state["base_version"] != project.active_version:
             raise ValueError("Draft base version is no longer active")
+        from reqlica.projects.schema_plan import require_database_ready
+
+        require_database_ready(
+            draft_directory(project, draft_id),
+            _contained(project.directory, "data.sqlite"),
+        )
         return _inspect(project, draft_id, state)
 
 
