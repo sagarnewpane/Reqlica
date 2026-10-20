@@ -11,7 +11,16 @@ from pathlib import Path
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from reqlica.console.routes import drafts, preview, runtime, schemas, validation
+from reqlica.console.routes import (
+    data,
+    drafts,
+    environment,
+    generation,
+    preview,
+    runtime,
+    schemas,
+    validation,
+)
 from reqlica.mcp.server import create_server
 
 
@@ -36,6 +45,10 @@ def create_app() -> FastAPI:
     app.include_router(preview.router)
     app.include_router(schemas.router)
     app.include_router(runtime.router)
+    app.include_router(generation.router)
+    app.include_router(generation.provider_router)
+    app.include_router(data.router)
+    app.include_router(environment.router)
     app.add_api_route("/api/health", health, methods=["GET"], tags=["Console"])
     # Keep this last: the transport handles /mcp and returns 404 for other paths.
     app.mount("/", mcp_app)

@@ -233,8 +233,11 @@ async def get_project_context(
     handoff facts, and optional author-maintained PROJECT_CONTEXT.md. Actual source
     and tests explain business behavior; table names alone do not. Runtime worker
     health is explicitly not queried. Database schema is the live database at read
-    time even in draft context; it does not predict migrations. No stored records
-    or row counts are returned, and handlers are never imported or executed.
+    time even in draft context; proposed database_setup is separate and not proof
+    of live tables. Draft checks prepare additive plans on disposable copies;
+    applying to live SQLite is a separate confirmed console action. No stored records,
+    row counts, or environment values are returned; environment lists configured
+    names only. Handlers are never imported or executed.
 
     For large systems use include_source=false first, then source_paths for relevant
     files and database_tables to narrow schema metadata. Truncation/limits are

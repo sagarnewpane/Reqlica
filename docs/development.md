@@ -151,6 +151,7 @@ The gateway's management routes are:
 
 | Method | Route | Result |
 |---|---|---|
+| `POST` | `/api/projects` | Create/register a project from `{directory, name?}`; return the standard project payload with HTTP `201`, `status: "idle"`, and starter endpoint URLs. |
 | `GET` | `/api/projects` | All registered projects in a `projects` array. |
 | `GET` | `/api/projects?running=true` | Running projects only. |
 | `GET` | `/api/projects/{id}/endpoints` | Project status and endpoints. |
@@ -168,6 +169,20 @@ Project payloads include `id`, `name`, `directory`, `status`, `pid`, `error`, `u
 and a full `url`. Unknown IDs return `404`, malformed stored files normally return
 `422`, and worker failures return `502`. Conversion/activation conflicts return
 `409`; activation temporarily rejects new project requests with `503`.
+
+Creation uses the existing CLI scaffolder and never starts a worker. `directory`
+must be an absolute path or `~/...` on the server machine, pointing to a new or
+empty directory. Missing parents are created; existing files are not overwritten.
+`name` defaults to the directory name. Invalid bodies return `422`, nonempty or
+conflicting paths return `409`, permission failures return `403`, and other
+filesystem/registry failures return `500`. On a timeout, refresh discovery before
+retrying: creation may have completed. Concurrent HTTP creation is serialized.
+
+The standalone `backend/reqlica/reqlicav1.html` dashboard supports creation and both
+deletion modes. Open its **Connection & help** section for the embedded local
+server launcher (the Next.js scaffold is separate). Deletion defaults to keeping
+files; permanent deletion validates the target and requires typing the exact
+directory. The backend rechecks `expected_directory` before removing files.
 
 Deletion returns `id`, `name`, `directory`, `status: "deleted"`, `unregistered`, and
 `files_deleted`. It does not use the standard running-project payload. Unknown IDs
@@ -188,7 +203,7 @@ backend/reqlica/
   projects/     # Registry, drafts, and versions
   runtime/      # Gateway, workers, activation, and database SDK
   validation/   # Static checks and disposable execution
-  generation/   # Planned AI integration
+  generation/   # Single-turn Groq context, proposals, and draft generation
   mcp/          # AI-facing Streamable HTTP tools, mounted by the console
 frontend/       # Dashboard scaffold
 tests/          # Backend tests

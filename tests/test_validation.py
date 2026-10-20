@@ -112,6 +112,45 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(result["tests_run"], 0)
         self.assertEqual(result["tests_passed"], 0)
 
+    def test_undefined_names_in_unexecuted_handler_branches_fail_before_import(self):
+        marker = self.root / "imported"
+        self.write(
+            "endpoints/hello.py",
+            f"from pathlib import Path\nPath({str(marker)!r}).touch()\n"
+            "def hello():\n    return missing_response\n",
+        )
+        result = validate_draft(*self.arguments())
+        self.assertEqual(result["status"], "failed", result)
+        self.assertEqual(result["source_issues"][0]["line"], 4)
+        self.assertIn("missing_response", result["output"])
+        self.assertFalse(marker.exists())
+
+    def test_async_tests_must_actually_execute_their_assertions(self):
+        for base, status in (("TestCase", "error"), ("IsolatedAsyncioTestCase", "failed")):
+            with self.subTest(base=base):
+                self.write(
+                    "tests/test_hello.py",
+                    f"import unittest\nclass AsyncTests(unittest.{base}):\n"
+                    "    async def test_failure(self):\n        self.fail('executed async assertion')\n",
+                )
+                result = test_draft(*self.arguments())
+                self.assertEqual(result["status"], status, result)
+                self.assertEqual(result["tests_passed"], 0)
+                self.assertIn(
+                    "does not await" if base == "TestCase" else "executed async assertion",
+                    result["output"],
+                )
+
+    def test_returned_boolean_is_not_a_passing_assertion(self):
+        self.write(
+            "tests/test_hello.py",
+            "import unittest\nclass InvalidTest(unittest.TestCase):\n"
+            "    def test_boolean(self): return False\n",
+        )
+        result = test_draft(*self.arguments())
+        self.assertEqual(result["status"], "failed", result)
+        self.assertEqual(result["tests_passed"], 0)
+
     def test_skips_and_expected_failures_require_an_ordinary_success(self):
         skipped = "    @unittest.skip('not exercised')\n    def test_skip(self):\n        self.fail()\n"
         expected_failure = "    @unittest.expectedFailure\n    def test_expected_failure(self):\n        self.fail()\n"
@@ -223,6 +262,22 @@ class DatabaseTest(unittest.TestCase):
             self.assertEqual(result["body"], {"value": 12})
         self.assertEqual(database.execute("SELECT value FROM counter").fetchone()[0], 1)
         self.assertEqual(content_digest(code_directory(self.project)), live_revision)
+
+    def test_draft_calls_forward_auth_and_custom_headers(self):
+        self.write(
+            "endpoints/hello.py",
+            "from fastapi import Request\ndef hello(request: Request):\n"
+            "    return {k: request.headers.get(k) for k in ('authorization', 'x-tenant')}\n",
+        )
+        result = call_draft_endpoint(
+            *self.arguments(), "GET", "/hello",
+            headers={"Authorization": "Bearer test-token", "X-Tenant": "sample"},
+        )
+        self.assertEqual(result["status_code"], 200, result)
+        self.assertEqual(result["body"], {"authorization": "Bearer test-token", "x-tenant": "sample"})
+        for headers in ({"Host": "evil"}, {"X-Reqlica-UI": "1"}, {"Authorization": "bad\r\nvalue"}):
+            with self.subTest(headers=headers), self.assertRaises(ValueError):
+                call_draft_endpoint(*self.arguments(), "GET", "/hello", headers=headers)
 
     def test_call_paths_are_relative_and_redirects_are_not_followed(self):
         for path in (

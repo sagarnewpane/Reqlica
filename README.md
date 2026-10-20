@@ -13,8 +13,11 @@ workers, persistent SQLite data, and a draft/test/approval/version workflow thro
 the CLI and management APIs. AI clients can now create and check endpoint drafts
 through the console's built-in HTTP MCP server.
 
-An embedded AI generator, the dashboard, database migrations, reset, and import/export
-are not implemented yet. See the [roadmap](docs/roadmap.md) for planned work.
+The standalone HTML dashboard supports resumable endpoint generation with capability-aware
+output formats, local schema validation and per-file checkpoints into unpublished drafts; see the
+[generation guide](docs/generation.md).
+The packaged Next.js dashboard, database migrations, reset, and import/export
+remain planned. See the [roadmap](docs/roadmap.md).
 
 ## Quick Start
 
@@ -54,6 +57,63 @@ uv run reqlica project endpoints <project-id>
 uv run reqlica project stop <project-id>
 uv run reqlica project start <project-id>
 ```
+
+The gateway also accepts `POST /api/projects` with
+`{"directory": "/absolute/path/to/books", "name": "Book API"}` and returns the
+created idle project with HTTP `201`. The standalone
+`backend/reqlica/reqlicav1.html` dashboard can create and delete projects; its
+**Connection & help** section includes the local server launcher.
+
+In **Request tester**, choose a route shortcut and click **Insert example** to
+fill its path/query and JSON body from saved OpenAPI examples, defaults, or types.
+This never sends the request and keeps custom headers. Review sample values and
+record IDs before sending. Drafts need current validation; live contracts become
+available after validated activation. Missing contracts leave inputs unchanged.
+
+The same **Generate API** screen also has **Ask about project**: ask how endpoints
+are designed, which inputs they accept, or how the project fits together. Groq
+reads the published code, tests, notes, routes, and database definitions and returns
+an explanation with source references. Follow-ups remember recent exchanges;
+per-project history survives refreshes in the same tab, and **New chat** clears it.
+Sources, caveats, and privacy notes are expandable rather than repeated banners.
+Chat creates no drafts and runs no code;
+switch explicitly to **Generate draft** to request changes. See
+[`docs/generation.md`](docs/generation.md) for context/privacy details.
+
+**Endpoints → Edit source** opens its handler in a fresh draft. **Modify with AI**
+generates a targeted edit and tests without changing the published API. In
+**Mock data**, describe custom records, edit/download the JSON, or validate and
+explicitly append it to an existing SQLite table. Existing records are preserved;
+the mock-data importer does not create tables. See [`docs/mock-data.md`](docs/mock-data.md).
+
+Generated APIs can now include a declarative `database/schema.json` plan. In
+**Drafts & checks → Database setup**, review the SQL, validate/test on disposable
+copies, then confirm creating new live tables with a pre-change backup. Existing
+tables/records are preserved; code approval and activation remain separate.
+See [`docs/database-setup.md`](docs/database-setup.md). Destructive/alter-table
+migrations are not supported.
+
+For code expecting `JWT_SECRET` or another application variable, open
+**Settings → Project environment**. Save a value or generate a secure JWT key,
+rerun draft checks, and explicitly restart the published API. Values are stored
+privately per project, never shown by settings APIs or sent to AI. See
+[`docs/environment.md`](docs/environment.md) for security boundaries and limits.
+
+API generation and AI endpoint edits now begin with a clarification review.
+Answer questions about fields, configuration names, and behavior, then explicitly
+generate from those decisions. Optional follow-up reviews preserve earlier answers.
+Actual secret values belong in Project environment—not clarification answers.
+
+Generation also checks handler/test imports before saving drafts. Clarification
+uses the same declared-runtime dependency policy; missing libraries produce
+actionable errors rather than automatic installs. See
+[dependency handling](docs/generation.md#dependencies-and-missing-package-errors).
+
+Failed draft checks now offer **Repair with AI…**: Reqlica uses the original spec,
+current implementation/tests and failure logs to repair implementation and rerun
+checks for at most two confirmed attempts. Tests, routes and schema plans remain
+protected; code backups are kept. It never installs packages or publishes code.
+See [draft recovery](docs/generation.md#repair-a-failed-draft).
 
 Remove a project through the running gateway (confirmation required):
 
@@ -104,7 +164,7 @@ Run backend tests:
 ```bash
 uv run python -m unittest discover -s tests
 ```
-
+y
 - [Development guide](docs/development.md): configuration, troubleshooting, project APIs, and code layout.
 - [Drafts and versions](docs/persistence-drafts-versions.md): editing, checks, approval, persistence, and activation.
 - [MCP tools](docs/mcp.md): connect an AI client and generate endpoint drafts.

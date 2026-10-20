@@ -3,6 +3,7 @@
 from typing import Any
 
 from fastapi import APIRouter
+from pydantic import Field
 from reqlica.console.dependencies import Revision, draft_operation
 from reqlica.projects import drafts
 
@@ -15,6 +16,7 @@ class EndpointCall(Revision):
     method: str
     path: str
     json_body: Any = None
+    headers: dict[str, str] = Field(default_factory=dict)
 
 
 @router.post("/validate")
@@ -41,4 +43,5 @@ def call(project_id: str, draft_id: str, body: EndpointCall) -> dict:
         body.method,
         body.path,
         body.json_body,
+        body.headers,
     )

@@ -7,6 +7,7 @@ import httpx
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from reqlica.cli import _mock_base_url
+from reqlica.generation.progress import track
 from reqlica.projects import drafts
 from reqlica.projects.store import get_project
 from reqlica.projects.versions import _read_code_file, content_digest, project_lock
@@ -32,6 +33,14 @@ def draft_operation(operation: Callable, *args, **kwargs):
 
 def list_drafts(project_id: str) -> dict:
     return drafts.list_drafts(project_id)
+
+
+def activity_operation(project_id: str, activity_id: str | None, operation: Callable, *args):
+    def execute():
+        with track(project_id, activity_id):
+            return operation(*args)
+
+    return draft_operation(execute)
 
 
 def read_draft_file(project_id: str, draft_id: str, path: str) -> dict:

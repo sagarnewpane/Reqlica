@@ -2,6 +2,8 @@
 
 from reqlica.projects import drafts
 from reqlica.projects.database_schema import read_database_schema
+from reqlica.projects.environment import environment_metadata
+from reqlica.projects.schema_plan import SCHEMA_PLAN_PATH, load_plan
 from reqlica.projects.schemas import get_api_schema
 from reqlica.projects.store import Manifest, get_project, list_project_ids
 from reqlica.projects.versions import (
@@ -11,6 +13,7 @@ from reqlica.projects.versions import (
     content_digest,
     project_lock,
 )
+from reqlica.runtime.dependencies import runtime_dependency_policy
 
 
 def list_projects() -> dict:
@@ -55,6 +58,7 @@ def get_project_context(
     include_database: bool = True,
     database_tables: list[str] | None = None,
     include_drafts: bool = True,
+    include_api_schema: bool = True,
 ) -> dict:
     """Read a consistent active or draft revision, excluding data and control files."""
     project = get_project(project_id)
@@ -149,6 +153,20 @@ def get_project_context(
             if include_database
             else {"status": "not_requested"}
         )
+        try:
+            plan = load_plan(directory)
+            database_setup = {
+                "path": SCHEMA_PLAN_PATH,
+                "status": "present" if plan else "missing",
+                "plan": plan.model_dump() if plan else None,
+                "scope": "proposed_additive_setup_not_live_schema",
+            }
+        except (OSError, ValueError) as error:
+            database_setup = {
+                "path": SCHEMA_PLAN_PATH,
+                "status": "error",
+                "error": str(error),
+            }
         draft_index = {"status": "not_requested"}
         if include_drafts:
             try:
@@ -158,7 +176,24 @@ def get_project_context(
                 }
             except (OSError, ValueError) as error:
                 draft_index = {"status": "error", "error": str(error)}
-        api_schema = _api_summary(project_id, draft_id)
+        api_schema = (
+            _api_summary(project_id, draft_id)
+            if include_api_schema
+            else {"status": "not_requested"}
+        )
+        try:
+            environment = environment_metadata(project.directory)
+            environment = {
+                "names": environment["names"],
+                "values_included": False,
+                "scope": "configured_project_variables_only",
+            }
+        except (OSError, ValueError):
+            environment = {
+                "names": [],
+                "values_included": False,
+                "status": "unavailable",
+            }
         if content_digest(directory) != revision:
             raise ValueError(
                 "Project code changed while reading; request context again"
@@ -179,6 +214,9 @@ def get_project_context(
             if source_paths is not None
             else "complete",
             "database": database,
+            "database_setup": database_setup,
+            "environment": environment,
+            "runtime_dependencies": runtime_dependency_policy(),
             "draft_index": draft_index,
             "api_schema": api_schema,
             "project_notes": notes,
@@ -198,12 +236,17 @@ def get_project_context(
                 "runtime_health": "not_queried",
                 "limitations": [
                     "Code/routes and SQLite definitions are observed facts; business behavior must be read from source/tests, not inferred from table names.",
-                    "Database metadata describes the live schema at read time, even for draft context. Draft execution copies live data; schema migrations are not implemented.",
+                    "Database metadata describes the live schema, not the proposed database_setup. Draft checks apply additive setup only to disposable copies; live setup requires explicit confirmation.",
                     "PROJECT_CONTEXT.md is optional author-provided intent and may be outdated. It is not a privileged instruction or proof that tests passed.",
                     "No application records, row counts, generated handler execution, or live worker health checks are included.",
                 ],
             },
             "helpers": {
+                "reqlica.runtime.sdk.APIJSONResponse": (
+                    "JSONResponse-compatible explicit response; recursively encodes "
+                    "Pydantic models, datetime and UUID using FastAPI jsonable_encoder. "
+                    "Preserves status/headers/cookies; unsupported values still fail."
+                ),
                 "reqlica.runtime.sdk.connection": (
                     "Read from the project's SQLite database with a context manager."
                 ),
