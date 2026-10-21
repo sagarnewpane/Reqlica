@@ -1,6 +1,6 @@
 # Reqlica
 
-<img width="640" height="320" alt="Reqlica_Logo" src="https://github.com/user-attachments/assets/f2fd5444-1ecd-4ffc-bc58-2c236579745f" />
+![Alt text](logo.png)
 
 A self-hosted mock backend tool for frontend developers and QA engineers.
 The goal is to generate stateful Python APIs from descriptions or API specs,
