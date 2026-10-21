@@ -221,7 +221,7 @@
 
       <section class="view" id="data-view" aria-label="Mock data" hidden>
         <div class="view-title"><div><h2>Mock data</h2><p>Describe a dataset across tables. Review the records, then save them together.</p></div><button class="btn ghost" data-view="settings">Provider settings</button></div>
-        <details class="ai-context-details"><summary>How data generation works</summary><div><p>Your provider receives your description and table definitions—not existing records. Related data generation creates parent rows first and links child rows to their actual IDs. Generated data stays in the preview until you download it or explicitly confirm an insert. Inserts append to existing ordinary SQLite tables, never create tables or replace records. Tables with triggers/virtual tables are not supported.</p><p class="help" id="data-provider-summary"></p></div></details>
+        <details class="ai-context-details"><summary>How data generation works</summary><div><p>Your provider receives your description, table definitions, and published models and handlers—not database rows or runtime secret values. Simple related records are linked to actual parent IDs. Data requiring password hashes, encryption, custom validators, or unsupported storage formats is refused. Generated data stays in the preview until you download it or explicitly confirm an insert. Inserts append to existing ordinary SQLite tables, never create tables or replace records. Tables with triggers/virtual tables are not supported.</p><p class="help" id="data-provider-summary"></p></div></details>
         <div class="layout-two"><div class="panel"><div class="panel-head"><h2>Describe the dataset</h2></div><form id="ai-data-form"><div class="panel-body"><div class="notice error" id="ai-data-error" role="alert" hidden></div>
           <div class="field"><label for="data-provider">Provider</label><select id="data-provider" data-ai-provider></select></div>
           <div class="field-row"><div class="field"><label for="data-target">Destination</label><select id="data-target"><option value="related">Related database records</option><option value="json">JSON fixture</option><option value="sqlite">Existing SQLite table</option></select></div><div class="field" id="data-count-field"><label for="ai-data-count">Records</label><input id="ai-data-count" type="number" min="1" max="100" value="5" required></div></div>
@@ -231,7 +231,7 @@
           <div class="field"><label for="ai-data-prompt">What data do you need?</label><textarea id="ai-data-prompt" rows="4" placeholder="Create 2 users and 2 posts, one post for each user. Use realistic names and different post titles."></textarea></div>
           <div class="field" id="data-template-field"><label for="ai-data-template">Example record / field hints</label><textarea id="ai-data-template" class="mono" spellcheck="false">{"name":"Sample item","price":14.99,"stock":20}</textarea></div>
         </div><div class="panel-foot"><button class="btn" type="button" data-action="template-data" id="template-data-button">Use template</button><button class="btn primary" type="submit" id="generate-data-button">Generate records →</button></div></form></div>
-        <aside class="panel"><div class="panel-head"><h2>Review records</h2><span class="badge neutral" id="ai-data-preview-count">0 records</span></div><div class="chat-empty" id="ai-data-empty"><h3>Your data starts here.</h3><p>Generate records or use your template, then edit any values before saving.</p></div><div class="panel-body" id="data-preview-workspace" hidden><div id="data-related-counts" class="actions" hidden></div><label for="ai-data-preview">JSON records · editable</label><textarea id="ai-data-preview" class="source" spellcheck="false" rows="14"></textarea><p class="help" id="data-preview-status" role="status"></p><div class="notice error section-gap" id="data-validation-error" role="alert" hidden></div><details class="section-gap"><summary>Batch details</summary><pre class="code" id="ai-data-brief">No records prepared.</pre></details></div><div class="panel-foot" id="data-preview-actions"><div class="actions"><button class="btn ghost" data-action="copy-data-preview" id="copy-data-preview" disabled>Copy JSON</button><button class="btn" data-action="download-data" id="download-data-button" disabled>Download</button><button class="btn" data-action="validate-data" id="validate-data-button" disabled>Validate records</button></div><button class="btn primary" data-action="insert-data" id="insert-data-button" hidden disabled>Insert records…</button></div></aside></div>
+        <aside class="panel"><div class="panel-head"><h2>Review records</h2><span class="badge neutral" id="ai-data-preview-count">0 records</span></div><div class="chat-empty" id="ai-data-empty"><h3 id="data-empty-title">Your data starts here.</h3><p id="data-empty-description">Generate records or use your template, then edit any values before saving.</p></div><div class="panel-body" id="data-preview-workspace" hidden><div id="data-related-counts" class="actions" hidden></div><label for="ai-data-preview">JSON records · editable</label><textarea id="ai-data-preview" class="source" spellcheck="false" rows="14"></textarea><p class="help" id="data-preview-status" role="status"></p><div class="notice error section-gap" id="data-validation-error" role="alert" hidden></div><details class="section-gap"><summary>Batch details</summary><pre class="code" id="ai-data-brief">No records prepared.</pre></details></div><div class="panel-foot" id="data-preview-actions"><div class="actions"><button class="btn ghost" data-action="copy-data-preview" id="copy-data-preview" disabled>Copy JSON</button><button class="btn" data-action="download-data" id="download-data-button" disabled>Download</button><button class="btn" data-action="validate-data" id="validate-data-button" disabled>Validate records</button></div><button class="btn primary" data-action="insert-data" id="insert-data-button" hidden disabled>Insert records…</button></div></aside></div>
 
       </section>
 
@@ -1492,8 +1492,8 @@ function renderDataWorkspace() {
   $('data-table').value=w.dataTable;
   const table=w.dataSchema?.tables.find(t=>t.name===w.dataTable);$('data-table-schema').textContent=table?pretty({columns:table.columns,foreign_keys:table.foreign_keys,indexes:table.indexes}):'Choose an existing table. Create missing tables in Drafts & checks → Database setup, then reload here.';
   $('ai-data-empty').hidden=hasData;$('data-preview-workspace').hidden=!hasData;$('data-preview-actions').hidden=!hasData;
-  const emptyHelp=$('ai-data-empty').querySelector?.('p');
-  if(emptyHelp)emptyHelp.textContent=related?'Describe the dataset in one prompt. Review the linked records here before saving.':'Generate records or use your template, then edit any values before saving.';
+  $('data-empty-title').textContent=w.dataRefusal?"This data can't be mocked":'Your data starts here.';
+  $('data-empty-description').textContent=w.dataRefusal || (related?'Describe the dataset in one prompt. Review the linked records here before saving.':'Generate records or use your template, then edit any values before saving.');
   $('ai-data-preview').value=w.dataRawPreview;
   const counts=dataRecordCounts(w.dataPreview),total=Object.values(counts).reduce((a,b)=>a+b,0);
   $('ai-data-preview-count').textContent=total?total+' records'+(related?' · '+Object.keys(counts).length+' tables':''):'No records yet';
@@ -1584,17 +1584,24 @@ async function loadDataSchema() {
 }
 async function generateDataWithGroq() {
   clearError('ai-data-error');
+  aiWorkspace().dataRefusal=null;
   try {
     const w=aiWorkspace(),input=dataInputs(),p=aiConfig.providers.find(item=>item.id===$('data-provider').value);
     if(!input.requirements)throw Error('Describe the records you want to generate.');
     if(!['groq','openai','compatible'].includes(p?.kind))throw Error('Select a Groq, OpenAI, or OpenAI-compatible provider.');
     const related=w.dataTarget==='related';
-    if(!await confirmAction('Generate mock records?', 'Send this description and '+(related?'connected database definitions':input.target==='sqlite'?'template and definitions for '+input.table:'fixture field shape')+' to '+p.model+' at '+p.baseUrl+'? Existing records are not sent. Generated JSON will be previewed only; nothing is inserted.'))return;
+    if(!await confirmAction('Generate mock records?', 'Send this description and '+(related?'database definitions and published application code':input.target==='sqlite'?'template, published application code, and definitions for '+input.table:'fixture field shape')+' to '+p.model+' at '+p.baseUrl+'? Existing records are not sent. Generated JSON will be previewed only; nothing is inserted.'))return;
     const key=providerKeys.get(p.id);
     const preview=await api('console',root()+(related?'/data/related/generate':'/data/generate'),'POST',{...input,provider:p.kind,base_url:p.baseUrl,model:p.model,reasoning_mode:p.reasoning || 'default',temperature:aiConfig.defaults.temperature,max_tokens:aiConfig.defaults.maxTokens},key?{'X-Reqlica-Groq-Key':key}:{});
     w.dataPreview=related?preview.records_by_table:preview.records;w.dataRawPreview=pretty(w.dataPreview);w.dataValidation=preview;w.dataImportResult=null;w.dataBrief={summary:preview.summary,assumptions:preview.assumptions,validation:preview.validation,schema:preview.schema_fingerprint,insertion_order:preview.insertion_order,preview_primary_keys:preview.preview_primary_keys,note:preview.note};w.dataProvider=p.id;
     renderDataWorkspace();syncControls();
-  } catch(error){showError(error,'ai-data-error');}
+  } catch(error){
+    if(error.details?.code==='mock_data_unsupported') {
+      const w=aiWorkspace();w.dataRefusal=error.details.message;w.dataPreview=null;w.dataRawPreview='';w.dataValidation=null;w.dataImportResult=null;w.dataBrief=null;
+      renderDataWorkspace();syncControls();error=Error(w.dataRefusal);
+    }
+    showError(error,'ai-data-error');
+  }
 }
 async function validateDataPreview() {
   clearError('ai-data-error');
@@ -1604,7 +1611,7 @@ async function validateDataPreview() {
     const result=await api('console',root()+(related?'/data/related/validate':'/data/validate'),'POST',dataValidationBody(records));
     w.dataValidation=result;w.dataPreview=related?result.records_by_table:result.records;w.dataRawPreview=pretty(w.dataPreview);w.dataImportResult=null;
     w.dataBrief={...w.dataBrief,validation:result.validation,schema:result.schema_fingerprint,insertion_order:result.insertion_order,preview_primary_keys:result.preview_primary_keys,note:result.note};renderDataWorkspace();syncControls();
-  } catch(error){showError(error,'ai-data-error');}
+  } catch(error){aiWorkspace().dataValidation=null;syncControls();showError(error,'ai-data-error');}
 }
 async function insertDataPreview() {
   clearError('ai-data-error');

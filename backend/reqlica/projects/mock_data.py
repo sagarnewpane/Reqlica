@@ -13,6 +13,7 @@ from pathlib import Path
 from reqlica.generation.data_schemas import DataImportRequest, DataValidationRequest
 from reqlica.generation.errors import GenerationError
 from reqlica.projects.database_schema import read_database_schema
+from reqlica.projects.data_contracts import application_data_contract, check_application_row, DataContractError, require_mockable
 from reqlica.projects.drafts import _contained
 from reqlica.projects.store import get_project
 from reqlica.projects.versions import project_lock
@@ -145,7 +146,7 @@ def _quote(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
 
-def _insert(database, table: dict, records: list[dict]) -> list[int | None]:
+def _insert(database, table: dict, records: list[dict], contract=None) -> list[int | None]:
     kind = database.execute(
         "SELECT type FROM pragma_table_list WHERE schema = 'main' AND name = ?",
         (table["name"],),
@@ -157,7 +158,7 @@ def _insert(database, table: dict, records: list[dict]) -> list[int | None]:
         )
     writable = {column["name"] for column in table["columns"] if not column["hidden"]}
     ids = []
-    for row in records:
+    for index, row in enumerate(records):
         if not set(row) <= writable:
             raise GenerationError(
                 "A record has unknown or generated columns; edit the preview and validate again",
@@ -170,14 +171,18 @@ def _insert(database, table: dict, records: list[dict]) -> list[int | None]:
         columns = list(row)
         # OR ABORT overrides schema-level REPLACE/IGNORE conflict policies.
         cursor = database.execute(
-            f"INSERT OR ABORT INTO {_quote(table['name'])} ({','.join(_quote(c) for c in columns)}) VALUES ({','.join('?' for _ in columns)})",
+            f"INSERT OR ABORT INTO {_quote(table['name'])} ({','.join(_quote(c) for c in columns)}) VALUES ({','.join('?' for _ in columns)}) RETURNING *",
             [row[column] for column in columns],
         )
+        stored = dict(zip((column[0] for column in cursor.description), cursor.fetchone()))
+        if contract is not None:
+            check_application_row(contract, table["name"], stored, index)
         ids.append(
             cursor.lastrowid
             if not re.search(r"\bWITHOUT\s+ROWID\b", table["sql"], re.IGNORECASE)
             else None
         )
+        cursor.close()
     return ids
 
 
@@ -193,7 +198,7 @@ def _connect(path: Path):
 
 
 def preview_digest(
-    target: str, table: str | None, records: list[dict], fingerprint: str | None
+    target: str, table: str | None, records: list[dict], fingerprint: str | None, application_revision: str | None = None
 ) -> str:
     return hashlib.sha256(
         json.dumps(
@@ -202,6 +207,7 @@ def preview_digest(
                 "table": table,
                 "records": records,
                 "schema": fingerprint,
+                "application_revision": application_revision,
             },
             sort_keys=True,
             allow_nan=False,
@@ -213,6 +219,7 @@ def validate_data(project_id: str, request: DataValidationRequest) -> dict:
     project = get_project(project_id)
     records = validate_records(request.records)
     fingerprint = None
+    contract = None
     validation = {"status": "passed", "message": "JSON records are valid"}
     if request.target == "sqlite":
         with project_lock(project.directory):
@@ -222,6 +229,8 @@ def validate_data(project_id: str, request: DataValidationRequest) -> dict:
                     "Database schema changed; reload its definitions and validate again"
                 )
             table = selected_table(schema, request.table)
+            contract = application_data_contract(project_id, schema)
+            require_mockable(contract, [request.table])
             fingerprint = schema["fingerprint"]
             with tempfile.TemporaryDirectory(prefix="reqlica-data-preview-") as folder:
                 copied = Path(folder) / "preview.sqlite"
@@ -229,14 +238,16 @@ def validate_data(project_id: str, request: DataValidationRequest) -> dict:
                 try:
                     with closing(_connect(copied)) as database:
                         database.execute("BEGIN IMMEDIATE")
-                        _insert(database, table, records)
+                        _insert(database, table, records, contract)
                         # Commit only the disposable copy, so deferred foreign
                         # keys are checked exactly as they will be on insertion.
                         database.commit()
                     validation = {
                         "status": "passed",
-                        "message": "Batch passed constraints on a disposable database copy",
+                        "message": "Batch passed database and declared application field checks on a disposable copy",
                     }
+                except DataContractError as error:
+                    validation = {"status": "failed", "message": str(error), "issues": error.issues}
                 except sqlite3.IntegrityError:
                     validation = {
                         "status": "failed",
@@ -257,8 +268,10 @@ def validate_data(project_id: str, request: DataValidationRequest) -> dict:
         "table": request.table,
         "records": records,
         "schema_fingerprint": fingerprint,
+        "application_revision": contract["revision"] if contract else None,
+        "application_checks": contract["coverage"] if contract else None,
         "preview_digest": preview_digest(
-            request.target, request.table, records, fingerprint
+            request.target, request.table, records, fingerprint, contract["revision"] if contract else None
         ),
         "validation": validation,
     }
@@ -267,14 +280,13 @@ def validate_data(project_id: str, request: DataValidationRequest) -> dict:
 def insert_data(project_id: str, request: DataImportRequest) -> dict:
     project = get_project(project_id)
     records = validate_records(request.records)
-    digest = preview_digest(
-        request.target, request.table, records, request.expected_schema
-    )
-    if digest != request.expected_preview_digest:
-        raise ValueError(
-            "The records differ from the reviewed preview; validate them again"
-        )
     with project_lock(project.directory):
+        schema = database_schema(project_id)
+        contract = application_data_contract(project_id, schema)
+        require_mockable(contract, [request.table])
+        digest = preview_digest(request.target, request.table, records, request.expected_schema, contract["revision"])
+        if digest != request.expected_preview_digest:
+            raise ValueError("The records differ from the reviewed preview or the application changed; validate them again")
         try:
             with closing(_connect(_database_path(project))) as database:
                 database.execute("BEGIN IMMEDIATE")
@@ -283,11 +295,13 @@ def insert_data(project_id: str, request: DataImportRequest) -> dict:
                     raise ValueError("Database schema changed; nothing was inserted")
                 table = selected_table(schema, request.table)
                 try:
-                    ids = _insert(database, table, records)
+                    ids = _insert(database, table, records, contract)
                     database.commit()
                 except BaseException:
                     database.rollback()
                     raise
+        except DataContractError as error:
+            raise GenerationError(str(error) + ": " + error.issues[0]["message"] + "; nothing was inserted", 422) from error
         except sqlite3.IntegrityError as error:
             raise GenerationError(
                 "The batch conflicts with current database constraints. The entire batch was rolled back; no records were inserted.",
