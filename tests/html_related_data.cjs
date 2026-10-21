@@ -36,3 +36,12 @@ test('related counts and table names are rendered as text, not markup',()=>{
  const {c,w,$}=fixture();w.dataSchema.tables=[{name:'<img src=x>',storage_type:'table'}];w.dataPreview={'<script>':[ {id:1} ]};w.dataRawPreview=JSON.stringify(w.dataPreview);c.renderDataWorkspace();
  assert.match($('data-related-tables').innerHTML,/&lt;img/);assert.doesNotMatch($('data-related-tables').innerHTML,/<img/);assert.match($('data-related-counts').innerHTML,/&lt;script&gt;/);
 });
+test('unsupported data clears the old preview and shows a plain refusal',async()=>{
+ const {c,w,$}=fixture();w.dataPreview=c.result.records_by_table;w.dataRawPreview=JSON.stringify(w.dataPreview);w.dataValidation=c.result;
+ const error=Error('HTTP 422: refused');error.details={code:'mock_data_unsupported',message:"This data can't be mocked reliably: users.password_hash requires application-specific hashing."};c.api=async()=>{throw error;};
+ await c.generateDataWithGroq();assert.equal(w.dataRawPreview,'');assert.equal(w.dataValidation,null);assert.equal(w.dataPreview,null);assert.equal($('data-preview-actions').hidden,true);assert.equal($('data-empty-title').textContent,"This data can't be mocked");assert.match($('data-empty-description').textContent,/password_hash/);
+});
+test('failed validation invalidates an earlier successful review',async()=>{
+ const {c,w}=fixture();w.dataRawPreview=JSON.stringify(c.result.records_by_table);w.dataValidation=c.result;c.api=async()=>{throw Error('Unsupported custom format');};
+ await c.validateDataPreview();assert.equal(w.dataValidation,null);
+});

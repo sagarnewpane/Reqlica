@@ -52,6 +52,7 @@ class MockDataPlan(BaseModel):
 
     summary: str
     assumptions: list[str]
+    refusal_reason: str | None = Field(default=None, max_length=1024)
     records_json: str = Field(
         description="A JSON-encoded array containing exactly the requested number of record objects. Data only; never SQL or Python."
     )
@@ -108,6 +109,7 @@ class RelatedMockDataPlan(BaseModel):
 
     summary: str = Field(min_length=1, max_length=8192, pattern=r"\S")
     assumptions: list[str] = Field(max_length=30)
+    refusal_reason: str | None = Field(default=None, max_length=1024)
     records_by_table_json: str = Field(
         description='JSON object mapping existing table names to record arrays. Link foreign keys with {"$ref":"users.0.id"}; omit automatic primary keys. Data only.'
     )
