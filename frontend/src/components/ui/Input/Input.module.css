@@ -1,0 +1,32 @@
+.input {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 14px;
+  background-color: var(--background-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  font-size: 14px;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.input::placeholder {
+  color: var(--text-secondary);
+}
+
+.input:hover {
+  border-color: var(--reqlica-green);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--reqlica-green);
+  box-shadow: 0 0 0 3px rgba(27, 66, 50, 0.1);
+}
+
+.input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

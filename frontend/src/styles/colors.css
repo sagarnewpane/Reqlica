@@ -1,0 +1,17 @@
+:root {
+  --reqlica-green: #1b4232;
+  --reqlica-lime: #b5ce26;
+  --button-primary: var(--reqlica-green);
+  --button-accent: var(--reqlica-lime);
+  --background-primary: #f7faf8;
+  --background-secondary: #ffffff;
+  --text-primary: #17231d;
+  --text-secondary: #66736c;
+  --border-primary: #dfe7e2;
+  --status-success: #5f9f4a;
+  --status-success-background: rgba(95, 159, 74, 0.12);
+  --status-warning: #d99b2b;
+  --status-warning-background: rgba(217, 155, 43, 0.12);
+  --status-danger: #d64545;
+  --status-danger-background: rgba(214, 69, 69, 0.12);
+}

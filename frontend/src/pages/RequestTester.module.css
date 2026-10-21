@@ -1,0 +1,233 @@
+.content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 36px 32px;
+}
+
+.pageHeading {
+  margin-bottom: 28px;
+}
+
+.pageHeading h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.pageHeading p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.section {
+  margin-bottom: 32px;
+}
+
+.sectionHeading {
+  margin-bottom: 18px;
+}
+
+.sectionHeading h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.sectionHeading p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.requestPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.requestPanel h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.requestBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.methodSelect {
+  width: 130px;
+  flex-shrink: 0;
+}
+
+.endpointInput {
+  flex: 1;
+  min-width: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.tab,
+.activeTab {
+  padding: 12px 20px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.activeTab {
+  border-bottom-color: var(--reqlica-green);
+  color: var(--reqlica-green);
+  font-weight: 600;
+}
+
+.tabContent {
+  min-height: 150px;
+}
+
+.placeholder h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.placeholder p {
+  margin: 0 0 20px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.bodyTextarea {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background-color: var(--background-secondary);
+  color: var(--text-primary);
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.bodyTextarea:focus {
+  outline: none;
+  border-color: var(--reqlica-green);
+}
+
+.responsePanel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.responseInfo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.status {
+  padding: 6px 12px;
+  border-radius: 6px;
+  background-color: var(--status-success-background);
+  color: var(--status-success);
+  font-weight: 700;
+}
+
+.codeBlock {
+  margin: 0;
+  padding: 20px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background-color: var(--background-primary);
+  color: var(--text-primary);
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-x: auto;
+}
+
+.tableWrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table th,
+.table td {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-primary);
+  font-size: 14px;
+}
+
+.table th {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.method {
+  display: inline-block;
+  min-width: 65px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background-color: var(--background-primary);
+  color: var(--reqlica-green);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .content {
+    padding: 24px 20px;
+  }
+
+  .requestBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .methodSelect,
+  .endpointInput {
+    width: 100%;
+  }
+
+  .fieldRow {
+    grid-template-columns: 1fr;
+  }
+
+  .tabs {
+    overflow-x: auto;
+  }
+
+  .table th,
+  .table td {
+    padding: 12px;
+  }
+}
