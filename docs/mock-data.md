@@ -104,23 +104,37 @@ insertion rechecks constraints and schema inside its write transaction.
   persist independently of draft activation. The APIs remain trusted-local and
   unauthenticated; keep the console/gateway on loopback.
 
-## Chained live requests
+## Related records from one prompt
 
-The Mock data page accepts a JSON array of up to 50 named request steps. Each
-step has `name`, `method`, `path`, and optional `body` and `headers`. For example:
+Choose **Related database records** in Mock data, then describe the whole dataset:
+“Create 2 users and 2 posts, one post for each user.” The provider receives the
+existing table definitions and relationships. It chooses the tables and counts
+from your description; no request sequence or separate per-table prompt is needed.
 
-```json
-[
-  {"name":"user","method":"POST","path":"/users","body":{"name":"Sample"}},
-  {"name":"post","method":"POST","path":"/posts","body":{"user_id":"{{user.id}}","title":"Hello"}}
-]
-```
+The preview groups editable records by table and shows the per-table counts.
+Parent rows are inserted before their children. Foreign keys use references such
+as `{"$ref":"users.0.id"}` (zero-based row index), which resolve to actual generated
+IDs at insertion time. IDs shown in the disposable preview are provisional;
+concurrent inserts do not break these references.
 
-References resolve from earlier JSON response bodies. A whole-value reference
-preserves its JSON type; path substitutions are URL encoded. Requests run in
-order against live project data with shared project headers. Execution stops on
-an HTTP error, missing reference, or network error. Completed writes remain;
-there is no transaction across requests and no automatic retry.
+Validate checks the full dataset on a disposable SQLite copy. **Insert records**
+requires confirmation and saves all tables in one transaction. If any row fails,
+the entire batch rolls back. Existing rows are retained. No automatic retry is
+made. Generation itself never writes live records.
+
+Limits: 10 existing ordinary tables, 100 total records, 128 KiB. Tables with
+triggers and virtual tables remain unsupported. References must follow declared
+foreign keys. Cyclic references are rejected; schema creation remains a separate
+Database setup action. Synthetic authentication hashes may not support real login.
+
+Endpoints: `POST /api/projects/{id}/data/related/generate`, `/related/validate`,
+and `/related/insert`. Validation/import use `records_by_table` and
+`expected_schema`; insertion also requires the reviewed `expected_preview_digest`
+and `confirm: true`.
+
+HTTP request sequences remain available separately in Request tester. They execute
+real API calls and can reference earlier responses; they are not used to generate
+related database records.
 
 Selecting a SQLite table fills the example field from its writable columns,
 omitting automatic integer primary keys. Edit placeholders and foreign-key IDs

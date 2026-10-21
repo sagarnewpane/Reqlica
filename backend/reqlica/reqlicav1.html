@@ -48,6 +48,58 @@
 .check-card-title{display:flex;align-items:center;justify-content:space-between;gap:8px}.check-card-title h3{font-size:14px}.check-metric{font:600 24px/1.3 var(--mono);margin-top:16px;color:var(--ink)}.check-metric small{font:13px var(--sans);font-weight:400;color:var(--muted)}.failure-list{display:grid;gap:12px;margin-top:20px}.failure-item{padding:16px;border-left:3px solid var(--error);background:var(--inset);border-radius:4px;min-width:0}.failure-item strong{display:block;font:600 13px var(--mono);overflow-wrap:anywhere}.failure-item p{font-size:13px;margin-top:8px;white-space:pre-wrap;overflow-wrap:anywhere}.failure-item .help{color:var(--muted)}#draft-repair{margin-bottom:0;padding:20px}#repair-status{flex-basis:100%;margin-top:4px}#repair-context-status{margin-bottom:20px}.repair-attempts{display:grid;gap:12px;margin-top:20px}.repair-attempt{padding:16px;border:1px solid var(--line);border-radius:6px;min-width:0}.repair-attempt .feature-head strong{font-size:13px}.repair-attempt p{font-size:13px;margin-top:8px;white-space:pre-wrap;overflow-wrap:anywhere}.repair-attempt ul{font-size:13px;padding-left:20px;margin:12px 0 0}.repair-files{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.repair-files code{font-size:12px;color:var(--secondary)}.repair-blockers{color:var(--draft)}
 @media(max-width:760px){.decision-card{padding:16px}.decision-card .decision-label{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px 12px}.decision-kind{grid-column:2}.feature-head{gap:8px}.variable-row{align-items:flex-start;flex-direction:column;gap:8px}.variable-row .actions{width:100%}.variable-row .actions .btn{flex:1}.decision-actions .btn,#environment-form>.actions>.btn{width:100%}.setup-steps{display:grid;gap:8px}.setup-steps li{gap:8px}#draft-repair{padding:16px}#draft-repair .field-row{gap:20px}.check-metric{font-size:22px}.repair-attempt{padding:12px}.feature-status{padding:12px}}
 .ai-activity{margin:0 0 20px;padding:16px;border:1px solid var(--line);border-left:3px solid var(--draft);border-radius:6px;background:var(--inset);overflow-wrap:anywhere}.ai-activity[data-state="complete"]{border-left-color:var(--request)}.ai-activity[data-state="failed"]{border-left-color:var(--error)}.ai-activity-head{display:flex;align-items:center;justify-content:space-between;gap:16px;color:var(--muted);font-variant-numeric:tabular-nums}.ai-activity-title{margin-top:8px;font-weight:600;color:var(--ink)}.ai-activity .help{margin-top:4px}.ai-activity details{margin-top:8px;font-size:13px}.ai-activity summary{padding:8px 0}.ai-activity ol{list-style:none;margin:0;padding:0;display:grid;gap:8px}.ai-activity li{display:flex;justify-content:space-between;gap:16px;color:var(--secondary)}.ai-activity time{flex-shrink:0;color:var(--muted);font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* Generation: requirements lead; saved work is a compact, separate activity list. */
+.project-ai-layout:not(.is-chat){align-items:start;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr)}
+#generation-brief-panel{position:sticky;top:24px}
+#generation-brief-panel .panel-head{padding:18px 20px}
+#generation-brief-panel .panel-head .badge{font-size:10px;letter-spacing:.6px}
+#generation-brief-panel .ai-preview-empty{padding:24px 20px 28px}
+#generation-brief-panel .ai-preview-empty h3{font-size:15px;font-weight:600}
+#generation-brief-panel .ai-preview-empty p{font-size:13px;line-height:1.65;max-width:42ch}
+.brief-symbol{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;margin-bottom:16px;border:1px solid var(--line);border-radius:6px;color:var(--draft);font:14px var(--mono)}
+.brief-privacy{display:flex;align-items:center;gap:8px;margin-top:18px;font-size:11px;color:var(--muted)}
+.brief-privacy:before{content:'';width:5px;height:5px;border-radius:50%;background:var(--muted)}
+#generation-brief-panel .panel-foot{padding:12px 20px}
+#generation-brief-panel .panel-foot .small{flex:1;min-width:140px;font-size:12px}
+#generation-preview{font-size:12px;max-height:460px;padding:20px}
+#generation-jobs{margin-top:24px}
+.generation-history-head{padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line)}
+.generation-history-head h2{font-size:15px;font-weight:600;letter-spacing:-.2px}
+.generation-history-head p{font-size:12px;color:var(--muted);margin-top:2px}
+.generation-history-count{font:12px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}
+.generation-history-list{max-height:420px;overflow-y:auto;overscroll-behavior:contain}
+.generation-job{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start;padding:16px 24px;border-bottom:1px solid var(--line)}
+.generation-job:last-child{border-bottom:0}
+.generation-job details{min-width:0}
+.generation-job summary{display:grid;grid-template-columns:8px minmax(0,1fr) 16px;align-items:center;gap:12px;padding:0;min-height:44px;list-style:none}
+.generation-job summary::-webkit-details-marker{display:none}
+.generation-job summary:after{content:'+';font:16px var(--mono);color:var(--muted);text-align:center}
+.generation-job details[open] summary:after{content:'−'}
+.generation-job summary:focus-visible{outline:2px solid var(--focus);outline-offset:4px;border-radius:3px}
+.generation-job-indicator{width:6px;height:6px;border-radius:50%;background:var(--muted)}
+.generation-job[data-state=completed] .generation-job-indicator{background:var(--request)}
+.generation-job[data-state=ready] .generation-job-indicator{background:var(--draft)}
+.generation-job[data-state=error] .generation-job-indicator{background:var(--error)}
+.generation-job-title{display:block;font-size:14px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5}
+.generation-job-meta{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;color:var(--muted);font-size:12px;line-height:1.5;margin-top:4px;font-variant-numeric:tabular-nums}
+.generation-job-status{font-weight:500}
+.generation-job[data-state=completed] .generation-job-status{color:var(--request)}
+.generation-job[data-state=ready] .generation-job-status{color:var(--draft)}
+.generation-job[data-state=error] .generation-job-status{color:var(--error)}
+.generation-job-body{padding:12px 28px 4px;font-size:13px;line-height:1.7;color:var(--secondary);overflow-wrap:anywhere}
+.generation-job-body p+p{margin-top:12px}
+.generation-job-body .help{font-size:12px}
+.generation-job-error{color:var(--error)}
+.generation-job-action{font-size:12px;padding:7px 12px;white-space:nowrap;margin-top:2px;border-color:var(--line);min-height:40px}
+@media(max-width:1100px){.project-ai-layout:not(.is-chat){grid-template-columns:minmax(0,1fr)}#generation-brief-panel{position:static}#generation-brief-panel .ai-preview-empty p{max-width:65ch}}
+@media(max-width:760px){.generation-history-head{padding:16px 20px}.generation-job{padding:12px 20px;gap:8px;grid-template-columns:minmax(0,1fr)}.generation-job-action{justify-self:start;margin-left:20px;margin-top:0}.generation-job-title{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.generation-job-body{padding-left:20px;padding-right:0}.generation-job-meta{gap:4px 10px}}
+#data-view .layout-two{align-items:start}
+#data-view .field-row:has(#data-count-field[hidden]){grid-template-columns:minmax(0,1fr)}
+#data-related-schema{margin-top:4px;margin-bottom:20px;padding:16px}
+#data-related-tables{margin-top:12px;gap:6px}
+#data-related-counts{margin-bottom:16px}
+#data-preview-actions[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -127,6 +179,10 @@
           <div class="actions"><button class="btn" type="button" id="insert-request-example" data-action="insert-request-example" aria-describedby="request-example-status" disabled>Insert example</button><span class="small muted">From OpenAPI · does not send</span></div>
           <p class="help" id="request-example-status" role="status">Choose a route shortcut to insert its example. Review sample values before sending; existing records and business rules are not inferred.</p>
           <div class="field-row section-gap"><div class="field"><label for="request-method">Method</label><select id="request-method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>HEAD</option></select></div><div class="field"><label for="request-path">Path and query string</label><input id="request-path" required value="/hello" placeholder="/books/123?limit=10"></div></div><div class="field" id="request-headers-field"><label for="request-headers">Headers · JSON object</label><textarea id="request-headers" class="mono" spellcheck="false">{}</textarea><p class="help">Optional authorization/content-type headers. Browser-controlled and proxy-internal headers cannot be overridden.</p></div><div class="field"><label for="request-body">JSON body · optional</label><textarea id="request-body" class="mono" spellcheck="false" placeholder='{"title": "Example"}'></textarea></div><p class="help" id="request-help"></p></div><div class="panel-foot"><span class="small muted">Redirects are not followed by the local bridge.</span><button class="btn primary" type="submit">Send request →</button></div></form><div class="response-meta"><span class="badge neutral" id="response-status" role="status">Not sent</span><span class="muted small" id="response-time">—</span><button class="btn ghost" data-action="copy-response">Copy response</button></div><pre class="code" id="response-body" tabindex="0">Send a request to inspect its real response.</pre><details class="panel-body"><summary>Response headers / draft runner details</summary><pre class="code" id="response-details">—</pre></details></div><aside><div class="notice draft"><strong>Live requests can change real data.</strong><p class="small">POST, PUT, PATCH, and DELETE run against persistent project data. A request to an idle project starts its worker; a stopped project must be started explicitly.</p></div><div class="notice"><strong>Draft calls are disposable.</strong><p class="small">Select a draft in Drafts &amp; checks first. Calls pin its revision and accept JSON bodies, and forward configured request headers. Each call gets a fresh disposable data copy. A call never counts as validation or a test.</p></div><div class="notice"><strong>No scenario API yet.</strong><p class="small">Artificial delays, forced errors, seeding/reset, and server request logs are not implemented. This page does not fake them.</p></div></aside></div>
+        <div class="panel section-gap"><div class="panel-head"><h2>HTTP request sequences</h2><span class="badge draft">LIVE API</span></div><div class="panel-body"><p class="help">Run up to 50 requests in order. Reference earlier JSON responses with {{stepName.field}} in bodies, paths, or headers. A whole body value preserves its JSON type. Shared headers apply to every step. Stops on the first failure; completed writes remain and are never retried automatically.</p><label for="request-chain">Request steps · JSON array</label><textarea id="request-chain" class="source" rows="12" spellcheck="false">[
+  {"name":"user","method":"POST","path":"/users","body":{"name":"Sample user"}},
+  {"name":"post","method":"POST","path":"/posts","body":{"user_id":"{{user.id}}","title":"Sample post"}}
+]</textarea><div class="actions section-gap"><button class="btn primary" data-action="run-request-chain">Run chain…</button></div><pre class="code section-gap" id="request-chain-results" role="status">No chain run yet.</pre></div></div>
       </section>
 
       <section class="view" id="settings-view" aria-label="Settings" hidden>
@@ -151,33 +207,32 @@
         <details class="ai-context-details" id="ai-context-details"><summary>Context &amp; privacy</summary><div><p>The selected provider receives your input, published Python/tests, routes, project notes, database definitions/setup plans, and configured variable names—not their values. Chat also includes up to eight recent exchanges; older replies are discussion, not verified facts. Database rows, other drafts, environment files/values, and provider keys are excluded from model input.</p><p class="help">Completed exchanges are saved for this project in this browser tab, including across refreshes. New chat clears them. Closing the tab normally ends the session; browser session restore can retain it. Nothing is written to project files. Generation remains a separate, confirmed action; review code before running checks.</p><p class="help" id="chat-storage-note"></p><p class="help" id="generation-provider-summary"></p></div></details></div>
         <div class="panel section-gap" id="generation-result" role="region" aria-label="AI review and generation results" hidden></div>
         <div class="layout-two project-ai-layout" id="project-ai-layout"><div class="panel" id="project-input-panel"><div class="panel-head" id="project-input-heading"><h2 id="project-ai-input-title">Requirements</h2></div>
-          <form id="generate-form"><div class="panel-body"><div id="generation-error" class="notice error" role="alert" hidden></div><section id="generation-jobs" class="notice section-gap" aria-label="Saved generations" hidden></section>
+          <form id="generate-form"><div class="panel-body"><div id="generation-error" class="notice error" role="alert" hidden></div>
             <div class="field generation-provider-field"><label for="generation-provider">Provider</label><select id="generation-provider" data-ai-provider required></select></div>
             <div id="project-question-input" hidden><label class="sr-only" for="project-question">Message about this project</label><textarea id="project-question" rows="2" maxlength="16384" placeholder="Ask about an endpoint, or follow up on the conversation…"></textarea></div>
             <div class="ai-modes" id="generation-input-modes" role="group" aria-label="Generation input"><button class="btn active" type="button" data-generation-mode="describe" aria-pressed="true">Describe the API</button><button class="btn" type="button" data-generation-mode="upload" aria-pressed="false">Upload a specification</button></div>
             <div id="generation-describe"><label for="generation-prompt">What should your API do?</label><textarea id="generation-prompt" rows="8" placeholder="Add a typed GET /greeting endpoint with an optional name and meaningful HTTP tests…"></textarea></div>
             <div id="generation-upload" hidden><div class="field"><label for="generation-file">OpenAPI, JSON schema, or documentation</label><input id="generation-file" type="file" accept=".json,.yaml,.yml,.md,.txt"><p class="help" id="generation-file-status" role="status">JSON, YAML, Markdown, or text · max 1 MiB for previews.</p></div><label for="generation-spec-text">Review or paste the specification</label><textarea id="generation-spec-text" class="mono" spellcheck="false" placeholder="Paste your specification, or choose a file above."></textarea></div>
           </div><div class="panel-foot"><button class="btn" id="preview-generation-button" type="submit" data-needs-ai-provider>Preview generation brief →</button><button class="btn primary" type="button" data-action="generate-draft" id="generate-draft-button">Generate draft →</button><p class="help" id="generate-draft-help">Select a Groq, OpenAI, or OpenAI-compatible profile to generate.</p></div></form>
-        </div><aside class="panel" id="generation-brief-panel"><div class="panel-head"><h2>Review your input brief</h2><span class="badge draft">LOCAL PREVIEW</span></div><div class="ai-preview-empty" id="generation-empty"><h3>Your brief will appear here.</h3><p>Preview the input without making any request. The console adds current published project context only when you explicitly generate. Credentials are never included in this brief.</p></div><pre class="code" id="generation-preview" hidden tabindex="0"></pre><div class="panel-foot"><span class="small muted" id="generation-preview-status">No brief prepared.</span><button class="btn" data-action="copy-generation-preview" id="copy-generation-preview" disabled>Copy brief</button></div></aside>
+        </div><aside class="panel" id="generation-brief-panel"><div class="panel-head"><h2>Input brief</h2><span class="badge draft">LOCAL PREVIEW</span></div><div class="ai-preview-empty" id="generation-empty"><span class="brief-symbol" aria-hidden="true">{ }</span><h3>Review before you generate</h3><p>Describe an endpoint or upload a specification, then preview the input you’ll send.</p><span class="brief-privacy">Preview stays local · credentials excluded</span></div><pre class="code" id="generation-preview" hidden tabindex="0"></pre><div class="panel-foot" id="generation-preview-footer" hidden><span class="small muted" id="generation-preview-status">No brief prepared.</span><button class="btn" data-action="copy-generation-preview" id="copy-generation-preview" disabled>Copy brief</button></div></aside>
         <aside class="panel" id="project-answer-panel" hidden><div class="panel-head"><div class="actions"><h2>Conversation</h2><span class="badge neutral">READ ONLY</span></div><button class="btn ghost" id="new-project-chat" data-action="new-project-chat" disabled>New chat</button></div><div class="chat-empty" id="project-answer-empty"><h3>Get to know your API.</h3><p>Ask a question, then explore it together.</p><div class="chat-suggestions"><button class="btn" data-question-suggestion="Give me an overview of this project and its endpoints.">Project overview</button><button class="btn" data-question-suggestion="Explain the inputs, validation rules, and responses of the endpoints in this project.">Endpoint design</button><button class="btn" data-question-suggestion="How are the data models related in this project?">Data relationships</button></div></div><div class="chat-thread" id="project-answer-content" role="region" aria-label="Project conversation" tabindex="0" hidden></div><div class="panel-foot"><span class="chat-status" id="project-answer-status" role="status">No messages yet.</span><button class="btn ghost" id="copy-project-answer" data-action="copy-project-answer" disabled>Copy last reply</button></div></aside></div>
+        <section id="generation-jobs" class="panel" aria-label="Saved generations" hidden></section>
       </section>
 
       <section class="view" id="data-view" aria-label="Mock data" hidden>
-        <div class="view-title"><div><h2>Mock data</h2><p>Describe your records, review the JSON, then download or insert them.</p></div><button class="btn ghost" data-view="settings">Provider settings</button></div>
-        <details class="ai-context-details"><summary>How data generation works</summary><div><p>Groq receives your description, template, and selected table definitions—not existing records. Generated data stays in the preview until you download it or explicitly confirm an insert. Inserts append to existing ordinary SQLite tables, never create tables or replace records. Tables with triggers/virtual tables are not supported.</p><p class="help" id="data-provider-summary"></p></div></details>
+        <div class="view-title"><div><h2>Mock data</h2><p>Describe a dataset across tables. Review the records, then save them together.</p></div><button class="btn ghost" data-view="settings">Provider settings</button></div>
+        <details class="ai-context-details"><summary>How data generation works</summary><div><p>Your provider receives your description and table definitions—not existing records. Related data generation creates parent rows first and links child rows to their actual IDs. Generated data stays in the preview until you download it or explicitly confirm an insert. Inserts append to existing ordinary SQLite tables, never create tables or replace records. Tables with triggers/virtual tables are not supported.</p><p class="help" id="data-provider-summary"></p></div></details>
         <div class="layout-two"><div class="panel"><div class="panel-head"><h2>Describe the dataset</h2></div><form id="ai-data-form"><div class="panel-body"><div class="notice error" id="ai-data-error" role="alert" hidden></div>
           <div class="field"><label for="data-provider">Provider</label><select id="data-provider" data-ai-provider></select></div>
-          <div class="field-row"><div class="field"><label for="data-target">Destination</label><select id="data-target"><option value="json">JSON fixture</option><option value="sqlite">Existing SQLite table</option></select></div><div class="field"><label for="ai-data-count">Records</label><input id="ai-data-count" type="number" min="1" max="100" value="5" required></div></div>
+          <div class="field-row"><div class="field"><label for="data-target">Destination</label><select id="data-target"><option value="related">Related database records</option><option value="json">JSON fixture</option><option value="sqlite">Existing SQLite table</option></select></div><div class="field" id="data-count-field"><label for="ai-data-count">Records</label><input id="ai-data-count" type="number" min="1" max="100" value="5" required></div></div>
           <div class="field" id="data-collection-field"><label for="ai-data-collection">Collection name</label><input id="ai-data-collection" value="items" maxlength="128"></div>
           <div class="field" id="data-table-field" hidden><label for="data-table">Table</label><select id="data-table"><option value="">Load database tables</option></select><button class="btn ghost" type="button" data-action="load-data-schema">Reload tables</button><details class="technical-details"><summary>Columns &amp; relationships</summary><pre class="code" id="data-table-schema">Choose a table.</pre></details></div>
-          <div class="field"><label for="ai-data-prompt">What should the records look like?</label><textarea id="ai-data-prompt" rows="4" placeholder="Create a varied book catalog: realistic titles, prices from 5–40, and a few out-of-stock books."></textarea></div>
-          <div class="field"><label for="ai-data-template">Example record / field hints</label><textarea id="ai-data-template" class="mono" spellcheck="false">{"name":"Sample item","price":14.99,"stock":20}</textarea></div>
-        </div><div class="panel-foot"><button class="btn" type="button" data-action="template-data">Use template</button><button class="btn primary" type="submit" id="generate-data-button">Generate records →</button></div></form></div>
-        <aside class="panel"><div class="panel-head"><h2>Review records</h2><span class="badge neutral" id="ai-data-preview-count">0 records</span></div><div class="chat-empty" id="ai-data-empty"><h3>Your data starts here.</h3><p>Generate records or use your template, then edit any values before saving.</p></div><div class="panel-body" id="data-preview-workspace" hidden><label for="ai-data-preview">JSON records · editable</label><textarea id="ai-data-preview" class="source" spellcheck="false" rows="14"></textarea><p class="help" id="data-preview-status" role="status"></p><div class="notice error section-gap" id="data-validation-error" role="alert" hidden></div><details class="section-gap"><summary>Batch details</summary><pre class="code" id="ai-data-brief">No records prepared.</pre></details></div><div class="panel-foot"><div class="actions"><button class="btn ghost" data-action="copy-data-preview" id="copy-data-preview" disabled>Copy JSON</button><button class="btn" data-action="download-data" id="download-data-button" disabled>Download</button><button class="btn" data-action="validate-data" id="validate-data-button" disabled>Validate records</button></div><button class="btn primary" data-action="insert-data" id="insert-data-button" hidden disabled>Insert records…</button></div></aside></div>
-        <div class="panel section-gap"><div class="panel-head"><h2>Chained requests</h2><span class="badge draft">LIVE API</span></div><div class="panel-body"><p class="help">Run up to 50 requests in order. Reference earlier JSON responses with {{stepName.field}} in bodies, paths, or headers. A whole body value preserves its JSON type. Shared headers apply to every step. Stops on the first failure; completed writes remain and are never retried automatically.</p><label for="request-chain">Request steps · JSON array</label><textarea id="request-chain" class="source" rows="12" spellcheck="false">[
-  {"name":"user","method":"POST","path":"/users","body":{"name":"Sample user"}},
-  {"name":"post","method":"POST","path":"/posts","body":{"user_id":"{{user.id}}","title":"Sample post"}}
-]</textarea><div class="actions section-gap"><button class="btn primary" data-action="run-request-chain">Run chain…</button></div><pre class="code section-gap" id="request-chain-results" role="status">No chain run yet.</pre></div></div>
+          <div id="data-related-schema" class="notice" hidden><div class="feature-head"><strong>Connected tables</strong><button class="btn ghost" type="button" data-action="load-data-schema">Reload tables</button></div><div id="data-related-tables" class="actions section-gap"></div><p class="help">Describe tables, counts, and relationships in one prompt. Parent rows and foreign keys are linked automatically. Up to 100 records across 10 tables.</p><details class="technical-details"><summary>Relationships</summary><pre class="code" id="data-related-relationships"></pre></details></div>
+          <div class="field"><label for="ai-data-prompt">What data do you need?</label><textarea id="ai-data-prompt" rows="4" placeholder="Create 2 users and 2 posts, one post for each user. Use realistic names and different post titles."></textarea></div>
+          <div class="field" id="data-template-field"><label for="ai-data-template">Example record / field hints</label><textarea id="ai-data-template" class="mono" spellcheck="false">{"name":"Sample item","price":14.99,"stock":20}</textarea></div>
+        </div><div class="panel-foot"><button class="btn" type="button" data-action="template-data" id="template-data-button">Use template</button><button class="btn primary" type="submit" id="generate-data-button">Generate records →</button></div></form></div>
+        <aside class="panel"><div class="panel-head"><h2>Review records</h2><span class="badge neutral" id="ai-data-preview-count">0 records</span></div><div class="chat-empty" id="ai-data-empty"><h3>Your data starts here.</h3><p>Generate records or use your template, then edit any values before saving.</p></div><div class="panel-body" id="data-preview-workspace" hidden><div id="data-related-counts" class="actions" hidden></div><label for="ai-data-preview">JSON records · editable</label><textarea id="ai-data-preview" class="source" spellcheck="false" rows="14"></textarea><p class="help" id="data-preview-status" role="status"></p><div class="notice error section-gap" id="data-validation-error" role="alert" hidden></div><details class="section-gap"><summary>Batch details</summary><pre class="code" id="ai-data-brief">No records prepared.</pre></details></div><div class="panel-foot" id="data-preview-actions"><div class="actions"><button class="btn ghost" data-action="copy-data-preview" id="copy-data-preview" disabled>Copy JSON</button><button class="btn" data-action="download-data" id="download-data-button" disabled>Download</button><button class="btn" data-action="validate-data" id="validate-data-button" disabled>Validate records</button></div><button class="btn primary" data-action="insert-data" id="insert-data-button" hidden disabled>Insert records…</button></div></aside></div>
+
       </section>
 
       <section class="view" id="setup-view" hidden>
@@ -307,9 +362,9 @@ const aiActivityStages={
   failed:['Request failed','See the error above. The last confirmed activity is listed below.'],
 };
 function aiActivityTarget(service,path,method,body) {
-  if(service!=='console' || method!=='POST' || !/^\/api\/projects\/[^/]+\/(clarify|generate|ask|edit-endpoint|data\/generate|drafts\/[^/]+\/repair|generation-jobs\/[^/]+\/step)$/.test(path))return null;
+  if(service!=='console' || method!=='POST' || !/^\/api\/projects\/[^/]+\/(clarify|generate|ask|edit-endpoint|data\/(?:related\/)?generate|drafts\/[^/]+\/repair|generation-jobs\/[^/]+\/step)$/.test(path))return null;
   if(path.endsWith('/repair'))return 'repair-error';
-  if(path.endsWith('/data/generate'))return 'ai-data-error';
+  if(/\/data\/(?:related\/)?generate$/.test(path))return 'ai-data-error';
   return path.endsWith('/edit-endpoint') || body?.endpoint?'ai-endpoint-error':'generation-error';
 }
 function renderAiActivity(activity) {
@@ -425,6 +480,7 @@ function setView(view,record=true) {
   if (view === 'tester') renderRequestRoutes();
   if (view === 'settings') { renderProviderProfiles(); renderAIProviderChoices(); renderEnvironment(); }
   if (view === 'generate' || view === 'data') renderAIWorkspace();
+  if(view==='data' && aiWorkspace().dataTarget==='related' && !aiWorkspace().dataSchema)loadDataSchema();
   syncControls();
   const heading=$(view+'-view').querySelector('h1,h2');
   if (heading) { heading.tabIndex=-1; heading.focus({preventScroll:true}); }
@@ -710,14 +766,14 @@ function syncControls() {
   document.querySelectorAll('[data-needs-ai-provider]').forEach(el=>el.disabled=state.busy || !aiConfig.providers.length);
   document.querySelectorAll('[data-ai-project-feature]').forEach(el=>el.disabled=state.busy || !state.project);
   $('copy-generation-preview').disabled=state.busy || !state.project || !aiWorkspace().generationPreview;
-  const dataset=aiWorkspace(),hasData=!!dataset.dataRawPreview?.trim(),sqlite=dataset.dataTarget==='sqlite';
+  const dataset=aiWorkspace(),hasData=!!dataset.dataRawPreview?.trim(),related=dataset.dataTarget==='related',sqlite=dataset.dataTarget==='sqlite' || related;
   $('copy-data-preview').disabled=state.busy || !hasData;
   $('download-data-button').disabled=state.busy || !hasData;
-  $('validate-data-button').disabled=state.busy || !hasData || (sqlite && !dataset.dataTable);
+  $('validate-data-button').disabled=state.busy || !hasData || (sqlite && !related && !dataset.dataTable);
   $('insert-data-button').hidden=!sqlite;
-  $('insert-data-button').disabled=state.busy || !sqlite || !!dataset.dataImportResult || dataset.dataValidation?.validation?.status!=='passed' || dataset.dataValidation.table!==dataset.dataTable;
+  $('insert-data-button').disabled=state.busy || !sqlite || !!dataset.dataImportResult || dataset.dataValidation?.validation?.status!=='passed' || (!related && dataset.dataValidation.table!==dataset.dataTable);
   const dataProvider=aiConfig.providers.find(p=>p.id===$('data-provider').value),editProvider=aiConfig.providers.find(p=>p.id===$('endpoint-ai-provider').value);
-  $('generate-data-button').disabled=state.busy || !['groq','openai','compatible'].includes(dataProvider?.kind) || (sqlite && !dataset.dataTable);
+  $('generate-data-button').disabled=state.busy || !['groq','openai','compatible'].includes(dataProvider?.kind) || (sqlite && !related && !dataset.dataTable) || (related && !dataset.dataSchema?.tables?.length);
   $('generate-endpoint-edit').disabled=state.busy || !['groq','openai','compatible'].includes(editProvider?.kind) || !aiEndpointContext?.revision;
   $('copy-endpoint-preview').disabled=state.busy || !endpointBrief;
   $('ai-project-help').textContent=state.project?'AI profiles are shared across projects. Runtime variables stay per project. Repair is available beside failed draft checks.':'Open a project to explore these screens. Provider settings are available without a project.';
@@ -1165,7 +1221,7 @@ function aiWorkspace() {
   if(!state.project)return {};
   if(!aiWorkspaces.has(state.project.id)) {
     const turns=loadProjectChat(state.project.id),last=turns.at(-1);
-    aiWorkspaces.set(state.project.id,{task:turns.length?'ask':'generate',turns,chatConsent:null,question:'',answeredQuestion:last?.question || '',answer:last || null,mode:'describe',description:'',spec:'',filename:'',generationProvider:'',generationPreview:null,generationResult:null,dataProvider:'',collection:'items',count:5,dataPrompt:'',template:'{\n  "name": "Sample item",\n  "price": 14.99,\n  "stock": 20\n}',dataTarget:'json',dataTable:'',dataSchema:null,dataRawPreview:'',dataValidation:null,dataImportResult:null,dataPreview:null,dataBrief:null,endpointPrompts:{},endpointEditResult:null});
+    aiWorkspaces.set(state.project.id,{task:turns.length?'ask':'generate',turns,chatConsent:null,question:'',answeredQuestion:last?.question || '',answer:last || null,mode:'describe',description:'',spec:'',filename:'',generationProvider:'',generationPreview:null,generationResult:null,dataProvider:'',collection:'items',count:5,dataPrompt:'',template:'{\n  "name": "Sample item",\n  "price": 14.99,\n  "stock": 20\n}',dataTarget:'related',dataTable:'',dataSchema:null,dataRawPreview:'',dataValidation:null,dataImportResult:null,dataPreview:null,dataBrief:null,endpointPrompts:{},endpointEditResult:null});
   }
   return aiWorkspaces.get(state.project.id);
 }
@@ -1207,6 +1263,7 @@ async function newProjectChat() {
 function renderGenerationPreview() {
   const w=aiWorkspace();
   $('generation-empty').hidden=!!w.generationPreview;$('generation-preview').hidden=!w.generationPreview;$('generation-preview').textContent=w.generationPreview?pretty(w.generationPreview):'';
+  $('generation-preview-footer').hidden=!w.generationPreview;
   $('generation-preview-status').textContent=w.generationPreview?'Local brief snapshot · generation result is separate.':'No current brief; preview again after changing inputs.';
 }
 function needsInformationMarkup(result) {
@@ -1262,7 +1319,16 @@ function previewGeneration() {
 function renderGenerationJobs() {
   const jobs=aiWorkspace().generationJobs || [],node=$('generation-jobs');
   node.hidden=!jobs.length || aiWorkspace().task==='ask';
-  node.innerHTML=jobs.map(job=>'<div class="section-gap"><strong>'+esc(job.summary)+'</strong><p class="help" role="status">'+esc(job.status)+' · '+job.completed_files.length+' / '+job.total_files+' files saved · '+esc(job.provider.model)+'</p>'+(job.error?'<p>'+esc(job.error.message)+'</p>':'')+(job.can_resume?'<button type="button" class="btn" data-generation-job="'+esc(job.id)+'" '+(state.busy?'disabled':'')+'>Resume generation →</button>':job.draft_id?'<button type="button" class="btn" data-job-draft="'+esc(job.draft_id)+'">Inspect saved draft →</button>':'')+'</div>').join('');
+  const opened=new Set(Array.from(node.querySelectorAll?.('details[open]') || [],item=>item.dataset.jobDetails));
+  const completed=jobs.filter(job=>job.status==='completed').length;
+  node.innerHTML='<div class="generation-history-head"><div><h2>Saved generations</h2><p>Open a draft to review it, or expand a run for details.</p></div><span class="generation-history-count">'+completed+' / '+jobs.length+' completed</span></div><div class="generation-history-list">'+jobs.map(job=>{
+    const tone=job.status==='completed'?'completed':job.error?'error':job.can_resume?'ready':'neutral';
+    const status=job.status==='completed'?'Completed':job.status==='running'?'Generating':job.can_resume?(job.error?'Needs attention':'Ready to resume'):job.status==='stale'?'Outdated':job.status.replaceAll('_',' ');
+    const files=(job.completed_files?.length || 0)+' / '+(job.total_files || 0)+' files saved';
+    const title=job.summary || 'Untitled generation';
+    const action=job.can_resume?'<button type="button" class="btn generation-job-action" data-generation-job="'+esc(job.id)+'" '+(state.busy?'disabled':'')+'>Resume generation →</button>':job.draft_id?'<button type="button" class="btn generation-job-action" data-job-draft="'+esc(job.draft_id)+'">Inspect saved draft →</button>':'';
+    return '<article class="generation-job" data-state="'+tone+'"><details data-job-details="'+esc(job.id)+'"'+(opened.has(job.id)?' open':'')+'><summary><span class="generation-job-indicator" aria-hidden="true"></span><span><span class="generation-job-title">'+esc(title)+'</span><span class="generation-job-meta"><span class="generation-job-status">'+esc(status)+'</span><span>'+esc(files)+'</span></span></span></summary><div class="generation-job-body"><p>'+esc(title)+'</p><p class="help">Model · <code>'+esc(job.provider?.model || 'Unknown')+'</code></p>'+(job.error?'<p class="generation-job-error">'+esc(job.error.message)+'</p>':'')+'</div></details>'+action+'</article>';
+  }).join('')+'</div>';
 }
 async function loadGenerationJobs() {
   const projectId=state.project?.id;if(!projectId)return;
@@ -1374,7 +1440,12 @@ function previewData() {
   } catch(error) {showError(error,'ai-data-error');}
 }
 function dataInputs() {
-  const w=aiWorkspace(),count=Number($('ai-data-count').value),raw=$('ai-data-template').value.trim() || '{}';
+  const w=aiWorkspace();
+  if(w.dataTarget==='related') {
+    if(!w.dataSchema?.tables?.length)throw Error('Load existing database tables first.');
+    return {requirements:$('ai-data-prompt').value.trim(),expected_schema:w.dataSchema.fingerprint};
+  }
+  const count=Number($('ai-data-count').value),raw=$('ai-data-template').value.trim() || '{}';
   if(!Number.isInteger(count) || count<1 || count>100)throw Error('Choose 1–100 whole records.');
   if(new TextEncoder().encode(raw).length>16384)throw Error('Keep the record template within 16 KiB.');
   let template;try{template=JSON.parse(raw);}catch{throw Error('Enter a valid JSON record template.');}
@@ -1387,23 +1458,51 @@ function readDataRecords() {
   const raw=aiWorkspace().dataRawPreview;
   if(new TextEncoder().encode(raw).length>128*1024)throw Error('Keep the record batch within 128 KiB.');
   let records;try{records=JSON.parse(raw,(key,value)=>{if(typeof value==='number' && !Number.isFinite(value))throw Error();return value;});}catch{throw Error('The record preview must contain valid JSON with finite numbers.');}
+  if(aiWorkspace().dataTarget==='related'){validateRelatedPreview(records);return records;}
   if(!Array.isArray(records) || !records.length || records.length>100 || records.some(row=>!row || typeof row!=='object' || Array.isArray(row) || !Object.keys(row).length))throw Error('Use an array of 1–100 nonempty JSON record objects.');
   return records;
+}
+function validateRelatedPreview(records) {
+  if(!records || typeof records!=='object' || Array.isArray(records) || !Object.keys(records).length || Object.keys(records).length>10)throw Error('Use an object mapping 1–10 table names to record arrays.');
+  let total=0;
+  for(const rows of Object.values(records)) {
+    if(!Array.isArray(rows) || !rows.length || rows.some(row=>!row || typeof row!=='object' || Array.isArray(row) || !Object.keys(row).length))throw Error('Each table needs an array of nonempty record objects.');
+    total+=rows.length;
+  }
+  if(total>100)throw Error('Use at most 100 records across all tables.');
+}
+function dataRecordCounts(records) {
+  if(Array.isArray(records))return {records:records.length};
+  return Object.fromEntries(Object.entries(records || {}).map(([name,rows])=>[name,Array.isArray(rows)?rows.length:0]));
+}
+function dataValidationBody(records) {
+  const w=aiWorkspace();
+  return w.dataTarget==='related'?{records_by_table:records,expected_schema:w.dataSchema?.fingerprint}:{target:w.dataTarget,records,...(w.dataTarget==='sqlite'?{table:w.dataTable,expected_schema:w.dataSchema?.fingerprint}:{})};
 }
 function renderDataWorkspace() {
   const w=aiWorkspace(),hasData=!!w.dataRawPreview;
   const tables=(w.dataSchema?.tables || []).filter(t=>!t.storage_type || t.storage_type==='table');
-  $('data-target').value=w.dataTarget;$('data-collection-field').hidden=w.dataTarget==='sqlite';$('data-table-field').hidden=w.dataTarget!=='sqlite';
+  const related=w.dataTarget==='related';
+  $('data-target').value=w.dataTarget;$('data-collection-field').hidden=w.dataTarget!=='json';$('data-table-field').hidden=w.dataTarget!=='sqlite';
+  for(const id of ['data-count-field','data-template-field','template-data-button'])$(id).hidden=related;
+  $('data-related-schema').hidden=!related;
+  $('data-related-tables').innerHTML=tables.map(table=>'<span class="badge neutral">'+esc(table.name)+'</span>').join('') || '<span class="help">No tables loaded. Reload definitions or create tables in Database setup.</span>';
+  $('data-related-relationships').textContent=(w.dataSchema?.relationships || []).map(r=>r.from_table+'.'+r.from_columns.join(', ')+' → '+r.to_table+'.'+r.to_columns.map(c=>c || 'primary key').join(', ')).join('\n') || 'No declared foreign keys.';
   $('data-table').innerHTML='<option value="">'+(tables.length?'Choose a table':'No ordinary tables; use JSON fixtures')+'</option>'+tables.map(t=>'<option value="'+esc(t.name)+'">'+esc(t.name)+'</option>').join('');
   $('data-table').value=w.dataTable;
   const table=w.dataSchema?.tables.find(t=>t.name===w.dataTable);$('data-table-schema').textContent=table?pretty({columns:table.columns,foreign_keys:table.foreign_keys,indexes:table.indexes}):'Choose an existing table. Create missing tables in Drafts & checks → Database setup, then reload here.';
-  $('ai-data-empty').hidden=hasData;$('data-preview-workspace').hidden=!hasData;
+  $('ai-data-empty').hidden=hasData;$('data-preview-workspace').hidden=!hasData;$('data-preview-actions').hidden=!hasData;
+  const emptyHelp=$('ai-data-empty').querySelector?.('p');
+  if(emptyHelp)emptyHelp.textContent=related?'Describe the dataset in one prompt. Review the linked records here before saving.':'Generate records or use your template, then edit any values before saving.';
   $('ai-data-preview').value=w.dataRawPreview;
-  $('ai-data-preview-count').textContent=(w.dataPreview?.length || 0)+' records';
+  const counts=dataRecordCounts(w.dataPreview),total=Object.values(counts).reduce((a,b)=>a+b,0);
+  $('ai-data-preview-count').textContent=total?total+' records'+(related?' · '+Object.keys(counts).length+' tables':''):'No records yet';
+  $('data-related-counts').hidden=!related || !hasData;
+  $('data-related-counts').innerHTML=related?Object.entries(counts).map(([name,count])=>'<span class="badge neutral">'+esc(name)+' · '+count+'</span>').join(''):'';
   $('ai-data-brief').textContent=w.dataBrief?pretty(w.dataBrief):'No records prepared.';
   clearError('data-validation-error');
   const validation=w.dataValidation?.validation;
-  $('data-preview-status').textContent=w.dataImportResult?'Inserted '+w.dataImportResult.inserted_count+' records into '+w.dataImportResult.table:validation?.status==='passed'?'Validated'+(w.dataTarget==='sqlite'?' for '+w.dataTable:' as JSON')+' · ready to review':hasData?'Preview only · edit values, then validate before inserting.':'';
+  $('data-preview-status').textContent=w.dataImportResult?'Inserted '+w.dataImportResult.inserted_count+' records'+(related?' across '+Object.keys(w.dataImportResult.inserted_counts || {}).length+' tables':' into '+w.dataImportResult.table):validation?.status==='passed'?'Validated'+(related?' together across related tables':w.dataTarget==='sqlite'?' for '+w.dataTable:' as JSON')+' · ready to review':hasData?'Preview only · edit values, then validate before inserting.':'';
   if(validation?.status==='failed')showError(Error(validation.message),'data-validation-error');
 }
 function resolveChainValue(value,results,pathMode=false) {
@@ -1489,10 +1588,11 @@ async function generateDataWithGroq() {
     const w=aiWorkspace(),input=dataInputs(),p=aiConfig.providers.find(item=>item.id===$('data-provider').value);
     if(!input.requirements)throw Error('Describe the records you want to generate.');
     if(!['groq','openai','compatible'].includes(p?.kind))throw Error('Select a Groq, OpenAI, or OpenAI-compatible provider.');
-    if(!await confirmAction('Generate mock records?', 'Send this description, template, and '+(input.target==='sqlite'?'definitions for '+input.table:'fixture field shape')+' to '+p.model+' at '+p.baseUrl+'? Existing records are not sent. Generated JSON will be previewed only; nothing is inserted.'))return;
+    const related=w.dataTarget==='related';
+    if(!await confirmAction('Generate mock records?', 'Send this description and '+(related?'connected database definitions':input.target==='sqlite'?'template and definitions for '+input.table:'fixture field shape')+' to '+p.model+' at '+p.baseUrl+'? Existing records are not sent. Generated JSON will be previewed only; nothing is inserted.'))return;
     const key=providerKeys.get(p.id);
-    const preview=await api('console',root()+'/data/generate','POST',{...input,provider:p.kind,base_url:p.baseUrl,model:p.model,reasoning_mode:p.reasoning || 'default',temperature:aiConfig.defaults.temperature,max_tokens:aiConfig.defaults.maxTokens},key?{'X-Reqlica-Groq-Key':key}:{});
-    w.dataPreview=preview.records;w.dataRawPreview=pretty(preview.records);w.dataValidation=preview;w.dataImportResult=null;w.dataBrief={summary:preview.summary,assumptions:preview.assumptions,validation:preview.validation,schema:preview.schema_fingerprint};w.dataProvider=p.id;
+    const preview=await api('console',root()+(related?'/data/related/generate':'/data/generate'),'POST',{...input,provider:p.kind,base_url:p.baseUrl,model:p.model,reasoning_mode:p.reasoning || 'default',temperature:aiConfig.defaults.temperature,max_tokens:aiConfig.defaults.maxTokens},key?{'X-Reqlica-Groq-Key':key}:{});
+    w.dataPreview=related?preview.records_by_table:preview.records;w.dataRawPreview=pretty(w.dataPreview);w.dataValidation=preview;w.dataImportResult=null;w.dataBrief={summary:preview.summary,assumptions:preview.assumptions,validation:preview.validation,schema:preview.schema_fingerprint,insertion_order:preview.insertion_order,preview_primary_keys:preview.preview_primary_keys,note:preview.note};w.dataProvider=p.id;
     renderDataWorkspace();syncControls();
   } catch(error){showError(error,'ai-data-error');}
 }
@@ -1500,23 +1600,26 @@ async function validateDataPreview() {
   clearError('ai-data-error');
   try {
     const w=aiWorkspace(),records=readDataRecords();
-    const result=await api('console',root()+'/data/validate','POST',{target:w.dataTarget,records,...(w.dataTarget==='sqlite'?{table:w.dataTable,expected_schema:w.dataSchema?.fingerprint}:{})});
-    w.dataValidation=result;w.dataPreview=result.records;w.dataRawPreview=pretty(result.records);w.dataImportResult=null;
-    w.dataBrief={...w.dataBrief,validation:result.validation,schema:result.schema_fingerprint};renderDataWorkspace();syncControls();
+    const related=w.dataTarget==='related';
+    const result=await api('console',root()+(related?'/data/related/validate':'/data/validate'),'POST',dataValidationBody(records));
+    w.dataValidation=result;w.dataPreview=related?result.records_by_table:result.records;w.dataRawPreview=pretty(w.dataPreview);w.dataImportResult=null;
+    w.dataBrief={...w.dataBrief,validation:result.validation,schema:result.schema_fingerprint,insertion_order:result.insertion_order,preview_primary_keys:result.preview_primary_keys,note:result.note};renderDataWorkspace();syncControls();
   } catch(error){showError(error,'ai-data-error');}
 }
 async function insertDataPreview() {
   clearError('ai-data-error');
   try {
     const w=aiWorkspace(),review=w.dataValidation,records=readDataRecords();
-    if(w.dataTarget!=='sqlite' || review?.validation?.status!=='passed' || review.table!==w.dataTable || w.dataImportResult)throw Error('Validate the current table and records before inserting.');
-    if(!await confirmAction('Insert '+records.length+' records into '+w.dataTable+'?', 'Append these reviewed records to persistent SQLite data for '+state.project.name+'? Existing records are kept. The full batch is atomic; nothing is automatically published or run through an endpoint.'))return;
-    w.dataImportResult=await api('console',root()+'/data/insert','POST',{target:'sqlite',table:w.dataTable,records,expected_schema:review.schema_fingerprint,expected_preview_digest:review.preview_digest,confirm:true});
+    const related=w.dataTarget==='related',counts=dataRecordCounts(records),total=Object.values(counts).reduce((a,b)=>a+b,0);
+    if(!['sqlite','related'].includes(w.dataTarget) || review?.validation?.status!=='passed' || (!related && review.table!==w.dataTable) || w.dataImportResult)throw Error('Validate the current tables and records before inserting.');
+    const destination=related?Object.entries(counts).map(([name,count])=>count+' '+name).join(', '):w.dataTable;
+    if(!await confirmAction('Insert '+total+' related records?', 'Append '+destination+' to '+state.project.name+'? Parent rows are inserted first; foreign keys resolve to actual IDs. The full batch is atomic across all tables. Existing records are kept.'))return;
+    w.dataImportResult=await api('console',root()+(related?'/data/related/insert':'/data/insert'),'POST',{...dataValidationBody(records),expected_schema:review.schema_fingerprint,expected_preview_digest:review.preview_digest,confirm:true});
     w.dataBrief={...w.dataBrief,insertion:w.dataImportResult};renderDataWorkspace();syncControls();
   } catch(error){aiWorkspace().dataValidation=null;$('data-preview-status').textContent='Insertion was not confirmed successful. Check live records before retrying.';showError(error,'ai-data-error');syncControls();}
 }
 function downloadData() {
-  const records=readDataRecords(),w=aiWorkspace(),name=((w.dataTarget==='sqlite'?w.dataTable:w.collection) || 'mock-data').replace(/[^a-z0-9_-]+/gi,'-').slice(0,80);
+  const records=readDataRecords(),w=aiWorkspace(),name=((w.dataTarget==='related'?'related-records':w.dataTarget==='sqlite'?w.dataTable:w.collection) || 'mock-data').replace(/[^a-z0-9_-]+/gi,'-').slice(0,80);
   const url=URL.createObjectURL(new Blob([pretty(records)+'\n'],{type:'application/json'})),link=document.createElement('a');
   link.href=url;link.download=(name || 'mock-data')+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),0);
 }
@@ -1910,7 +2013,7 @@ $('ai-endpoint-form').onsubmit=event=>{event.preventDefault();run(()=>prepareGen
 $('repair-requirements').addEventListener('input',syncControls);
 document.addEventListener('input',event=>{const id=event.target.dataset.clarificationAnswer;if(id){const [scope,key]=id.split(':'),review=activeClarification(scope);if(review)review.answers[key]=event.target.value;syncControls();}});
 document.addEventListener('change',event=>{const id=event.target.dataset.clarificationOption;if(id && event.target.value){const [scope,key]=id.split(':'),review=activeClarification(scope);if(review){review.answers[key]=event.target.value;document.getElementById('clarification-'+scope+'-'+key).value=event.target.value;syncControls();}}});
-$('data-target').onchange=()=>run(async()=>{const w=aiWorkspace();w.dataTemplates=w.dataTemplates || {json:w.template,sqlite:'{}'};w.dataTemplates[w.dataTarget]=w.template;w.dataTarget=$('data-target').value;w.template=w.dataTemplates[w.dataTarget];$('ai-data-template').value=w.template;w.dataValidation=null;w.dataImportResult=null;if(w.dataTarget==='sqlite')await loadDataSchema();renderDataWorkspace();syncControls();});
+$('data-target').onchange=()=>run(async()=>{const w=aiWorkspace();w.dataTemplates=w.dataTemplates || {json:w.template,sqlite:'{}',related:'{}'};w.dataTemplates[w.dataTarget]=w.template;w.dataTarget=$('data-target').value;w.template=w.dataTemplates[w.dataTarget] || '{}';w.dataRawPreview='';w.dataPreview=null;$('ai-data-template').value=w.template;w.dataValidation=null;w.dataImportResult=null;if(w.dataTarget!=='json')await loadDataSchema();renderDataWorkspace();syncControls();});
 $('data-table').onchange=()=>{const w=aiWorkspace();w.dataTable=$('data-table').value;fillTableExample();w.dataValidation=null;w.dataImportResult=null;renderDataWorkspace();syncControls();};
 $('ai-data-preview').oninput=()=>{const w=aiWorkspace();w.dataRawPreview=$('ai-data-preview').value;w.dataValidation=null;w.dataImportResult=null;$('data-preview-status').textContent='Edited records · validate before inserting.';$('ai-data-preview-count').textContent='Edited';clearError('data-validation-error');syncControls();};
 $('ai-endpoint-prompt').oninput=()=>{if(state.project && aiEndpointContext?.projectId===state.project.id){const r=aiEndpointContext.endpoint;aiWorkspace().endpointPrompts[r.method+' '+r.path]=$('ai-endpoint-prompt').value;}};
@@ -1980,7 +2083,7 @@ hop_headers = {"connection", "keep-alive", "proxy-authenticate", "proxy-authoriz
 
 def upstream_timeout(service, path, method, configured=None):
     ai_request = service == "console" and method == "POST" and re.fullmatch(
-        r"/api/projects/[^/]+/(clarify|generate|ask|edit-endpoint|data/generate|drafts/[^/]+/repair|generation-jobs/[^/]+/step)", path
+        r"/api/projects/[^/]+/(clarify|generate|ask|edit-endpoint|data/(?:related/)?generate|drafts/[^/]+/repair|generation-jobs/[^/]+/step)", path
     )
     if not ai_request:
         return 80
