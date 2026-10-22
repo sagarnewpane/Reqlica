@@ -13,9 +13,9 @@ workers, persistent SQLite data, and a draft/test/approval/version workflow thro
 the CLI and management APIs. AI clients can now create and check endpoint drafts
 through the console's built-in HTTP MCP server.
 
-The standalone HTML dashboard supports resumable endpoint generation with capability-aware
-output formats, local schema validation and per-file checkpoints into unpublished drafts; see the
-[generation guide](docs/generation.md).
+The standalone HTML dashboard provides one **Project AI** conversation for questions,
+specifications, endpoint changes, repairs, checks, and mock-data previews through MCP.
+See the [conversation guide](docs/mcp.md#project-ai-inside-the-dashboard).
 The packaged Next.js dashboard, database migrations, reset, and import/export
 remain planned. See the [roadmap](docs/roadmap.md).
 
@@ -70,21 +70,26 @@ This never sends the request and keeps custom headers. Review sample values and
 record IDs before sending. Drafts need current validation; live contracts become
 available after validated activation. Missing contracts leave inputs unchanged.
 
-The same **Generate API** screen also has **Ask about project**: ask how endpoints
-are designed, which inputs they accept, or how the project fits together. Groq
-reads the published code, tests, notes, routes, and database definitions and returns
-an explanation with source references. Follow-ups remember recent exchanges;
-per-project history survives refreshes in the same tab, and **New chat** clears it.
-Sources, caveats, and privacy notes are expandable rather than repeated banners.
-Chat creates no drafts and runs no code;
-switch explicitly to **Generate draft** to request changes. See
-[`docs/generation.md`](docs/generation.md) for context/privacy details.
+**Project AI** is one conversation for understanding the project, building from an
+attached/pasted specification, changing endpoints, repairing drafts, running checks,
+and preparing synthetic data previews. The same composer handles clarifications
+and follow-ups, keeping the assigned draft, provider, permissions, and remaining
+budget. Expand **Conversation setup** to select context, disable draft edits, or
+allow validation/tests/disposable requests. Questions should not create drafts;
+read-only permission also blocks editing tools on the server.
 
-**Endpoints → Edit source** opens its handler in a fresh draft. **Modify with AI**
-generates a targeted edit and tests without changing the published API. In
-**Mock data**, describe custom records, edit/download the JSON, or validate and
-explicitly append it to an existing SQLite table. Existing records are preserved;
-the mock-data importer does not create tables. See [`docs/mock-data.md`](docs/mock-data.md).
+Tool actions are expandable; checks remain tied to the exact source revision.
+Conversations persist in private local checkpoints and support pause/resume.
+Earlier read-only chats and generation jobs remain accessible in archives.
+See [Project AI and MCP](docs/mcp.md#project-ai-inside-the-dashboard).
+
+**Endpoints → Edit source** still opens a handler in a fresh manual draft.
+**Modify in Project AI**, failed-check repair, and mock-data preparation prefill
+the conversation without making an AI request. Data previews open in **Mock data**
+for manual editing, validation, copying/downloading, and separately confirmed
+append-only insertion into existing tables. The AI cannot insert live rows.
+Manual source/routes, checks, request testing, database setup, environment values,
+approval, and activation remain available. See [mock data](docs/mock-data.md).
 
 Generated APIs can now include a declarative `database/schema.json` plan. In
 **Drafts & checks → Database setup**, review the SQL, validate/test on disposable

@@ -106,6 +106,29 @@ class EndpointEditRequest(GenerationRequest):
     expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+class AgentRequest(ModelSettings):
+    message: str = Field(min_length=1, max_length=32_768, pattern=r"\S")
+    draft_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
+    expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    allow_execution: bool = False
+    allow_edits: bool = True
+
+    @model_validator(mode="after")
+    def selected_revision(self):
+        if bool(self.draft_id) != bool(self.expected_revision):
+            raise ValueError("Select both the draft and its current revision, or neither for a new draft")
+        return self
+
+
+class AgentReplyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(min_length=1, max_length=32_768, pattern=r"\S")
+    reply_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    expected_turn: int = Field(ge=0, strict=True)
+    expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class RepairRequest(ModelSettings):
     expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
     confirm: bool = False

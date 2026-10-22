@@ -1,46 +1,29 @@
 # Project AI: conversations and endpoint generation
 
-Reqlica's dashboard reviews requirements with Groq, asks clarification questions,
-and generates a draft only after a separate confirmed generation action. Each
-review operation makes one provider request. Dashboard generation uses durable
-plan/file checkpoints with bounded retries. The legacy generation and endpoint
-editing APIs allow one correction for malformed JSON or response-schema errors.
-It uses the same
-`get_project_context()` helper as MCP. Read-only project chat also accepts bounded
-recent conversation history and refreshes project context for each reply. The
-server stores no chat conversations. Generation checkpoints retain the requirements
-and intermediate source. Generated code is never executed by the generation flow. Draft generation
-remains separate and does not automatically consume chat history. Failed draft
-checks now have a separately confirmed, bounded repair-and-retest workflow.
+The dashboard now uses one **Project AI** conversation through MCP for questions,
+API creation, specification input, endpoint changes, repair, checks, and data
+previews. See the [current dashboard workflow](mcp.md#project-ai-inside-the-dashboard).
+The same composer handles initial requests and follow-ups; manual editing,
+approval, activation, and live data insertion remain separate controls.
+
+The generation, read-only chat, clarification, endpoint-editing, and repair APIs
+below remain available for compatibility. Earlier browser chats and saved generation
+jobs remain accessible in Project AI's archives. Their historical endpoint behavior
+is not the new dashboard conversation flow. Conversation transcripts are stored
+privately in the project's `.reqlica/agent-runs/` directory; legacy read-only chat
+history remains in browser session storage.
 
 ## Try it in the HTML dashboard
 
-1. Configure `GROQ_API_KEY` in the repository-root `.env` or environment and
-   restart `uv run reqlica start`. The existing `GROQ_API` name also works.
-2. Launch `backend/reqlica/reqlicav1.html` through the local server described in
-   its **Connection & help** section.
-3. In **Settings**, add a **Groq** profile. Use
-   `https://api.groq.com/openai/v1` and `openai/gpt-oss-20b` (default) or
-   `openai/gpt-oss-120b`. A browser key is optional when the console has one.
-4. Open a versioned project and **Generate API**. Start with a small stateless
-   request, such as a typed greeting endpoint and HTTP tests.
-5. **Preview generation brief** stays local. **Review requirements** shares context
-   only after confirmation, asks about ambiguous fields/configuration/behavior,
-   and creates no draft. Choose suggestions or type decisions—not secret values.
-   Optionally **Review answers with AI…** for follow-up questions. Once answered,
-   explicitly **Generate from answers** (or **Generate draft** if none were needed).
-6. Review the returned summary, assumptions, and draft files. Only after review,
-   explicitly run **Validate**, **Run tests**, and disposable requests. Fix failed
-   code/tests manually; success is not assumed from a valid JSON response.
-7. Approval remains CLI-only and activation remains explicit. Nothing is live
-   merely because generation succeeded.
-
-Model, temperature, and maximum output tokens are used for real generation.
-This initial generator always requests typed contracts, tests, and assumptions;
-the other preference checkboxes still apply only to UI previews. Other provider
-types remain previews. Endpoint editing now saves real drafts; custom mock data
-supports JSON previews/downloads and confirmed append-only inserts into existing
-SQLite tables. See [mock-data.md](mock-data.md).
+1. Launch the HTML dashboard through **Connection & help** and add a provider
+   supporting function tools in **Settings**.
+2. Open **Project AI**, enter a question or requested change, and optionally attach
+   or paste a specification. Choose context and permissions in **Conversation setup**.
+3. Send the message after reviewing the provider disclosure. Reply in the same
+   composer if the AI needs a decision. Questions should not change code; disable
+   draft edits to enforce read-only behavior. Checks require separate permission.
+4. Review draft files and actual validation/test results. Run remaining manual
+   checks, approve the checked revision, and explicitly activate it when ready.
 
 ## Dependencies and missing-package errors
 

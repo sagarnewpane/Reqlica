@@ -13,11 +13,14 @@ in Mock data.
    For JSON fixtures it defines the field shape/types; values are illustrative.
    Nested objects/arrays are supported. For SQLite it is optional field guidance,
    useful for supplying existing foreign-key IDs; actual columns come from the DB.
-2. **Generate records** makes one confirmed provider request. Database generation
-   sends the description, template, project name/ID, table definitions, and published
-   application code/field contracts. Existing database rows, runtime secret values,
-   chat history, and provider credentials are excluded from model input. JSON-only
-   fixtures do not send application code. The model returns data, never SQL/Python.
+2. **Prepare with Project AI** prefills the shared conversation with these inputs;
+   it makes no model request. Review the provider/context permissions and send the
+   message. The AI can read live definitions and published application contracts,
+   then validate synthetic JSON, SQLite, or linked-table previews through MCP.
+   Existing database rows and environment values are excluded from context; trusted
+   code execution, if separately permitted, can expose values in its output.
+   The AI cannot insert live data. Use **Review mock data** to return the artifact
+   to this screen. Earlier data-generation APIs below remain available.
 3. Review and edit **JSON records**. **Use template** instead prepares local copies
    without an AI call or adding invented fields. **Copy JSON** / **Download** export
    the reviewed array without writing project files or changing live data.

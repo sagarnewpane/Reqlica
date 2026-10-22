@@ -54,7 +54,7 @@ def _path(project_id, job_id):
 
 
 @contextmanager
-def _lease(path):
+def _lease(path, label="generation"):
     # Separate from the project lock: provider calls must not block other project work.
     descriptor = os.open(path.with_suffix('.lock'), os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
@@ -63,7 +63,7 @@ def _lease(path):
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise GenerationError('This generation already has a request in progress.', 409, code='generation_busy') from None
+            raise GenerationError(f'This {label} already has a request in progress.', 409, code='generation_busy') from None
         yield
     finally:
         os.close(descriptor)
