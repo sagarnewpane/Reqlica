@@ -9,9 +9,13 @@ from reqlica.generation.data_schemas import (
     DataImportRequest,
     DataValidationRequest,
     MockDataRequest,
+    RelatedDataValidationRequest,
+    RelatedDataImportRequest,
+    RelatedMockDataRequest,
 )
 from reqlica.generation.errors import GenerationError
-from reqlica.generation.mock_data import generate_mock_data
+from reqlica.generation.mock_data import generate_mock_data, generate_related_mock_data
+from reqlica.projects.related_data import validate_related_data, insert_related_data
 from reqlica.projects.mock_data import database_schema, insert_data, validate_data
 
 router = APIRouter(prefix="/api/projects/{project_id}/data", tags=["Mock data"])
@@ -60,3 +64,26 @@ def validate(project_id: str, body: DataValidationRequest, response: Response) -
 @router.post("/insert")
 def insert(project_id: str, body: DataImportRequest, response: Response) -> dict:
     return operation(response, insert_data, project_id, body)
+
+
+@router.post("/related/generate")
+def generate_related(
+    project_id: str,
+    body: RelatedMockDataRequest,
+    response: Response,
+    groq_key: Annotated[str | None, Header(alias="X-Reqlica-Groq-Key")] = None,
+    activity_id: Annotated[str | None, Header(alias="X-Reqlica-Activity-ID", pattern=r"^[a-f0-9]{32}$")] = None,
+) -> dict:
+    return operation(response, activity_operation, project_id, activity_id,
+                     generate_related_mock_data, project_id, body,
+                     SecretStr(groq_key) if groq_key else None)
+
+
+@router.post("/related/validate")
+def validate_related(project_id: str, body: RelatedDataValidationRequest, response: Response) -> dict:
+    return operation(response, validate_related_data, project_id, body)
+
+
+@router.post("/related/insert")
+def insert_related(project_id: str, body: RelatedDataImportRequest, response: Response) -> dict:
+    return operation(response, insert_related_data, project_id, body)

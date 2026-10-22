@@ -7,9 +7,88 @@ Changing `CONSOLE_HOST` or `CONSOLE_PORT` also changes the MCP address.
 Connect an AI client using **Streamable HTTP** and that URL. MCP uses JSON-RPC
 tool discovery and calls, not one REST URL per tool. In this MCP workflow, the
 connected AI reads requirements and uses tools to save and check generated Python.
-Separately, the console's [single-turn Groq generator](generation.md) reuses the
-same project-context and draft helpers directly; it does not expose local MCP to
-Groq or run a tool-execution loop.
+The standalone dashboard uses the same MCP interface through **Project AI**.
+The older [generation APIs](generation.md) remain available for compatibility and
+saved generation jobs; new dashboard work uses the conversation.
+
+## Project AI inside the dashboard
+
+1. Add a provider profile with a model supporting Chat Completions function tools
+   (Groq, OpenAI, or an OpenAI-compatible API).
+2. Open **Project AI** and use the composer for questions, specifications, API
+   creation/changes, repairs, or synthetic data. Attach a JSON/YAML/Markdown/text
+   specification or paste one. Message plus attachment must fit 32,768 characters.
+3. Expand **Conversation setup** to choose published context or an existing draft.
+   Existing editable drafts must use the current published base. After activation,
+   start new work from published code. Older drafts matching published code roll
+   over safely; diverged old-base drafts still require manual review.
+4. **Allow draft edits when requested** permits source changes. Disable it for
+   server-enforced read-only questions and data previews. Legacy projects support
+   read-only conversations; convert to versioned storage for draft editing.
+   **Allow validation, tests, and disposable requests** separately permits Python
+   execution with your OS permissions. Checks are disabled by default.
+5. Send the first message after reviewing the provider/context disclosure.
+   Use the same composer for clarification and follow-up messages. Setup is fixed
+   per conversation; **New conversation** lets you change it. Follow-ups retain
+   one assigned draft, complete tool history, and the remaining request budget.
+6. Expand tool actions, inspect revision-linked checks, and use **Review draft**
+   for source review, remaining manual checks, approval, and activation.
+   **Pause after this step** stops future steps after the current request finishes.
+
+Endpoint modification and failed-check repair buttons prefill Project AI with the
+route or draft context. Mock-data preparation also prefills a conversation. These
+entry points do not call the model until you send the message.
+
+For mock data, `get_mock_data_context` reads live definitions and published app
+contracts without records or execution. `preview_mock_data` validates JSON fixtures,
+one-table SQLite batches, or related records on disposable copies using the manual
+screen's application-format checks. Unsupported hashes/encrypted/custom formats
+remain refused. Related rows use references such as `{"$ref":"users.0.id"}`.
+**Review mock data** transfers a preview to the manual data screen for editing and
+fresh validation. Insertion remains separately confirmed; there is no live-insert
+MCP tool. A preview never creates database tables.
+
+Saved conversations appear under **Conversations**; earlier browser chats and
+checkpointed generations are archived separately. Replies are idempotent after a
+lost acknowledgement. Outside code changes or newer publication stop continuation
+for review; follow-ups cannot reset conflicts, permissions, or exhausted budgets.
+
+AI replies render basic Markdown (paragraphs, emphasis, lists and code); raw HTML
+remains escaped. Tool errors show fixed, actionable explanations when their cause
+is known, including missing/stale API contracts that need current validation.
+
+Each browser request advances one model response or one MCP tool call. Tool
+arguments are checked against the selected project, one assigned draft, the
+latest revision, draft-edit permission and execution permission before being passed to MCP. The
+agent cannot list other projects/drafts, approve, activate, install packages,
+apply live database setup or make live gateway calls. Source writes are limited
+to canonical Python files in `endpoints/`, `models/`, `tests/`, the additive
+`database/schema.json` plan and `PROJECT_CONTEXT.md`. A tool error is returned to
+the model; a completed tool can still report a failing check.
+
+Private checkpoints in `<project>/.reqlica/agent-runs/` retain the request, model
+settings, transcript, pending tool calls, tool activity, and usage. Provider keys
+are supplied per request and never stored there. Selected source and tool results
+are sent to the provider; context excludes environment values, but trusted Python
+can print secrets or return records in its output. Checkpoints persist across
+refreshes and server restarts; reopening a build never advances it automatically.
+They remain until removed locally or with the project directory.
+
+**Conversations → Open conversation → Resume conversation** continues within the original
+budget: at most 24 model requests and 64 tool calls, with a 512 KiB model-context
+limit. Failed provider requests consume budget and require an explicit resume.
+Edits outside the build or a changed published base stop it for review. A process
+interrupted during an in-flight step is never replayed automatically, because a
+draft write may already have committed. Inspect existing drafts and start a new
+build targeting the appropriate draft. Closing the tab also stops future steps;
+the current server request may still finish. Model support and quality depend on
+the selected provider; there is no fallback to text-generated tool calls.
+OpenRouter builds check the model's advertised tool support and only send optional
+tool controls it supports. This avoids routing failures from requiring an
+unsupported `parallel_tool_calls` option. Unknown compatible providers receive
+the tool definitions without optional parallel/choice controls; the backend still
+executes returned tool calls sequentially. HTTP 404 errors distinguish known
+OpenRouter parameter/privacy routing failures from model or base-URL problems.
 
 **Trusted local use only:** MCP is unauthenticated, like the management API.
 Keep the console on loopback; do not publish it to the internet or an untrusted

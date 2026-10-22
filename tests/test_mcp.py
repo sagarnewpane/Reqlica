@@ -95,6 +95,8 @@ class MCPTests(unittest.TestCase):
                 "get_project_urls",
                 "get_draft_urls",
                 "get_api_schema",
+                "get_mock_data_context",
+                "preview_mock_data",
             },
         )
         self.assertTrue(tools["get_project_context"]["annotations"]["readOnlyHint"])
@@ -119,6 +121,20 @@ class MCPTests(unittest.TestCase):
             self.tool_error(name, {}, "Unknown tool")
         self.assertEqual(self.client.get("/api/health").status_code, 200)
         self.assertEqual(self.client.get("/docs").status_code, 200)
+
+    def test_mock_data_tools_validate_json_and_reject_unsafe_or_stale_input(self):
+        arguments = {"project_id": self.project.id}
+        preview = self.tool("preview_mock_data", {**arguments, "records_json": '[{"name":"Example"}]'})
+        self.assertEqual(preview["validation"]["status"], "passed")
+        for records in ['[{"name":"first","name":"second"}]', '[{"value":NaN}]', '[{"value":Infinity}]']:
+            self.tool_error("preview_mock_data", {**arguments, "records_json": records}, "Error")
+        self.tool_error("preview_mock_data", {**arguments, "target": "sqlite", "table": "users",
+            "expected_schema": "f" * 64, "records_json": '[{"name":"Example"}]'}, "schema changed")
+        context = self.tool("get_mock_data_context", arguments)
+        self.assertIn("fingerprint", context["schema"])
+        self.assertIn("application", context)
+        self.tool_error("preview_mock_data", {**arguments, "target": "related", "table": "users",
+            "expected_schema": "f" * 64, "records_json": '{"users":[{"name":"Example"}]}'}, "not table")
 
     def test_context_reads_source_without_importing_and_lists_broken_projects(self):
         active = code_directory(self.project)

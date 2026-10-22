@@ -1,12 +1,12 @@
-"""Stateless Groq requests: read-only explanations or unexecuted endpoint drafts."""
+"""AI generation, read-only project chat and checkpointed MCP builds."""
 
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, Response
+from fastapi import APIRouter, Header, HTTPException, Request, Response
 from pydantic import SecretStr
-from reqlica.generation import jobs
+from reqlica.generation import agent, jobs
 from reqlica.console.dependencies import activity_operation, draft_operation
-from reqlica.generation.progress import inspect as inspect_activity
+from reqlica.generation.progress import inspect as inspect_activity, track
 from reqlica.generation.clarification import review_requirements
 from reqlica.generation.errors import GenerationError
 from reqlica.generation.questions import answer_project_question
@@ -18,6 +18,8 @@ from reqlica.generation.schemas import (
     ProjectQuestionRequest,
     RepairRequest,
     ModelSettings,
+    AgentRequest,
+    AgentReplyRequest,
 )
 from reqlica.generation.reasoning import reasoning_options
 from reqlica.generation.output_format import output_mode
@@ -44,6 +46,55 @@ def model_reasoning_options(body: ModelSettings, response: Response) -> dict:
         raise HTTPException(error.status_code, error.detail, headers={"Cache-Control": "no-store"}) from error
 
 ActivityID = Annotated[str | None, Header(alias="X-Reqlica-Activity-ID", pattern=r"^[a-f0-9]{32}$")]
+
+
+@router.get("/agent-runs")
+def agent_runs(project_id: str, response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    return draft_operation(agent.list_runs, project_id)
+
+
+@router.get("/agent-runs/{run_id}")
+def agent_run(project_id: str, run_id: str, response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    return draft_operation(agent.inspect_run, project_id, run_id)
+
+
+@router.put("/agent-runs/{run_id}")
+def create_agent_run(project_id: str, run_id: str, body: AgentRequest, response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return draft_operation(agent.create_run, project_id, run_id, body)
+    except GenerationError as error:
+        raise HTTPException(error.status_code, error.detail) from error
+
+
+@router.post("/agent-runs/{run_id}/step")
+async def step_agent_run(
+    project_id: str, run_id: str, request: Request, response: Response,
+    groq_key: Annotated[str | None, Header(alias="X-Reqlica-Groq-Key")] = None,
+    activity_id: ActivityID = None,
+) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        with track(project_id, activity_id):
+            return await agent.step_run(request.app, project_id, run_id,
+                                        SecretStr(groq_key) if groq_key else None)
+    except GenerationError as error:
+        raise HTTPException(error.status_code, error.detail) from error
+    except FileNotFoundError as error:
+        raise HTTPException(404, str(error)) from error
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+
+
+@router.post("/agent-runs/{run_id}/replies")
+def reply_agent_run(project_id: str, run_id: str, body: AgentReplyRequest, response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return draft_operation(agent.reply_run, project_id, run_id, body)
+    except GenerationError as error:
+        raise HTTPException(error.status_code, error.detail) from error
 
 
 @router.get("/generation-jobs")

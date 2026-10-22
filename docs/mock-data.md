@@ -13,10 +13,14 @@ in Mock data.
    For JSON fixtures it defines the field shape/types; values are illustrative.
    Nested objects/arrays are supported. For SQLite it is optional field guidance,
    useful for supplying existing foreign-key IDs; actual columns come from the DB.
-2. **Generate records** makes one confirmed Groq request. Only the description,
-   template, project name/ID, and selected table definitions are sent—not existing
-   records, published code, chat history, or provider credentials in model input.
-   The model returns data, never executable SQL or Python.
+2. **Prepare with Project AI** prefills the shared conversation with these inputs;
+   it makes no model request. Review the provider/context permissions and send the
+   message. The AI can read live definitions and published application contracts,
+   then validate synthetic JSON, SQLite, or linked-table previews through MCP.
+   Existing database rows and environment values are excluded from context; trusted
+   code execution, if separately permitted, can expose values in its output.
+   The AI cannot insert live data. Use **Review mock data** to return the artifact
+   to this screen. Earlier data-generation APIs below remain available.
 3. Review and edit **JSON records**. **Use template** instead prepares local copies
    without an AI call or adding invented fields. **Copy JSON** / **Download** export
    the reviewed array without writing project files or changing live data.
@@ -24,7 +28,8 @@ in Mock data.
    This checks the batch on a disposable copy of the current DB, including existing
    unique values and foreign keys. It commits only that temporary copy to check
    deferred foreign keys, then deletes the copy. Existing rows are not sent to AI.
-   Failed constraints leave the generated records editable, with a visible error.
+   Edited previews with failed constraints remain editable. Invalid generated
+   batches are refused rather than presented as usable data.
 5. **Insert records…** is enabled only for the current passed preview. Confirm the
    destination table and record count. Insertion appends atomically to persistent
    project data; it never approves/activates code or calls a generated handler.
@@ -104,23 +109,37 @@ insertion rechecks constraints and schema inside its write transaction.
   persist independently of draft activation. The APIs remain trusted-local and
   unauthenticated; keep the console/gateway on loopback.
 
-## Chained live requests
+## Related records from one prompt
 
-The Mock data page accepts a JSON array of up to 50 named request steps. Each
-step has `name`, `method`, `path`, and optional `body` and `headers`. For example:
+Choose **Related database records** in Mock data, then describe the whole dataset:
+“Create 2 users and 2 posts, one post for each user.” The provider receives the
+existing table definitions and relationships. It chooses the tables and counts
+from your description; no request sequence or separate per-table prompt is needed.
 
-```json
-[
-  {"name":"user","method":"POST","path":"/users","body":{"name":"Sample"}},
-  {"name":"post","method":"POST","path":"/posts","body":{"user_id":"{{user.id}}","title":"Hello"}}
-]
-```
+The preview groups editable records by table and shows the per-table counts.
+Parent rows are inserted before their children. Foreign keys use references such
+as `{"$ref":"users.0.id"}` (zero-based row index), which resolve to actual generated
+IDs at insertion time. IDs shown in the disposable preview are provisional;
+concurrent inserts do not break these references.
 
-References resolve from earlier JSON response bodies. A whole-value reference
-preserves its JSON type; path substitutions are URL encoded. Requests run in
-order against live project data with shared project headers. Execution stops on
-an HTTP error, missing reference, or network error. Completed writes remain;
-there is no transaction across requests and no automatic retry.
+Validate checks the full dataset on a disposable SQLite copy. **Insert records**
+requires confirmation and saves all tables in one transaction. If any row fails,
+the entire batch rolls back. Existing rows are retained. No automatic retry is
+made. Generation itself never writes live records.
+
+Limits: 10 existing ordinary tables, 100 total records, 128 KiB. Tables with
+triggers and virtual tables remain unsupported. References must follow declared
+foreign keys. Cyclic references are rejected; schema creation remains a separate
+Database setup action. Application-specific hashing and custom validation are refused rather than approximated.
+
+Endpoints: `POST /api/projects/{id}/data/related/generate`, `/related/validate`,
+and `/related/insert`. Validation/import use `records_by_table` and
+`expected_schema`; insertion also requires the reviewed `expected_preview_digest`
+and `confirm: true`.
+
+HTTP request sequences remain available separately in Request tester. They execute
+real API calls and can reference earlier responses; they are not used to generate
+related database records.
 
 Selecting a SQLite table fills the example field from its writable columns,
 omitting automatic integer primary keys. Edit placeholders and foreign-key IDs
@@ -136,3 +155,28 @@ Provider API keys now persist with browser profiles, including across reloads.
 Clear a provider key and save, or remove the profile, to delete it. Project
 runtime environment values persist separately in `.reqlica/environment.json`;
 values remain write-only and are loaded on worker start/restart.
+
+
+## Application compatibility and refusal
+
+SQLite types alone are insufficient: a TEXT column may hold a UUID expected by
+an application model. Database mock generation now reads published Python and
+cached API schemas without importing project code or reading existing rows.
+Simple declared types, UUID/date formats, enum values, and field constraints are
+checked on the disposable copy and again during insertion. Related foreign keys
+inherit recognized ID formats. Preview digests also pin the application source
+revision; code changes require a fresh validation.
+
+This is intentionally limited. Tables with recognized password/hash, credential,
+encryption or binary fields, custom Python validators/serializers, nested storage
+or unsupported field schemas are refused with **“This data can't be mocked
+reliably”** and a reason. Use the application's own create/signup endpoints for
+those records. The provider may also explicitly refuse an uncertain request.
+Invalid generated records are refused without a data repair retry, and the UI
+clears the failed preview rather than offering it for insertion. No live rows
+are written during generation. Existing invalid records require separate cleanup.
+
+The provider receives published model/handler/helper source and inferred field
+rules in addition to database definitions. Runtime environment files and values,
+provider keys, test sources, and existing database rows are excluded from this
+context. Application code must not contain embedded production credentials.

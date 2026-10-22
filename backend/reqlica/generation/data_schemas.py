@@ -52,6 +52,7 @@ class MockDataPlan(BaseModel):
 
     summary: str
     assumptions: list[str]
+    refusal_reason: str | None = Field(default=None, max_length=1024)
     records_json: str = Field(
         description="A JSON-encoded array containing exactly the requested number of record objects. Data only; never SQL or Python."
     )
@@ -77,3 +78,38 @@ class DataImportRequest(DataValidationRequest):
         if self.target != "sqlite":
             raise ValueError("Only SQLite previews can be inserted")
         return self
+
+
+class RelatedDataValidationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_schema: str = Field(pattern=r"^[0-9a-f]{64}$")
+    records_by_table: dict[str, list[dict[str, JsonValue]]]
+
+
+class RelatedDataImportRequest(RelatedDataValidationRequest):
+    expected_preview_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    confirm: Literal[True]
+
+    @field_validator("confirm", mode="before")
+    @classmethod
+    def explicit_confirmation(cls, value):
+        if value is not True:
+            raise ValueError("Explicit confirmation is required")
+        return value
+
+
+class RelatedMockDataRequest(ModelSettings):
+    requirements: str = Field(min_length=1, max_length=16_384, pattern=r"\S")
+    expected_schema: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class RelatedMockDataPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    summary: str = Field(min_length=1, max_length=8192, pattern=r"\S")
+    assumptions: list[str] = Field(max_length=30)
+    refusal_reason: str | None = Field(default=None, max_length=1024)
+    records_by_table_json: str = Field(
+        description='JSON object mapping existing table names to record arrays. Link foreign keys with {"$ref":"users.0.id"}; omit automatic primary keys. Data only.'
+    )

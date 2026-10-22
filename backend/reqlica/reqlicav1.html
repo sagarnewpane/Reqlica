@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Local Reqlica dashboard with live project APIs, single-turn Groq endpoint generation, and draft review.">
+<meta name="description" content="Local Reqlica dashboard with live project APIs, AI-assisted API building, MCP tool activity, and draft review.">
 <title>Reqlica — Local workspace</title>
 <style>
 :root{color-scheme:dark;--workspace:#0f172a;--panel:#182236;--inset:#101a2d;--ink:#f1f5f9;--secondary:#cbd5e1;--muted:#9baec5;--line:#33435b;--control-line:#667a93;--request:#4ade80;--request-soft:#193a32;--on-request:#10241a;--draft:#f3d181;--draft-soft:#3a3020;--error:#ffaaaa;--error-soft:#442b33;--terminal:#0c1322;--terminal-ink:#d6e4f5;--focus:#a7f3d0;--radius:10px;--mono:'JetBrains Mono','SFMono-Regular',Consolas,monospace;--sans:'IBM Plex Sans','Avenir Next',Avenir,'Segoe UI',sans-serif}
@@ -48,6 +48,70 @@
 .check-card-title{display:flex;align-items:center;justify-content:space-between;gap:8px}.check-card-title h3{font-size:14px}.check-metric{font:600 24px/1.3 var(--mono);margin-top:16px;color:var(--ink)}.check-metric small{font:13px var(--sans);font-weight:400;color:var(--muted)}.failure-list{display:grid;gap:12px;margin-top:20px}.failure-item{padding:16px;border-left:3px solid var(--error);background:var(--inset);border-radius:4px;min-width:0}.failure-item strong{display:block;font:600 13px var(--mono);overflow-wrap:anywhere}.failure-item p{font-size:13px;margin-top:8px;white-space:pre-wrap;overflow-wrap:anywhere}.failure-item .help{color:var(--muted)}#draft-repair{margin-bottom:0;padding:20px}#repair-status{flex-basis:100%;margin-top:4px}#repair-context-status{margin-bottom:20px}.repair-attempts{display:grid;gap:12px;margin-top:20px}.repair-attempt{padding:16px;border:1px solid var(--line);border-radius:6px;min-width:0}.repair-attempt .feature-head strong{font-size:13px}.repair-attempt p{font-size:13px;margin-top:8px;white-space:pre-wrap;overflow-wrap:anywhere}.repair-attempt ul{font-size:13px;padding-left:20px;margin:12px 0 0}.repair-files{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.repair-files code{font-size:12px;color:var(--secondary)}.repair-blockers{color:var(--draft)}
 @media(max-width:760px){.decision-card{padding:16px}.decision-card .decision-label{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px 12px}.decision-kind{grid-column:2}.feature-head{gap:8px}.variable-row{align-items:flex-start;flex-direction:column;gap:8px}.variable-row .actions{width:100%}.variable-row .actions .btn{flex:1}.decision-actions .btn,#environment-form>.actions>.btn{width:100%}.setup-steps{display:grid;gap:8px}.setup-steps li{gap:8px}#draft-repair{padding:16px}#draft-repair .field-row{gap:20px}.check-metric{font-size:22px}.repair-attempt{padding:12px}.feature-status{padding:12px}}
 .ai-activity{margin:0 0 20px;padding:16px;border:1px solid var(--line);border-left:3px solid var(--draft);border-radius:6px;background:var(--inset);overflow-wrap:anywhere}.ai-activity[data-state="complete"]{border-left-color:var(--request)}.ai-activity[data-state="failed"]{border-left-color:var(--error)}.ai-activity-head{display:flex;align-items:center;justify-content:space-between;gap:16px;color:var(--muted);font-variant-numeric:tabular-nums}.ai-activity-title{margin-top:8px;font-weight:600;color:var(--ink)}.ai-activity .help{margin-top:4px}.ai-activity details{margin-top:8px;font-size:13px}.ai-activity summary{padding:8px 0}.ai-activity ol{list-style:none;margin:0;padding:0;display:grid;gap:8px}.ai-activity li{display:flex;justify-content:space-between;gap:16px;color:var(--secondary)}.ai-activity time{flex-shrink:0;color:var(--muted);font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* Generation: requirements lead; saved work is a compact, separate activity list. */
+.project-ai-layout:not(.is-chat){align-items:start;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr)}
+#generation-brief-panel{position:sticky;top:24px}
+#generation-brief-panel .panel-head{padding:18px 20px}
+#generation-brief-panel .panel-head .badge{font-size:10px;letter-spacing:.6px}
+#generation-brief-panel .ai-preview-empty{padding:24px 20px 28px}
+#generation-brief-panel .ai-preview-empty h3{font-size:15px;font-weight:600}
+#generation-brief-panel .ai-preview-empty p{font-size:13px;line-height:1.65;max-width:42ch}
+.brief-symbol{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;margin-bottom:16px;border:1px solid var(--line);border-radius:6px;color:var(--draft);font:14px var(--mono)}
+.brief-privacy{display:flex;align-items:center;gap:8px;margin-top:18px;font-size:11px;color:var(--muted)}
+.brief-privacy:before{content:'';width:5px;height:5px;border-radius:50%;background:var(--muted)}
+#generation-brief-panel .panel-foot{padding:12px 20px}
+#generation-brief-panel .panel-foot .small{flex:1;min-width:140px;font-size:12px}
+#generation-preview{font-size:12px;max-height:460px;padding:20px}
+#generation-jobs{margin-top:24px}
+.generation-history-head{padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line)}
+.generation-history-head h2{font-size:15px;font-weight:600;letter-spacing:-.2px}
+.generation-history-head p{font-size:12px;color:var(--muted);margin-top:2px}
+.generation-history-count{font:12px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}
+.generation-history-list{max-height:420px;overflow-y:auto;overscroll-behavior:contain}
+.generation-job{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start;padding:16px 24px;border-bottom:1px solid var(--line)}
+.generation-job:last-child{border-bottom:0}
+.generation-job details{min-width:0}
+.generation-job summary{display:grid;grid-template-columns:8px minmax(0,1fr) 16px;align-items:center;gap:12px;padding:0;min-height:44px;list-style:none}
+.generation-job summary::-webkit-details-marker{display:none}
+.generation-job summary:after{content:'+';font:16px var(--mono);color:var(--muted);text-align:center}
+.generation-job details[open] summary:after{content:'−'}
+.generation-job summary:focus-visible{outline:2px solid var(--focus);outline-offset:4px;border-radius:3px}
+.generation-job-indicator{width:6px;height:6px;border-radius:50%;background:var(--muted)}
+.generation-job[data-state=completed] .generation-job-indicator{background:var(--request)}
+.generation-job[data-state=ready] .generation-job-indicator{background:var(--draft)}
+.generation-job[data-state=error] .generation-job-indicator{background:var(--error)}
+.generation-job-title{display:block;font-size:14px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5}
+.generation-job-meta{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;color:var(--muted);font-size:12px;line-height:1.5;margin-top:4px;font-variant-numeric:tabular-nums}
+.generation-job-status{font-weight:500}
+.generation-job[data-state=completed] .generation-job-status{color:var(--request)}
+.generation-job[data-state=ready] .generation-job-status{color:var(--draft)}
+.generation-job[data-state=error] .generation-job-status{color:var(--error)}
+.generation-job-body{padding:12px 28px 4px;font-size:13px;line-height:1.7;color:var(--secondary);overflow-wrap:anywhere}
+.generation-job-body p+p{margin-top:12px}
+.generation-job-body .help{font-size:12px}
+.generation-job-error{color:var(--error)}
+.generation-job-action{font-size:12px;padding:7px 12px;white-space:nowrap;margin-top:2px;border-color:var(--line);min-height:40px}
+@media(max-width:1100px){.project-ai-layout:not(.is-chat){grid-template-columns:minmax(0,1fr)}#generation-brief-panel{position:static}#generation-brief-panel .ai-preview-empty p{max-width:65ch}}
+@media(max-width:760px){.generation-history-head{padding:16px 20px}.generation-job{padding:12px 20px;gap:8px;grid-template-columns:minmax(0,1fr)}.generation-job-action{justify-self:start;margin-left:20px;margin-top:0}.generation-job-title{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.generation-job-body{padding-left:20px;padding-right:0}.generation-job-meta{gap:4px 10px}}
+#data-view .layout-two{align-items:start}
+#data-view .field-row:has(#data-count-field[hidden]){grid-template-columns:minmax(0,1fr)}
+#data-related-schema{margin-top:4px;margin-bottom:20px;padding:16px}
+#data-related-tables{margin-top:12px;gap:6px}
+#data-related-counts{margin-bottom:16px}
+#data-preview-actions[hidden]{display:none}
+
+/* API builder: one draft, visible tool evidence, review at the end. Uses the
+   existing slate surfaces, green actions, amber drafts, mono source paths,
+   quiet borders and 4px spacing rhythm. */
+.agent-layout{display:grid;grid-template-columns:minmax(280px,1fr) minmax(0,1.5fr);gap:24px;align-items:start}.agent-scope{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.agent-scope code{color:var(--draft)}.agent-ledger{list-style:none;padding:0;margin:0;max-height:480px;overflow:auto}.agent-ledger li{padding:12px 0;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start}.agent-ledger li:last-child{border:0}.agent-ledger .agent-mark{font:600 12px var(--mono);color:var(--request);min-width:24px;padding-top:2px}.agent-ledger [data-status=error] .agent-mark,.agent-ledger [data-status=failed] .agent-mark{color:var(--error)}.agent-ledger p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}.agent-ledger code{display:block;color:var(--muted);margin-top:4px}.agent-result{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:20px}.agent-execution{align-items:flex-start;white-space:normal;margin-bottom:8px}.agent-execution input{flex-shrink:0;margin-top:4px}.agent-activity{font-size:13px;color:var(--secondary)}.agent-history{margin-top:24px}.agent-history .draft-item{padding-inline:0}.agent-history .draft-item:last-child{border-bottom:0}.agent-history p{overflow-wrap:anywhere}.agent-checks{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.agent-layout .panel{min-width:0}#agent-message{min-height:180px}.agent-empty{padding:24px 0}.agent-empty p{max-width:56ch;margin-top:8px}.agent-empty .btn{margin-top:16px}#agent-notice{margin-top:16px;margin-bottom:0}#agent-review{border-color:var(--draft);color:var(--draft)}
+@media(max-width:1100px){.agent-layout{grid-template-columns:1fr}}@media(max-width:760px){.agent-layout{gap:16px}.agent-history .draft-item{align-items:flex-start}.agent-ledger{max-height:360px}}
+
+.agent-prose{white-space:normal;overflow-wrap:anywhere;min-width:0;line-height:1.7}.agent-prose p,.agent-ledger .agent-prose p{white-space:normal;margin:0 0 12px}.agent-prose p:last-child{margin-bottom:0}.agent-prose h3{margin:20px 0 8px}.agent-prose h3:first-child{margin-top:0}.agent-prose ul,.agent-prose ol{margin:8px 0 16px;padding-left:24px}.agent-prose li,.agent-ledger .agent-prose li{display:list-item;border:0;padding:4px 0}.agent-prose code,.agent-ledger .agent-prose code{display:inline;color:var(--ink);background:var(--inset);padding:2px 5px;border-radius:4px;font-size:.9em}.agent-prose pre{white-space:pre-wrap;overflow:auto;background:var(--terminal);color:var(--terminal-ink);padding:16px;border-radius:6px}.agent-prose pre code,.agent-ledger .agent-prose pre code{display:block;background:none;color:inherit;padding:0}.agent-prose hr{border:0;border-top:1px solid var(--line);margin:20px 0}.agent-reply-panel{border-top:1px solid var(--line);padding:20px 24px}.agent-reply-panel textarea{min-height:88px}.agent-reply-panel .field{margin-bottom:12px}.agent-reply-panel .help{margin-bottom:12px}.agent-reply-panel .actions{justify-content:space-between}.agent-ledger .agent-mark{font-size:11px;min-width:28px}#agent-answer{white-space:normal}
+@media(max-width:760px){.agent-reply-panel{padding:20px}}
+
+.assistant-workspace{max-width:1040px;margin:0 auto}.assistant-config{margin-bottom:20px}.assistant-config>summary{padding:12px 20px;display:flex;justify-content:space-between;gap:16px;align-items:center;font-weight:600}.assistant-config>summary .help{margin:0;font-weight:400;text-align:right}.assistant-config .field-row{margin-bottom:12px}.assistant-config .field-row .field{margin-bottom:0}.assistant-permissions{display:flex;flex-wrap:wrap;gap:12px 24px}.assistant-permissions .check-label{white-space:normal;align-items:flex-start}.assistant-permissions input{flex-shrink:0;margin-top:4px}.assistant-conversation{overflow:clip}.assistant-conversation-body{padding-bottom:12px}.assistant-thread{max-height:58vh;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}.assistant-message{padding:20px 0;min-width:0}.assistant-message>.eyebrow{display:block;margin-bottom:8px}.assistant-message.you{background:var(--inset);border-radius:8px;padding:16px 20px;margin:16px 0}.assistant-message.you .agent-prose{color:var(--ink)}.assistant-tools{margin:8px 0 12px;border:1px solid var(--line);border-radius:6px;padding:0 16px}.assistant-tools>summary{font-size:13px}.assistant-tools .agent-ledger{max-height:240px}.assistant-answer{padding-bottom:8px}.assistant-answer:has(#agent-answer:empty){display:none}.assistant-composer{padding:20px 24px;border-top:1px solid var(--line);background:var(--panel)}.assistant-composer>textarea{min-height:96px;max-height:300px}.assistant-composer>label{font-size:13px}.assistant-compose-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:12px}.assistant-compose-foot .help{margin:0}.assistant-compose-foot .btn{flex-shrink:0}.assistant-attachment{margin-top:8px}.assistant-attachment>summary{font-size:13px}.assistant-suggestions{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.assistant-suggestions .btn{margin:0}.assistant-artifact{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px;background:var(--draft-soft);border:1px solid var(--line);border-radius:8px;margin-top:16px}.assistant-artifact p{color:var(--draft)}.assistant-archive{margin-top:16px}.assistant-archive article{padding:16px;border-bottom:1px solid var(--line)}#agent-workspace #agent-empty{padding:24px 0 32px}#agent-workspace #agent-empty h3{font-size:22px;margin-top:8px}#agent-workspace #agent-message{min-height:96px}#assistant-legacy-content{max-height:480px;overflow:auto}
+@media(max-width:760px){.assistant-config>summary{align-items:flex-start;flex-direction:column;gap:4px}.assistant-config>summary .help{text-align:left}.assistant-composer{padding:20px}.assistant-compose-foot{align-items:flex-start;flex-direction:column}.assistant-compose-foot .btn{width:100%}.assistant-artifact{align-items:flex-start;flex-direction:column}.assistant-thread{max-height:56vh}}
 </style>
 </head>
 <body>
@@ -58,7 +122,7 @@
     <div><div class="eyebrow">Local workspace</div><p class="small" id="nav-project">Choose a project</p>
       <nav class="nav">
         <button data-view="overview">◫ &nbsp; Overview</button>
-        <button data-view="generate">✧ &nbsp; Generate API</button>
+        <button data-view="generate">✧ &nbsp; Project AI</button>
         <button data-view="endpoints">{ } &nbsp; Endpoints</button>
         <button data-view="drafts">▤ &nbsp; Drafts &amp; checks</button>
         <button data-view="tester">▷ &nbsp; Request tester</button>
@@ -73,7 +137,7 @@
     <div class="content">
       <div id="notice" class="notice error" role="alert" hidden></div>
       <div id="launch-notice" class="notice draft" hidden><strong>Open this dashboard through its local server.</strong><p>Opening the HTML directly cannot bypass browser CORS. Use the launcher in Connection &amp; help; no backend changes are needed.</p><button class="btn section-gap" data-view="setup">Show launch instructions →</button></div>
-      <div class="mobile-nav"><label for="mobile-view">Project section</label><select id="mobile-view"><option value="overview">Overview</option><option value="generate">Generate API · Groq</option><option value="endpoints">Endpoints</option><option value="drafts">Drafts &amp; checks</option><option value="tester">Request tester</option><option value="data">Mock data</option><option value="settings">Settings</option><option value="setup">Connection &amp; help</option></select></div>
+      <div class="mobile-nav"><label for="mobile-view">Project section</label><select id="mobile-view"><option value="overview">Overview</option><option value="generate">Project AI</option><option value="endpoints">Endpoints</option><option value="drafts">Drafts &amp; checks</option><option value="tester">Request tester</option><option value="data">Mock data</option><option value="settings">Settings</option><option value="setup">Connection &amp; help</option></select></div>
       <section id="project-header" hidden><div class="page-head"><div><div class="eyebrow">Mock API workspace</div><h1 id="project-title"></h1><p id="project-subtitle"></p></div><div class="actions"><span class="badge neutral" id="runtime-status"></span><button class="btn" id="runtime-button" data-action="runtime">Start API</button><button class="btn ghost" data-action="refresh-project">Refresh</button></div></div><div class="connection"><span class="eyebrow">Live base URL</span><code id="base-url"></code><button class="btn ghost" data-action="copy-url">Copy URL</button></div></section>
 
       <section class="view" id="projects-view">
@@ -86,7 +150,7 @@
       <section class="view" id="overview-view" hidden><div class="layout-two"><div class="panel"><div class="panel-head"><h2>Project details</h2><span class="badge neutral">LIVE REGISTRY</span></div><div class="panel-body"><dl class="details-grid" id="project-details"></dl></div><div class="panel-foot"><button class="btn" data-view="endpoints">Browse endpoints →</button><button class="btn" data-view="tester">Try a request →</button></div></div><div class="panel"><div class="panel-head"><h2>Draft workflow</h2></div><div class="panel-body"><p>Edit a draft, validate and test the saved revision, then review and approve it here or using the CLI. Activate the approved revision when ready.</p><div class="actions section-gap"><button class="btn primary" data-view="drafts">Open drafts →</button><button class="btn" id="convert-button" data-action="convert" hidden>Convert legacy project</button></div><p class="help">Draft calls use disposable data. Live requests use persistent project records.</p></div></div></div><div class="notice draft section-gap" id="project-error" hidden></div><details class="section-gap"><summary>Remove project</summary><div class="notice"><p>Keep the files and unregister, or explicitly choose irreversible deletion of the project directory, drafts, and database. You will review the exact target before continuing.</p><button class="btn danger section-gap" data-action="delete-project">Delete project…</button></div></details></section>
 
       <section class="view" id="endpoints-view" hidden>
-        <div class="view-title"><div><h2>Active API contract</h2><p>Browse the contract or edit an endpoint in an unpublished draft.</p></div><div class="actions"><button class="btn" id="edit-endpoint-source" data-action="edit-endpoint-source">Edit source</button><button class="btn" id="ai-edit-endpoint" data-action="ai-edit-endpoint">✧ Modify with AI</button><a class="btn" id="published-docs" target="_blank" rel="noopener noreferrer">Swagger ↗</a><button class="btn" data-action="load-schema">Load OpenAPI</button></div></div>
+        <div class="view-title"><div><h2>Active API contract</h2><p>Browse the contract or edit an endpoint in an unpublished draft.</p></div><div class="actions"><button class="btn" id="edit-endpoint-source" data-action="edit-endpoint-source">Edit source</button><button class="btn" id="ai-edit-endpoint" data-action="ai-edit-endpoint">✧ Modify in Project AI</button><a class="btn" id="published-docs" target="_blank" rel="noopener noreferrer">Swagger ↗</a><button class="btn" data-action="load-schema">Load OpenAPI</button></div></div>
         <div class="workbench"><aside class="panel"><div class="panel-head"><h2>Endpoints</h2><span id="route-count" class="small muted"></span></div><div class="panel-body" style="padding:12px"><label class="sr-only" for="route-search">Search endpoints</label><input id="route-search" placeholder="Search method or path…"></div><div class="route-list" id="route-list"></div></aside><div class="panel"><div class="panel-head"><h2 id="endpoint-title">Choose an endpoint</h2><button class="btn" id="test-endpoint" data-action="test-endpoint" disabled>Test endpoint →</button></div><div class="panel-body"><dl class="details-grid" id="endpoint-details"></dl><p class="help section-gap">Edit source directly or request an AI change. Both create an unpublished draft for review.</p></div><pre class="code" id="endpoint-schema" tabindex="0">Load the generated OpenAPI contract to inspect this route. Contracts exist only after validation and activation.</pre></div></div>
       </section>
 
@@ -95,7 +159,7 @@
         <div id="draft-error" class="notice error" role="alert" hidden></div>
         <div class="panel" id="draft-list"><div class="empty"><p>No drafts loaded.</p></div></div>
         <div id="draft-workspace" class="section-gap" hidden>
-          <div class="notice"><strong id="draft-heading"></strong><p class="help" id="draft-times"></p><p class="small mono" id="draft-revision"></p><p class="help" id="draft-base"></p><div class="actions section-gap"><button class="btn" data-action="refresh-draft">Reload draft state</button><a class="btn" id="draft-docs" target="_blank" rel="noopener noreferrer">Draft Swagger ↗</a><button class="btn" data-action="draft-schema">Inspect draft OpenAPI</button><button class="btn" data-action="test-draft">Try a draft request →</button></div><form id="draft-name-form" class="draft-name-form"><div class="field"><label for="draft-name">Draft name</label><input id="draft-name" maxlength="100" required autocomplete="off" placeholder="e.g. Signup and JWT login"></div><button class="btn" type="submit">Save name</button></form></div>
+          <div class="notice"><strong id="draft-heading"></strong><p class="help" id="draft-times"></p><p class="small mono" id="draft-revision"></p><p class="help" id="draft-base"></p><div class="actions section-gap"><button class="btn" data-action="refresh-draft">Reload draft state</button><a class="btn" id="draft-docs" target="_blank" rel="noopener noreferrer">Draft Swagger ↗</a><button class="btn" data-action="draft-schema">Inspect draft OpenAPI</button><button class="btn" data-action="build-on-draft">Continue in Project AI →</button><button class="btn" data-action="test-draft">Try a draft request →</button></div><form id="draft-name-form" class="draft-name-form"><div class="field"><label for="draft-name">Draft name</label><input id="draft-name" maxlength="100" required autocomplete="off" placeholder="e.g. Signup and JWT login"></div><button class="btn" type="submit">Save name</button></form></div>
           <div class="layout-two"><div class="panel"><div class="panel-head"><h2>Source files</h2><span class="badge draft" id="editor-status">UNPUBLISHED</span></div><div class="file-list" id="draft-files"></div><form id="file-form"><div class="panel-body"><div class="field"><label for="file-path">Project-relative file path</label><input id="file-path" required placeholder="endpoints/hello.py" autocomplete="off"><p class="help">Choose a file above to load it. For a new file, enter an unused relative path.</p></div><div class="field"><label for="file-content">File contents</label><textarea id="file-content" class="source" spellcheck="false" aria-describedby="file-warning"></textarea><p id="file-warning" class="help">Python runs with your local user’s permissions. Save only trusted code.</p></div></div><div class="panel-foot"><button class="btn danger" type="button" data-action="delete-file">Delete file</button><button class="btn primary" type="submit">Save file to draft</button></div></form></div><aside><div class="panel"><div class="panel-head"><h2>Route definitions</h2></div><form id="route-form"><div class="panel-body"><div class="field"><label for="draft-route-select">Existing draft route</label><select id="draft-route-select"><option value="">New route</option></select></div><div class="field-row"><div class="field"><label for="route-method">Method</label><select id="route-method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>HEAD</option><option>TRACE</option></select></div><div class="field"><label for="route-path">Path</label><input id="route-path" required placeholder="/hello" pattern="/.*"></div></div><div class="field"><label for="route-handler">Handler reference</label><input id="route-handler" required placeholder="endpoints/hello.py:hello"><p class="help">Save the Python function in Source files first. Method + path identifies a route; changing either adds a new route rather than renaming the old one.</p></div></div><div class="panel-foot"><button class="btn danger" type="button" data-action="remove-route">Remove route</button><button class="btn" type="submit">Save route</button></div></form></div><div class="panel section-gap"><div class="panel-head"><h2>Changed files</h2></div><pre class="code" id="draft-changes"></pre></div></aside></div>
           <div class="panel section-gap" id="database-setup-panel"><div class="panel-head"><h2>Database setup</h2><span class="badge draft">ADDITIVE ONLY</span></div><div class="panel-body">
             <p id="database-setup-status" class="feature-status" role="status">A schema plan creates new tables; it never alters or deletes existing data.</p>
@@ -109,9 +173,9 @@
             <div class="notice section-gap" id="draft-repair" hidden>
               <h3 id="repair-heading">Recover this failed revision</h3><p class="help" id="repair-context-status"></p>
               <div id="repair-error" class="notice error section-gap" role="alert" hidden></div>
-              <div class="field-row section-gap"><div class="field"><label for="repair-provider">Repair provider</label><select id="repair-provider" data-ai-provider></select></div><div class="field"><label for="repair-attempts">Attempt limit</label><select id="repair-attempts"><option value="1">1 attempt</option><option value="2" selected>2 attempts</option></select></div></div>
+              <div class="field-row section-gap" hidden><div class="field"><label for="repair-provider">Repair provider</label><select id="repair-provider" data-ai-provider></select></div><div class="field"><label for="repair-attempts">Attempt limit</label><select id="repair-attempts"><option value="1">1 attempt</option><option value="2" selected>2 attempts</option></select></div></div>
               <div class="field section-gap" id="repair-requirements-field"><label for="repair-requirements">Original requirements or OpenAPI specification</label><textarea id="repair-requirements" rows="4" maxlength="32768" placeholder="Paste the original contract, not secret values. The AI must fix implementation, not redefine the API."></textarea></div>
-              <div class="actions"><button class="btn primary" id="repair-draft-button" data-action="repair-draft">Repair with AI…</button><span class="help" id="repair-status" role="status" aria-live="polite"></span></div>
+              <div class="actions"><button class="btn primary" id="repair-draft-button" data-action="repair-draft">Repair in Project AI →</button><span class="help" id="repair-status" role="status" aria-live="polite"></span></div>
               <div id="repair-attempt-list" class="repair-attempts" aria-label="Repair attempt history" hidden></div>
               <details id="repair-details" class="technical-details" hidden><summary>Raw repair report</summary><pre id="repair-report" class="code section-gap" tabindex="0"></pre></details>
             </div>
@@ -127,6 +191,10 @@
           <div class="actions"><button class="btn" type="button" id="insert-request-example" data-action="insert-request-example" aria-describedby="request-example-status" disabled>Insert example</button><span class="small muted">From OpenAPI · does not send</span></div>
           <p class="help" id="request-example-status" role="status">Choose a route shortcut to insert its example. Review sample values before sending; existing records and business rules are not inferred.</p>
           <div class="field-row section-gap"><div class="field"><label for="request-method">Method</label><select id="request-method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>HEAD</option></select></div><div class="field"><label for="request-path">Path and query string</label><input id="request-path" required value="/hello" placeholder="/books/123?limit=10"></div></div><div class="field" id="request-headers-field"><label for="request-headers">Headers · JSON object</label><textarea id="request-headers" class="mono" spellcheck="false">{}</textarea><p class="help">Optional authorization/content-type headers. Browser-controlled and proxy-internal headers cannot be overridden.</p></div><div class="field"><label for="request-body">JSON body · optional</label><textarea id="request-body" class="mono" spellcheck="false" placeholder='{"title": "Example"}'></textarea></div><p class="help" id="request-help"></p></div><div class="panel-foot"><span class="small muted">Redirects are not followed by the local bridge.</span><button class="btn primary" type="submit">Send request →</button></div></form><div class="response-meta"><span class="badge neutral" id="response-status" role="status">Not sent</span><span class="muted small" id="response-time">—</span><button class="btn ghost" data-action="copy-response">Copy response</button></div><pre class="code" id="response-body" tabindex="0">Send a request to inspect its real response.</pre><details class="panel-body"><summary>Response headers / draft runner details</summary><pre class="code" id="response-details">—</pre></details></div><aside><div class="notice draft"><strong>Live requests can change real data.</strong><p class="small">POST, PUT, PATCH, and DELETE run against persistent project data. A request to an idle project starts its worker; a stopped project must be started explicitly.</p></div><div class="notice"><strong>Draft calls are disposable.</strong><p class="small">Select a draft in Drafts &amp; checks first. Calls pin its revision and accept JSON bodies, and forward configured request headers. Each call gets a fresh disposable data copy. A call never counts as validation or a test.</p></div><div class="notice"><strong>No scenario API yet.</strong><p class="small">Artificial delays, forced errors, seeding/reset, and server request logs are not implemented. This page does not fake them.</p></div></aside></div>
+        <div class="panel section-gap"><div class="panel-head"><h2>HTTP request sequences</h2><span class="badge draft">LIVE API</span></div><div class="panel-body"><p class="help">Run up to 50 requests in order. Reference earlier JSON responses with {{stepName.field}} in bodies, paths, or headers. A whole body value preserves its JSON type. Shared headers apply to every step. Stops on the first failure; completed writes remain and are never retried automatically.</p><label for="request-chain">Request steps · JSON array</label><textarea id="request-chain" class="source" rows="12" spellcheck="false">[
+  {"name":"user","method":"POST","path":"/users","body":{"name":"Sample user"}},
+  {"name":"post","method":"POST","path":"/posts","body":{"user_id":"{{user.id}}","title":"Sample post"}}
+]</textarea><div class="actions section-gap"><button class="btn primary" data-action="run-request-chain">Run chain…</button></div><pre class="code section-gap" id="request-chain-results" role="status">No chain run yet.</pre></div></div>
       </section>
 
       <section class="view" id="settings-view" aria-label="Settings" hidden>
@@ -140,44 +208,56 @@
             <div class="actions"><button class="btn primary" type="submit" id="save-environment">Save value…</button><button class="btn" type="button" id="generate-environment" data-action="generate-environment">Generate secure key…</button></div>
           </form><details class="technical-details"><summary>Storage, checks &amp; JWT keys</summary><p class="help">Values are saved in a private local file outside source versions—not encrypted, not in browser storage, and not returned by the settings API. Trusted project Python receives them before imports, including during draft checks. Names only are available to AI. Use a dedicated test/development secret, not production credentials.</p><p class="help">Generate secure key creates and saves a JWT signing key. Replacing or removing one can invalidate tokens. Changes invalidate draft checks/approval and require an explicit worker restart; they never publish code or rewrite handlers. Process-startup and Reqlica control variables are reserved.</p></details></div><div class="panel-foot"><button class="btn ghost" id="reload-environment" data-action="reload-environment">Reload variable names</button><button class="btn" id="restart-environment" data-action="restart-environment">Start API…</button></div></div>
         <div class="layout-two"><div class="panel"><div class="panel-head"><h2>LLM providers</h2><button class="btn primary" data-action="add-provider">+ Add provider</button></div><div class="panel-body"><div id="provider-list" class="provider-list"></div></div><div class="panel-foot"><span class="ai-status" id="ai-storage-status" role="status">Non-secret preferences are saved in this browser only.</span></div></div>
-          <div class="panel"><div class="panel-head"><h2>AI defaults</h2><span id="ai-defaults-status" class="badge neutral">BROWSER ONLY</span></div><form id="ai-defaults-form"><div class="panel-body"><div id="ai-defaults-error" class="notice error" role="alert" hidden></div><div class="field"><label for="default-ai-provider">Default provider</label><select id="default-ai-provider" data-ai-provider></select></div><div class="field-row"><div class="field"><label for="ai-temperature">Temperature</label><input id="ai-temperature" type="number" min="0" max="2" step="0.1" value="0" required></div><div class="field"><label for="ai-max-tokens">Maximum output tokens</label><input id="ai-max-tokens" type="number" min="256" max="32768" step="256" value="8192" required></div></div><div class="field section-gap"><label for="ai-timeout-seconds">AI response timeout · seconds</label><input id="ai-timeout-seconds" type="number" min="30" max="600" step="1" value="300" required aria-describedby="ai-timeout-help"><p class="help" id="ai-timeout-help">Wait up to 30–600 seconds for provider network activity. Default: 300 seconds. The local proxy and dashboard allow extra time for the result. Generation checkpoints each file. Format failures have bounded retries; saved work can be resumed.</p></div><details id="ai-preview-preferences" class="section-gap"><summary>Preview-only preferences</summary><div class="ai-defaults section-gap"><label class="check-label"><input id="ai-include-tests" type="checkbox" checked><span>Include automated tests</span></label><label class="check-label"><input id="ai-include-schema" type="checkbox" checked><span>Include request/response schemas</span></label><label class="check-label"><input id="ai-clarify" type="checkbox" checked><span>Surface assumptions</span></label></div><p class="help">These options affect local briefs only. Actual generation always requests typed contracts, tests, and assumptions. Failed checks offer a separately confirmed, bounded Repair with AI workflow. Approval and publication remain manual.</p></details></div><div class="panel-foot"><button class="btn" type="button" data-action="reset-ai-defaults">Reset defaults</button><button class="btn primary" type="submit">Save preferences</button></div></form></div>
+          <div class="panel"><div class="panel-head"><h2>AI defaults</h2><span id="ai-defaults-status" class="badge neutral">BROWSER ONLY</span></div><form id="ai-defaults-form"><div class="panel-body"><div id="ai-defaults-error" class="notice error" role="alert" hidden></div><div class="field"><label for="default-ai-provider">Default provider</label><select id="default-ai-provider" data-ai-provider></select></div><div class="field-row"><div class="field"><label for="ai-temperature">Temperature</label><input id="ai-temperature" type="number" min="0" max="2" step="0.1" value="0" required></div><div class="field"><label for="ai-max-tokens">Maximum output tokens</label><input id="ai-max-tokens" type="number" min="256" max="32768" step="256" value="8192" required></div></div><div class="field section-gap"><label for="ai-timeout-seconds">AI response timeout · seconds</label><input id="ai-timeout-seconds" type="number" min="30" max="600" step="1" value="300" required aria-describedby="ai-timeout-help"><p class="help" id="ai-timeout-help">Wait up to 30–600 seconds for provider network activity. Default: 300 seconds. The local proxy and dashboard allow extra time for the result. Generation checkpoints each file. Format failures have bounded retries; saved work can be resumed.</p></div><details id="ai-preview-preferences" class="section-gap" hidden><summary>Preview-only preferences</summary><div class="ai-defaults section-gap"><label class="check-label"><input id="ai-include-tests" type="checkbox" checked><span>Include automated tests</span></label><label class="check-label"><input id="ai-include-schema" type="checkbox" checked><span>Include request/response schemas</span></label><label class="check-label"><input id="ai-clarify" type="checkbox" checked><span>Surface assumptions</span></label></div><p class="help">These options affect local briefs only. Actual generation always requests typed contracts, tests, and assumptions. Failed checks offer a separately confirmed, bounded Repair with AI workflow. Approval and publication remain manual.</p></details></div><div class="panel-foot"><button class="btn" type="button" data-action="reset-ai-defaults">Reset defaults</button><button class="btn primary" type="submit">Save preferences</button></div></form></div>
         </div>
-        <div class="panel section-gap"><div class="panel-head"><h2>AI features</h2><span class="badge neutral">GROQ</span></div><div class="panel-body"><ol class="ai-steps"><li><div><h3>Understand or build your API</h3><p>Chat about published code, or generate an unpublished draft for review.</p><button class="btn ghost" data-view="generate" data-ai-project-feature>Open Generate API →</button></div></li><li><div><h3>Edit an endpoint</h3><p>Open its source in a new draft, or request an AI change with tests.</p><button class="btn ghost" data-view="endpoints" data-ai-project-feature>Browse endpoints →</button></div></li><li><div><h3>Create mock data</h3><p>Generate custom JSON, edit/download it, or confirm an append to an existing SQLite table.</p><button class="btn ghost" data-view="data" data-ai-project-feature>Open Mock data →</button></div></li></ol><p class="help" id="ai-project-help">Open a project to explore these screens. Provider settings are available without a project.</p></div></div>
+        <div class="panel section-gap"><div class="panel-head"><h2>AI features</h2><span class="badge neutral">PROVIDER PROFILES</span></div><div class="panel-body"><ol class="ai-steps"><li><div><h3>Understand or build your API</h3><p>One conversation for questions, specifications, API changes, tests, repairs, and mock-data previews.</p><button class="btn ghost" data-view="generate" data-ai-project-feature>Open Project AI →</button></div></li><li><div><h3>Edit an endpoint</h3><p>Open its source in a new draft, or request an AI change with tests.</p><button class="btn ghost" data-view="endpoints" data-ai-project-feature>Browse endpoints →</button></div></li><li><div><h3>Create mock data</h3><p>Generate custom JSON, edit/download it, or confirm an append to an existing SQLite table.</p><button class="btn ghost" data-view="data" data-ai-project-feature>Open Mock data →</button></div></li></ol><p class="help" id="ai-project-help">Open a project to explore these screens. Provider settings are available without a project.</p></div></div>
       </section>
 
-      <section class="view" id="generate-view" aria-label="Generate API" hidden>
-        <div class="view-title"><div><h2>Project AI</h2><p>Explore the design. Build when you’re ready.</p></div><button class="btn ghost" data-view="settings">Provider settings</button></div>
-        <div class="project-ai-toolbar"><div class="ai-modes" role="group" aria-label="Project AI task"><button class="btn active" type="button" data-project-ai-task="generate" aria-pressed="true">Generate draft</button><button class="btn" type="button" data-project-ai-task="ask" aria-pressed="false">Ask about project</button></div>
-        <details class="ai-context-details" id="ai-context-details"><summary>Context &amp; privacy</summary><div><p>The selected provider receives your input, published Python/tests, routes, project notes, database definitions/setup plans, and configured variable names—not their values. Chat also includes up to eight recent exchanges; older replies are discussion, not verified facts. Database rows, other drafts, environment files/values, and provider keys are excluded from model input.</p><p class="help">Completed exchanges are saved for this project in this browser tab, including across refreshes. New chat clears them. Closing the tab normally ends the session; browser session restore can retain it. Nothing is written to project files. Generation remains a separate, confirmed action; review code before running checks.</p><p class="help" id="chat-storage-note"></p><p class="help" id="generation-provider-summary"></p></div></details></div>
+      <section class="view" id="generate-view" aria-label="Project AI" hidden>
+        <div class="view-title"><div><div class="eyebrow">Your API workspace</div><h2>Project AI</h2><p>Ask, create, change, and check. One conversation.</p></div><div class="actions"><button class="btn" type="button" id="assistant-new" data-action="new-assistant">New conversation</button><button class="btn ghost" data-view="settings">Provider settings</button></div></div>
+        <section id="agent-workspace" class="assistant-workspace" aria-label="Project conversation">
+          <details class="panel assistant-config" id="assistant-config"><summary><span>Conversation setup</span><span class="help" id="assistant-settings-summary">Provider, draft, and permissions</span></summary><div class="panel-body"><div class="field-row"><div class="field"><label for="agent-provider">Provider</label><select id="agent-provider" data-ai-provider required></select><p class="help">Use a model that supports tools.</p></div><div class="field"><label for="agent-draft">Context</label><select id="agent-draft"><option value="">Published API · create a draft only when needed</option></select><p class="help" id="agent-draft-help">Read published code, or continue an unpublished draft.</p></div></div><div class="assistant-permissions"><label class="check-label"><input id="agent-allow-edits" type="checkbox" checked><span>Allow draft edits when requested</span></label><label class="check-label"><input id="agent-execution" type="checkbox"><span>Allow validation, tests, and disposable requests</span></label></div><p class="help" id="assistant-permissions-help">Checks execute trusted Python on disposable data with your OS permissions. Publishing, live data insertion, database setup, and secret values stay under your manual control.</p><details><summary>Context &amp; privacy</summary><p class="small">The selected provider receives your messages, attached specifications, selected source, database definitions and tool results. Environment values are excluded from context; trusted code can expose values in its output. Conversations and previews are stored privately in this project's .reqlica/agent-runs folder. Provider keys are supplied per request and excluded from those files. Each conversation has a bounded request budget; it pauses when you close the tab.</p></details></div></details>
+          <div class="panel assistant-conversation" id="agent-output"><div class="panel-head"><div><h2>Conversation</h2><p class="help" id="agent-counter">Your project, from first question to reviewed draft.</p></div><span class="badge neutral" id="agent-status">Ready</span></div>
+            <div class="panel-body assistant-conversation-body"><div id="agent-empty" class="agent-empty"><div class="eyebrow">Start with what you need</div><h3>What should we work on?</h3><p>Understand an endpoint, build from a specification, fix a failed test, or prepare sample records.</p><div class="assistant-suggestions"><button class="btn" type="button" data-agent-example="Explain this project's endpoints, data models, and how requests move through the code. Do not change anything.">Explain this project</button><button class="btn" type="button" data-agent-example="Help me build an API from the specification I attach. Ask about missing requirements before changing code.">Build from a spec</button><button class="btn" type="button" data-agent-example="Prepare synthetic sample records for this project's existing tables. Show a preview for review; do not insert live data.">Prepare sample data</button></div></div>
+              <div id="agent-run-content" hidden><div class="agent-scope"><span class="eyebrow">Context</span><code id="agent-draft-id">Published API</code></div><p id="agent-request" hidden></p><p class="agent-activity" id="agent-live" role="status" aria-live="polite"></p><div class="agent-checks" id="agent-checks"></div><div class="assistant-thread" id="agent-events" role="log" aria-label="Conversation and tool activity" tabindex="0"></div><div class="assistant-message assistant-answer" id="assistant-answer-wrap"><span class="eyebrow">Reqlica</span><div class="agent-prose" id="agent-answer" role="region" aria-label="AI reply" tabindex="0"></div></div><div class="notice draft" id="agent-notice" hidden></div><div id="assistant-data-preview" class="assistant-artifact" hidden><div><span class="eyebrow">Mock data preview</span><p id="assistant-data-summary"></p></div><button class="btn" type="button" data-action="review-assistant-data">Review mock data →</button></div></div>
+            </div><div class="panel-foot" id="agent-run-actions" hidden><button class="btn" type="button" id="agent-pause" hidden>Pause after this step</button><button class="btn" type="button" id="agent-resume" data-action="resume-agent" hidden>Resume conversation →</button><button class="btn" type="button" id="agent-review" data-action="review-agent-draft" hidden>Review draft →</button></div>
+            <form id="agent-form" class="assistant-composer"><div class="notice error" id="agent-error" role="alert" hidden></div><label for="agent-message" id="assistant-message-label">Message Project AI</label><textarea id="agent-message" rows="4" maxlength="32768" placeholder="Ask about your API, describe a change, or answer the last question…"></textarea><details class="assistant-attachment"><summary>Attach or paste a specification</summary><div class="field"><label for="assistant-file">OpenAPI, JSON, YAML, Markdown, or text</label><input id="assistant-file" type="file" accept=".json,.yaml,.yml,.md,.txt"><p class="help">Read locally first. Message and attachment together must fit within 32,768 characters.</p></div><button class="btn ghost" type="button" data-action="paste-assistant-spec">Paste specification</button><div id="assistant-attachment-content" hidden><label for="assistant-spec">Review the attached text</label><textarea id="assistant-spec" class="mono" rows="5" maxlength="32768"></textarea><div class="actions"><span class="help" id="assistant-file-name"></span><button class="btn ghost" type="button" data-action="remove-assistant-attachment">Remove attachment</button></div></div></details><div class="assistant-compose-foot"><p class="help" id="assistant-compose-context">Draft changes remain unpublished.</p><button class="btn primary" type="submit" id="agent-start">Send message →</button></div></form>
+          </div>
+          <details class="agent-history" id="agent-history" hidden><summary>Conversations</summary><div id="agent-history-list"></div></details>
+          <details class="assistant-archive" id="assistant-legacy-chats" hidden><summary>Earlier read-only chats</summary><div id="assistant-legacy-content"></div><button class="btn ghost" type="button" data-action="new-project-chat">Clear earlier chat…</button></details>
+          <details class="assistant-archive" id="assistant-legacy-jobs" hidden><summary>Earlier generations</summary><section id="generation-jobs" class="panel" aria-label="Saved generations" hidden></section></details>
+        </section>
+        <div id="legacy-ai-controls" hidden aria-hidden="true">
+        <div class="project-ai-toolbar">
+        <details class="ai-context-details" id="ai-context-details"><summary>Context &amp; privacy</summary><div><p>The selected provider receives your input, published Python/tests, routes, project notes, database definitions/setup plans, and configured variable names—not their values. Chat also includes up to eight recent exchanges; older replies are discussion, not verified facts. Read-only chat excludes database rows, other drafts, environment files/values, and provider keys. The builder shares selected draft source and tool results, which may include handler responses or check output.</p><p class="help">Completed exchanges are saved for this project in this browser tab, including across refreshes. New chat clears them. Closing the tab normally ends the session; browser session restore can retain it. Nothing is written to project files. Generate draft remains a separate action. Build / modify uses MCP tools to edit one draft and optionally execute checks; its transcripts are saved locally in the project. Review and publication remain separate.</p><p class="help" id="chat-storage-note"></p><p class="help" id="generation-provider-summary"></p></div></details></div>
         <div class="panel section-gap" id="generation-result" role="region" aria-label="AI review and generation results" hidden></div>
         <div class="layout-two project-ai-layout" id="project-ai-layout"><div class="panel" id="project-input-panel"><div class="panel-head" id="project-input-heading"><h2 id="project-ai-input-title">Requirements</h2></div>
-          <form id="generate-form"><div class="panel-body"><div id="generation-error" class="notice error" role="alert" hidden></div><section id="generation-jobs" class="notice section-gap" aria-label="Saved generations" hidden></section>
+          <form id="generate-form"><div class="panel-body"><div id="generation-error" class="notice error" role="alert" hidden></div>
             <div class="field generation-provider-field"><label for="generation-provider">Provider</label><select id="generation-provider" data-ai-provider required></select></div>
             <div id="project-question-input" hidden><label class="sr-only" for="project-question">Message about this project</label><textarea id="project-question" rows="2" maxlength="16384" placeholder="Ask about an endpoint, or follow up on the conversation…"></textarea></div>
             <div class="ai-modes" id="generation-input-modes" role="group" aria-label="Generation input"><button class="btn active" type="button" data-generation-mode="describe" aria-pressed="true">Describe the API</button><button class="btn" type="button" data-generation-mode="upload" aria-pressed="false">Upload a specification</button></div>
             <div id="generation-describe"><label for="generation-prompt">What should your API do?</label><textarea id="generation-prompt" rows="8" placeholder="Add a typed GET /greeting endpoint with an optional name and meaningful HTTP tests…"></textarea></div>
             <div id="generation-upload" hidden><div class="field"><label for="generation-file">OpenAPI, JSON schema, or documentation</label><input id="generation-file" type="file" accept=".json,.yaml,.yml,.md,.txt"><p class="help" id="generation-file-status" role="status">JSON, YAML, Markdown, or text · max 1 MiB for previews.</p></div><label for="generation-spec-text">Review or paste the specification</label><textarea id="generation-spec-text" class="mono" spellcheck="false" placeholder="Paste your specification, or choose a file above."></textarea></div>
           </div><div class="panel-foot"><button class="btn" id="preview-generation-button" type="submit" data-needs-ai-provider>Preview generation brief →</button><button class="btn primary" type="button" data-action="generate-draft" id="generate-draft-button">Generate draft →</button><p class="help" id="generate-draft-help">Select a Groq, OpenAI, or OpenAI-compatible profile to generate.</p></div></form>
-        </div><aside class="panel" id="generation-brief-panel"><div class="panel-head"><h2>Review your input brief</h2><span class="badge draft">LOCAL PREVIEW</span></div><div class="ai-preview-empty" id="generation-empty"><h3>Your brief will appear here.</h3><p>Preview the input without making any request. The console adds current published project context only when you explicitly generate. Credentials are never included in this brief.</p></div><pre class="code" id="generation-preview" hidden tabindex="0"></pre><div class="panel-foot"><span class="small muted" id="generation-preview-status">No brief prepared.</span><button class="btn" data-action="copy-generation-preview" id="copy-generation-preview" disabled>Copy brief</button></div></aside>
+        </div><aside class="panel" id="generation-brief-panel"><div class="panel-head"><h2>Input brief</h2><span class="badge draft">LOCAL PREVIEW</span></div><div class="ai-preview-empty" id="generation-empty"><span class="brief-symbol" aria-hidden="true">{ }</span><h3>Review before you generate</h3><p>Describe an endpoint or upload a specification, then preview the input you’ll send.</p><span class="brief-privacy">Preview stays local · credentials excluded</span></div><pre class="code" id="generation-preview" hidden tabindex="0"></pre><div class="panel-foot" id="generation-preview-footer" hidden><span class="small muted" id="generation-preview-status">No brief prepared.</span><button class="btn" data-action="copy-generation-preview" id="copy-generation-preview" disabled>Copy brief</button></div></aside>
         <aside class="panel" id="project-answer-panel" hidden><div class="panel-head"><div class="actions"><h2>Conversation</h2><span class="badge neutral">READ ONLY</span></div><button class="btn ghost" id="new-project-chat" data-action="new-project-chat" disabled>New chat</button></div><div class="chat-empty" id="project-answer-empty"><h3>Get to know your API.</h3><p>Ask a question, then explore it together.</p><div class="chat-suggestions"><button class="btn" data-question-suggestion="Give me an overview of this project and its endpoints.">Project overview</button><button class="btn" data-question-suggestion="Explain the inputs, validation rules, and responses of the endpoints in this project.">Endpoint design</button><button class="btn" data-question-suggestion="How are the data models related in this project?">Data relationships</button></div></div><div class="chat-thread" id="project-answer-content" role="region" aria-label="Project conversation" tabindex="0" hidden></div><div class="panel-foot"><span class="chat-status" id="project-answer-status" role="status">No messages yet.</span><button class="btn ghost" id="copy-project-answer" data-action="copy-project-answer" disabled>Copy last reply</button></div></aside></div>
+        </div>
       </section>
 
       <section class="view" id="data-view" aria-label="Mock data" hidden>
-        <div class="view-title"><div><h2>Mock data</h2><p>Describe your records, review the JSON, then download or insert them.</p></div><button class="btn ghost" data-view="settings">Provider settings</button></div>
-        <details class="ai-context-details"><summary>How data generation works</summary><div><p>Groq receives your description, template, and selected table definitions—not existing records. Generated data stays in the preview until you download it or explicitly confirm an insert. Inserts append to existing ordinary SQLite tables, never create tables or replace records. Tables with triggers/virtual tables are not supported.</p><p class="help" id="data-provider-summary"></p></div></details>
+        <div class="view-title"><div><h2>Mock data</h2><p>Describe a dataset across tables. Review the records, then save them together.</p></div><button class="btn ghost" data-view="settings">Provider settings</button></div>
+        <details class="ai-context-details"><summary>How data generation works</summary><div><p>Your provider receives your description, table definitions, and published models and handlers—not database rows or runtime secret values. Simple related records are linked to actual parent IDs. Data requiring password hashes, encryption, custom validators, or unsupported storage formats is refused. Generated data stays in the preview until you download it or explicitly confirm an insert. Inserts append to existing ordinary SQLite tables, never create tables or replace records. Tables with triggers/virtual tables are not supported.</p><p class="help" id="data-provider-summary"></p></div></details>
         <div class="layout-two"><div class="panel"><div class="panel-head"><h2>Describe the dataset</h2></div><form id="ai-data-form"><div class="panel-body"><div class="notice error" id="ai-data-error" role="alert" hidden></div>
           <div class="field"><label for="data-provider">Provider</label><select id="data-provider" data-ai-provider></select></div>
-          <div class="field-row"><div class="field"><label for="data-target">Destination</label><select id="data-target"><option value="json">JSON fixture</option><option value="sqlite">Existing SQLite table</option></select></div><div class="field"><label for="ai-data-count">Records</label><input id="ai-data-count" type="number" min="1" max="100" value="5" required></div></div>
+          <div class="field-row"><div class="field"><label for="data-target">Destination</label><select id="data-target"><option value="related">Related database records</option><option value="json">JSON fixture</option><option value="sqlite">Existing SQLite table</option></select></div><div class="field" id="data-count-field"><label for="ai-data-count">Records</label><input id="ai-data-count" type="number" min="1" max="100" value="5" required></div></div>
           <div class="field" id="data-collection-field"><label for="ai-data-collection">Collection name</label><input id="ai-data-collection" value="items" maxlength="128"></div>
           <div class="field" id="data-table-field" hidden><label for="data-table">Table</label><select id="data-table"><option value="">Load database tables</option></select><button class="btn ghost" type="button" data-action="load-data-schema">Reload tables</button><details class="technical-details"><summary>Columns &amp; relationships</summary><pre class="code" id="data-table-schema">Choose a table.</pre></details></div>
-          <div class="field"><label for="ai-data-prompt">What should the records look like?</label><textarea id="ai-data-prompt" rows="4" placeholder="Create a varied book catalog: realistic titles, prices from 5–40, and a few out-of-stock books."></textarea></div>
-          <div class="field"><label for="ai-data-template">Example record / field hints</label><textarea id="ai-data-template" class="mono" spellcheck="false">{"name":"Sample item","price":14.99,"stock":20}</textarea></div>
-        </div><div class="panel-foot"><button class="btn" type="button" data-action="template-data">Use template</button><button class="btn primary" type="submit" id="generate-data-button">Generate records →</button></div></form></div>
-        <aside class="panel"><div class="panel-head"><h2>Review records</h2><span class="badge neutral" id="ai-data-preview-count">0 records</span></div><div class="chat-empty" id="ai-data-empty"><h3>Your data starts here.</h3><p>Generate records or use your template, then edit any values before saving.</p></div><div class="panel-body" id="data-preview-workspace" hidden><label for="ai-data-preview">JSON records · editable</label><textarea id="ai-data-preview" class="source" spellcheck="false" rows="14"></textarea><p class="help" id="data-preview-status" role="status"></p><div class="notice error section-gap" id="data-validation-error" role="alert" hidden></div><details class="section-gap"><summary>Batch details</summary><pre class="code" id="ai-data-brief">No records prepared.</pre></details></div><div class="panel-foot"><div class="actions"><button class="btn ghost" data-action="copy-data-preview" id="copy-data-preview" disabled>Copy JSON</button><button class="btn" data-action="download-data" id="download-data-button" disabled>Download</button><button class="btn" data-action="validate-data" id="validate-data-button" disabled>Validate records</button></div><button class="btn primary" data-action="insert-data" id="insert-data-button" hidden disabled>Insert records…</button></div></aside></div>
-        <div class="panel section-gap"><div class="panel-head"><h2>Chained requests</h2><span class="badge draft">LIVE API</span></div><div class="panel-body"><p class="help">Run up to 50 requests in order. Reference earlier JSON responses with {{stepName.field}} in bodies, paths, or headers. A whole body value preserves its JSON type. Shared headers apply to every step. Stops on the first failure; completed writes remain and are never retried automatically.</p><label for="request-chain">Request steps · JSON array</label><textarea id="request-chain" class="source" rows="12" spellcheck="false">[
-  {"name":"user","method":"POST","path":"/users","body":{"name":"Sample user"}},
-  {"name":"post","method":"POST","path":"/posts","body":{"user_id":"{{user.id}}","title":"Sample post"}}
-]</textarea><div class="actions section-gap"><button class="btn primary" data-action="run-request-chain">Run chain…</button></div><pre class="code section-gap" id="request-chain-results" role="status">No chain run yet.</pre></div></div>
+          <div id="data-related-schema" class="notice" hidden><div class="feature-head"><strong>Connected tables</strong><button class="btn ghost" type="button" data-action="load-data-schema">Reload tables</button></div><div id="data-related-tables" class="actions section-gap"></div><p class="help">Describe tables, counts, and relationships in one prompt. Parent rows and foreign keys are linked automatically. Up to 100 records across 10 tables.</p><details class="technical-details"><summary>Relationships</summary><pre class="code" id="data-related-relationships"></pre></details></div>
+          <div class="field"><label for="ai-data-prompt">What data do you need?</label><textarea id="ai-data-prompt" rows="4" placeholder="Create 2 users and 2 posts, one post for each user. Use realistic names and different post titles."></textarea></div>
+          <div class="field" id="data-template-field"><label for="ai-data-template">Example record / field hints</label><textarea id="ai-data-template" class="mono" spellcheck="false">{"name":"Sample item","price":14.99,"stock":20}</textarea></div>
+        </div><div class="panel-foot"><button class="btn" type="button" data-action="template-data" id="template-data-button">Use template</button><button class="btn primary" type="submit" id="generate-data-button">Prepare with Project AI →</button></div></form></div>
+        <aside class="panel"><div class="panel-head"><h2>Review records</h2><span class="badge neutral" id="ai-data-preview-count">0 records</span></div><div class="chat-empty" id="ai-data-empty"><h3 id="data-empty-title">Your data starts here.</h3><p id="data-empty-description">Generate records or use your template, then edit any values before saving.</p></div><div class="panel-body" id="data-preview-workspace" hidden><div id="data-related-counts" class="actions" hidden></div><label for="ai-data-preview">JSON records · editable</label><textarea id="ai-data-preview" class="source" spellcheck="false" rows="14"></textarea><p class="help" id="data-preview-status" role="status"></p><div class="notice error section-gap" id="data-validation-error" role="alert" hidden></div><details class="section-gap"><summary>Batch details</summary><pre class="code" id="ai-data-brief">No records prepared.</pre></details></div><div class="panel-foot" id="data-preview-actions"><div class="actions"><button class="btn ghost" data-action="copy-data-preview" id="copy-data-preview" disabled>Copy JSON</button><button class="btn" data-action="download-data" id="download-data-button" disabled>Download</button><button class="btn" data-action="validate-data" id="validate-data-button" disabled>Validate records</button></div><button class="btn primary" data-action="insert-data" id="insert-data-button" hidden disabled>Insert records…</button></div></aside></div>
+
       </section>
 
       <section class="view" id="setup-view" hidden>
@@ -247,7 +327,7 @@ let config = {...defaults};
 try { config = {...config, ...JSON.parse(localStorage.getItem('reqlica.html.connections') || '{}')}; } catch {}
 const state = {projects:[], project:null, drafts:[], draft:null, draftRoutes:[], selectedRoute:0, schema:null, view:'projects', busy:false, loaded:false, editorPath:null, editorRevision:null, dirty:false, response:null, deletion:null};
 let direct = {gateway:'http://127.0.0.1:4000', console:'http://127.0.0.1:3000'}, toastTimer;
-const labels = {projects:'Projects',overview:'Overview',generate:'Generate API',endpoints:'Endpoints',drafts:'Drafts & checks',tester:'Request tester',data:'Mock data',settings:'Settings',setup:'Connection & help'};
+const labels = {projects:'Projects',overview:'Overview',generate:'Project AI',endpoints:'Endpoints',drafts:'Drafts & checks',tester:'Request tester',data:'Mock data',settings:'Settings',setup:'Connection & help'};
 const providerPresets={groq:{name:'Groq',url:'https://api.groq.com/openai/v1',model:'openai/gpt-oss-20b',defaultModel:'openai/gpt-oss-20b'},ollama:{name:'Local model · Ollama',url:'http://localhost:11434',model:'Your installed model'},openai:{name:'OpenAI',url:'https://api.openai.com/v1',model:'Your OpenAI model identifier'},anthropic:{name:'Anthropic',url:'https://api.anthropic.com',model:'Your Anthropic model identifier'},compatible:{name:'OpenAI-compatible API',url:'http://localhost:1234/v1',model:'Your provider’s model identifier'}};
 const aiDefaultOptions={temperature:0,maxTokens:8192,timeoutSeconds:300,includeTests:true,includeSchema:true,clarify:true};
 const aiStorageKey='reqlica.html.ai-preferences.v1';
@@ -307,9 +387,10 @@ const aiActivityStages={
   failed:['Request failed','See the error above. The last confirmed activity is listed below.'],
 };
 function aiActivityTarget(service,path,method,body) {
-  if(service!=='console' || method!=='POST' || !/^\/api\/projects\/[^/]+\/(clarify|generate|ask|edit-endpoint|data\/generate|drafts\/[^/]+\/repair|generation-jobs\/[^/]+\/step)$/.test(path))return null;
+  if(service!=='console' || method!=='POST' || !/^\/api\/projects\/[^/]+\/(clarify|generate|ask|edit-endpoint|data\/(?:related\/)?generate|drafts\/[^/]+\/repair|generation-jobs\/[^/]+\/step|agent-runs\/[^/]+\/step)$/.test(path))return null;
+  if(path.includes('/agent-runs/'))return 'agent-error';
   if(path.endsWith('/repair'))return 'repair-error';
-  if(path.endsWith('/data/generate'))return 'ai-data-error';
+  if(/\/data\/(?:related\/)?generate$/.test(path))return 'ai-data-error';
   return path.endsWith('/edit-endpoint') || body?.endpoint?'ai-endpoint-error':'generation-error';
 }
 function renderAiActivity(activity) {
@@ -324,7 +405,7 @@ function renderAiActivity(activity) {
   if(list.innerHTML!==markup)list.innerHTML=markup;
 }
 function startAiActivity(target,path) {
-  const host=$(target);if(!host)return null;
+  const host=target==='agent-error'?$('agent-live'):$(target);if(!host)return null;
   $('ai-request-activity')?.remove();
   const node=document.createElement('section');node.id='ai-request-activity';node.className='ai-activity';node.setAttribute('aria-label','AI request activity');
   node.innerHTML='<div class="ai-activity-head"><span class="eyebrow">Request activity</span><span class="mono" data-activity-elapsed aria-hidden="true">0s</span></div><p class="ai-activity-title" data-activity-title role="status" aria-live="polite"></p><p class="help" data-activity-hint></p><details><summary>Activity details</summary><ol data-activity-events></ol></details>';
@@ -424,7 +505,9 @@ function setView(view,record=true) {
   if (view === 'endpoints') renderEndpoints();
   if (view === 'tester') renderRequestRoutes();
   if (view === 'settings') { renderProviderProfiles(); renderAIProviderChoices(); renderEnvironment(); }
+  if(view==='generate')aiWorkspace().agentScroll=true;
   if (view === 'generate' || view === 'data') renderAIWorkspace();
+  if(view==='data' && aiWorkspace().dataTarget==='related' && !aiWorkspace().dataSchema)loadDataSchema();
   syncControls();
   const heading=$(view+'-view').querySelector('h1,h2');
   if (heading) { heading.tabIndex=-1; heading.focus({preventScroll:true}); }
@@ -538,6 +621,7 @@ async function openProject(id) {
   await loadDrafts();
   await loadEnvironment();
   await loadGenerationJobs();
+  await loadAgentRuns();
 }
 async function refreshProject() {
   state.project=await api('gateway',root()+'/endpoints');
@@ -710,14 +794,14 @@ function syncControls() {
   document.querySelectorAll('[data-needs-ai-provider]').forEach(el=>el.disabled=state.busy || !aiConfig.providers.length);
   document.querySelectorAll('[data-ai-project-feature]').forEach(el=>el.disabled=state.busy || !state.project);
   $('copy-generation-preview').disabled=state.busy || !state.project || !aiWorkspace().generationPreview;
-  const dataset=aiWorkspace(),hasData=!!dataset.dataRawPreview?.trim(),sqlite=dataset.dataTarget==='sqlite';
+  const dataset=aiWorkspace(),hasData=!!dataset.dataRawPreview?.trim(),related=dataset.dataTarget==='related',sqlite=dataset.dataTarget==='sqlite' || related;
   $('copy-data-preview').disabled=state.busy || !hasData;
   $('download-data-button').disabled=state.busy || !hasData;
-  $('validate-data-button').disabled=state.busy || !hasData || (sqlite && !dataset.dataTable);
+  $('validate-data-button').disabled=state.busy || !hasData || (sqlite && !related && !dataset.dataTable);
   $('insert-data-button').hidden=!sqlite;
-  $('insert-data-button').disabled=state.busy || !sqlite || !!dataset.dataImportResult || dataset.dataValidation?.validation?.status!=='passed' || dataset.dataValidation.table!==dataset.dataTable;
+  $('insert-data-button').disabled=state.busy || !sqlite || !!dataset.dataImportResult || dataset.dataValidation?.validation?.status!=='passed' || (!related && dataset.dataValidation.table!==dataset.dataTable);
   const dataProvider=aiConfig.providers.find(p=>p.id===$('data-provider').value),editProvider=aiConfig.providers.find(p=>p.id===$('endpoint-ai-provider').value);
-  $('generate-data-button').disabled=state.busy || !['groq','openai','compatible'].includes(dataProvider?.kind) || (sqlite && !dataset.dataTable);
+  $('generate-data-button').disabled=state.busy || !['groq','openai','compatible'].includes(dataProvider?.kind) || (sqlite && !related && !dataset.dataTable) || (related && !dataset.dataSchema?.tables?.length);
   $('generate-endpoint-edit').disabled=state.busy || !['groq','openai','compatible'].includes(editProvider?.kind) || !aiEndpointContext?.revision;
   $('copy-endpoint-preview').disabled=state.busy || !endpointBrief;
   $('ai-project-help').textContent=state.project?'AI profiles are shared across projects. Runtime variables stay per project. Repair is available beside failed draft checks.':'Open a project to explore these screens. Provider settings are available without a project.';
@@ -725,6 +809,8 @@ function syncControls() {
   const asking=aiWorkspace().task==='ask';
   const generationReview=activeClarification('generate'),endpointReview=activeClarification('endpoint');
   syncDecisionProgress('generate',generationReview);syncDecisionProgress('endpoint',endpointReview);
+  if(aiWorkspace().task==='agent')$('generation-result').hidden=true;
+  syncAgentControls();
   if(!generationReview && aiWorkspace().generateClarification && !aiWorkspace().generationResult)$('generation-result').hidden=true;
   if(aiEndpointContext?.clarificationShown && !endpointReview)$('ai-endpoint-result').hidden=true;
   $('generate-draft-button').disabled=state.busy || !['groq','openai','compatible'].includes(generationProvider?.kind) || !state.project || (asking?!aiWorkspace().question?.trim():!state.project.active_version) || (!asking && generationReview && !clarificationsAnswered(generationReview));
@@ -734,8 +820,7 @@ function syncControls() {
   document.querySelectorAll('[data-review-clarification]').forEach(button=>{const review=activeClarification(button.dataset.reviewClarification);button.disabled=state.busy || !review || !clarificationsAnswered(review);});
   document.querySelectorAll('[data-generate-clarification]').forEach(button=>{const review=activeClarification(button.dataset.generateClarification);button.disabled=state.busy || !review || !clarificationsAnswered(review);});
   $('generate-draft-help').textContent=['groq','openai','compatible'].includes(generationProvider?.kind)?(asking?'Read-only · Published project context':generationReview?'Review the decisions, then explicitly generate a draft.':'Review fields and configuration first; no draft is created yet.'):'Choose a Groq, OpenAI, or OpenAI-compatible provider in Settings.';
-  const repairProvider=aiConfig.providers.find(p=>p.id===$('repair-provider').value);
-  $('repair-draft-button').disabled=state.busy || state.dirty || !repairableDraft() || !['groq','openai','compatible'].includes(repairProvider?.kind) || (!state.draft?.generation?.requirements && !$('repair-requirements').value.trim());
+  $('repair-draft-button').disabled=state.busy || state.dirty || !repairableDraft();
   const replacingEnvironment=hasEnvironment && state.environment.names.includes($('environment-name').value.trim());
   $('environment-edit-heading').textContent=replacingEnvironment?'Replace a saved variable':'Add a project variable';
   $('save-environment').textContent=replacingEnvironment?'Replace value…':'Save value…';
@@ -1165,7 +1250,7 @@ function aiWorkspace() {
   if(!state.project)return {};
   if(!aiWorkspaces.has(state.project.id)) {
     const turns=loadProjectChat(state.project.id),last=turns.at(-1);
-    aiWorkspaces.set(state.project.id,{task:turns.length?'ask':'generate',turns,chatConsent:null,question:'',answeredQuestion:last?.question || '',answer:last || null,mode:'describe',description:'',spec:'',filename:'',generationProvider:'',generationPreview:null,generationResult:null,dataProvider:'',collection:'items',count:5,dataPrompt:'',template:'{\n  "name": "Sample item",\n  "price": 14.99,\n  "stock": 20\n}',dataTarget:'json',dataTable:'',dataSchema:null,dataRawPreview:'',dataValidation:null,dataImportResult:null,dataPreview:null,dataBrief:null,endpointPrompts:{},endpointEditResult:null});
+    aiWorkspaces.set(state.project.id,{task:'agent',turns,chatConsent:null,question:'',answeredQuestion:last?.question || '',answer:last || null,mode:'describe',description:'',spec:'',filename:'',agentRuns:[],agentRun:null,agentMessage:'',agentDraft:'',agentStop:false,agentRunning:false,generationProvider:'',generationPreview:null,generationResult:null,dataProvider:'',collection:'items',count:5,dataPrompt:'',template:'{\n  "name": "Sample item",\n  "price": 14.99,\n  "stock": 20\n}',dataTarget:'related',dataTable:'',dataSchema:null,dataRawPreview:'',dataValidation:null,dataImportResult:null,dataPreview:null,dataBrief:null,endpointPrompts:{},endpointEditResult:null});
   }
   return aiWorkspaces.get(state.project.id);
 }
@@ -1176,17 +1261,10 @@ function generationMode(mode) {
   document.querySelectorAll('[data-generation-mode]').forEach(b=>{b.classList.toggle('active',b.dataset.generationMode===mode);b.setAttribute('aria-pressed',String(b.dataset.generationMode===mode));});
   renderGenerationPreview();syncControls();
 }
-function projectAITask(task) {
-  if(!state.project || !['generate','ask'].includes(task))return;
-  const w=aiWorkspace();if(w.task!==task)toast('');w.task=task;const asking=task==='ask';
-  $('project-ai-layout').classList.toggle('is-chat',asking);
-  document.querySelectorAll('[data-project-ai-task]').forEach(b=>{b.classList.toggle('active',b.dataset.projectAiTask===task);b.setAttribute('aria-pressed',String(b.dataset.projectAiTask===task));});
-  $('project-ai-input-title').textContent=asking?'Ask about this project':'Requirements';
-  $('project-question-input').hidden=!asking;$('generation-input-modes').hidden=asking;
-  $('generation-brief-panel').hidden=asking;$('project-answer-panel').hidden=!asking;
-  $('preview-generation-button').hidden=asking;$('generation-result').hidden=asking || (!w.generationResult && !activeClarification('generate'));
-  $('generate-draft-button').textContent=asking?'Send message →':'Generate draft →';
-  clearError('generation-error');generationMode(w.mode);renderProjectAnswer();renderGenerationJobs();syncControls();
+function projectAITask() {
+  if(!state.project)return;
+  aiWorkspace().task='agent';$('agent-workspace').hidden=false;$('project-ai-layout').hidden=true;$('generation-result').hidden=true;
+  renderAgentWorkspace();renderAgentDraftChoices();renderAssistantArchive();renderGenerationJobs();syncControls();
 }
 function renderProjectAnswer(scrollToEnd=false) {
   const w=aiWorkspace(),turns=w.turns || [],thread=$('project-answer-content'),oldScroll=thread.scrollTop,wasEmpty=!thread.children.length;
@@ -1202,11 +1280,12 @@ async function newProjectChat() {
   if((w.turns.length || w.question.trim() || w.chatConsent) && !await confirmAction('Start a new chat?','Clear this project’s conversation and unsent message from this tab? Project files, data, and drafts will be kept.'))return;
   try {sessionStorage.removeItem(chatStorageKey(state.project.id));}catch{chatStorageAvailable=false;}
   w.turns=[];w.answer=null;w.answeredQuestion='';w.question='';w.chatConsent=null;
-  $('project-question').value='';clearError('generation-error');renderProjectAnswer();syncControls();state.focusAfterRun='project-question';
+  $('project-question').value='';clearError('generation-error');renderProjectAnswer();renderAssistantArchive();syncControls();
 }
 function renderGenerationPreview() {
   const w=aiWorkspace();
   $('generation-empty').hidden=!!w.generationPreview;$('generation-preview').hidden=!w.generationPreview;$('generation-preview').textContent=w.generationPreview?pretty(w.generationPreview):'';
+  $('generation-preview-footer').hidden=!w.generationPreview;
   $('generation-preview-status').textContent=w.generationPreview?'Local brief snapshot · generation result is separate.':'No current brief; preview again after changing inputs.';
 }
 function needsInformationMarkup(result) {
@@ -1259,10 +1338,299 @@ function previewGeneration() {
     renderAIWorkspace();toast('Generation brief previewed locally. No AI call or real draft was created.');
   } catch(error) {showError(error,'generation-error');}
 }
+const agentToolLabels={get_mock_data_context:'Read mock-data context',preview_mock_data:'Prepare data preview',get_project_context:'Read project context',get_draft_changes:'Inspect draft changes',get_api_schema:'Read API contract',create_draft:'Create working draft',write_draft_file:'Save source file',upsert_endpoint:'Register endpoint',remove_endpoint:'Remove route',validate_draft:'Validate draft',test_draft:'Run behavior tests',call_draft_endpoint:'Try disposable request'};
+function agentInlineMarkdown(value) {
+  const text=String(value),pattern=/`([^`\n]+)`|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*/g;
+  let out='',end=0;
+  for(const match of text.matchAll(pattern)) {
+    out+=esc(text.slice(end,match.index));
+    out+=match[1]!==undefined?'<code>'+esc(match[1])+'</code>':match[2]!==undefined?'<strong>'+esc(match[2])+'</strong>':'<em>'+esc(match[3])+'</em>';
+    end=match.index+match[0].length;
+  }
+  return out+esc(text.slice(end));
+}
+function agentMarkdown(value) {
+  const blocks=[],lines=String(value || '').replace(/\r\n?/g,'\n').split('\n');
+  let paragraph=[],items=[],listType=null,code=null;
+  const flushParagraph=()=>{if(paragraph.length){blocks.push('<p>'+agentInlineMarkdown(paragraph.join(' '))+'</p>');paragraph=[];}};
+  const flushList=()=>{if(listType){blocks.push('<'+listType+'>'+items.map(item=>'<li>'+agentInlineMarkdown(item)+'</li>').join('')+'</'+listType+'>');listType=null;items=[];}};
+  for(const line of lines) {
+    if(code!==null) {if(/^\s*```\s*$/.test(line)){blocks.push('<pre><code>'+esc(code.join('\n'))+'</code></pre>');code=null;}else code.push(line);continue;}
+    if(/^\s*```[\w-]*\s*$/.test(line)){flushParagraph();flushList();code=[];continue;}
+    if(!line.trim()){flushParagraph();flushList();continue;}
+    const heading=line.match(/^#{1,4}\s+(.+)$/),list=line.match(/^\s*(?:([-*+])|\d+[.)])\s+(.+)$/);
+    if(heading){flushParagraph();flushList();blocks.push('<h3>'+agentInlineMarkdown(heading[1])+'</h3>');continue;}
+    if(/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line)){flushParagraph();flushList();blocks.push('<hr>');continue;}
+    if(list){flushParagraph();const type=list[1]?'ul':'ol';if(listType && listType!==type)flushList();listType=type;items.push(list[2]);continue;}
+    if(listType)items[items.length-1]+=' '+line.trim();else paragraph.push(line.trim());
+  }
+  flushParagraph();flushList();if(code!==null)blocks.push('<pre><code>'+esc(code.join('\n'))+'</code></pre>');
+  return blocks.join('');
+}
+function agentEventMarkup(event) {
+  if(event.kind==='assistant' || event.kind==='user')return '<li><span class="agent-mark">'+(event.kind==='user'?'You':'AI')+'</span><div class="agent-prose">'+agentMarkdown(event.text)+'</div></li>';
+  return '<li data-status="'+esc(event.status)+'"><span class="agent-mark">'+(event.status==='done'?'✓':'!')+'</span><div><strong>'+esc(agentToolLabels[event.name] || 'Unavailable tool')+'</strong>'+(event.path || event.route?'<code>'+esc(event.path || event.route)+'</code>':'')+'<p class="help">'+esc(event.detail || (event.status==='done'?'Completed':event.status==='failed'?'Check failed · feedback returned to AI':'Tool rejected or returned an error · feedback returned to AI'))+'</p></div></li>';
+}
+async function sendAgentReply() {
+  clearError('agent-error');
+  const w=aiWorkspace(),current=w.agentRun,message=assistantMessage();
+  if(!current?.can_reply || !message)return;
+  if(current.draft_id && state.dirty && state.draft?.id===current.draft_id){showError(Error('Save or discard unsaved source edits before continuing this draft.'),'agent-error');return;}
+  const p=agentProvider(current);
+  if(!p){showError(Error('Add a matching provider profile for '+current.provider.model+' in Settings to continue this build.'),'agent-error');return;}
+  w.agentReplyDrafts=w.agentReplyDrafts || {};w.agentReplyDrafts[current.id]=$('agent-message').value;
+  let pending=w.agentReplyPending;
+  if(!pending || pending.runId!==current.id || pending.body.message!==message) {
+    pending={runId:current.id,body:{message,reply_id:crypto.randomUUID().replaceAll('-',''),expected_turn:current.turn || 0,expected_revision:current.revision}};
+    w.agentReplyPending=pending;
+  }
+  let acknowledged=false;
+  try {
+    const result=await api('console',root()+'/agent-runs/'+current.id+'/replies','POST',pending.body);
+    acknowledged=true;w.agentReplyDrafts[current.id]='';w.agentReplyPending=null;w.agentAttachment=null;
+    updateAgentRun(result);await continueAgent(result,p);
+  } catch(error) {
+    if(!acknowledged) {
+      // A lost acknowledgement must not append the reply again. A read can
+      // confirm acceptance; further model/tool steps still require Resume.
+      try {
+        const saved=await api('console',root()+'/agent-runs/'+current.id);
+        if(saved.last_reply_id===pending.body.reply_id){w.agentReplyDrafts[current.id]='';w.agentReplyPending=null;w.agentAttachment=null;updateAgentRun(saved);}
+      }catch{}
+    }
+    showError(error,'agent-error');
+  }
+}
+
+function agentProvider(run) {
+  const normalize=value=>String(value || '').replace(/\/chat\/completions\/?$/,'').replace(/\/+$/,'');
+  const kind=run.provider.provider,base=run.provider.base_url || (kind==='groq'?'https://api.groq.com/openai/v1':kind==='openai'?'https://api.openai.com/v1':'');
+  return aiConfig.providers.find(p=>p.kind===kind && p.model===run.provider.model && normalize(p.baseUrl)===normalize(base));
+}
+function renderAgentDraftChoices() {
+  const w=aiWorkspace(),select=$('agent-draft');
+  const current=d=>!d.error && d.base_version===state.project.active_version;
+  const reset=!!w.agentDraft && !state.drafts.some(d=>d.id===w.agentDraft && current(d));
+  select.innerHTML='<option value="">Published API · create a draft only when needed</option>'+state.drafts.map(d=>'<option value="'+esc(d.id)+'"'+(current(d)?'':' disabled')+'>'+esc(draftName(d))+' · '+esc(d.id.slice(0,8))+(current(d)?'':' · older base — use a new draft')+'</option>').join('');
+  if(reset)w.agentDraft='';
+  select.value=w.agentRun?.draft_id || w.agentDraft || '';
+  $('agent-draft-help').textContent=reset?'The previous draft has an older base. New changes will start from the published API; the original draft is kept.':'One working draft per conversation. Choose a current draft to continue or repair it.';
+}
+function assistantMessage() {
+  const w=aiWorkspace(),text=$('agent-message').value.trim(),attachment=w.agentAttachment;
+  let message=text;
+  if(attachment) {
+    if(!attachment.text.trim() || attachment.text.includes('\u0000'))throw Error('The specification must contain readable, nonempty text.');
+    if(/\.json$/i.test(attachment.name))try{JSON.parse(attachment.text);}catch{throw Error('The attached JSON specification is invalid. Fix it before sending.');}
+    message+=(message?'\n\n':'')+'Attached specification ('+attachment.name+'):\n'+attachment.text;
+  }
+  if(!message.trim())throw Error('Enter a message or attach a specification.');
+  if(message.length>32768)throw Error('Keep the message and attached specification together within 32,768 characters.');
+  return message;
+}
+function renderAssistantAttachment() {
+  const attachment=aiWorkspace().agentAttachment;
+  $('assistant-attachment-content').hidden=!attachment;
+  $('assistant-spec').value=attachment?.text || '';
+  $('assistant-file-name').textContent=attachment?.name || '';
+  $('assistant-file').value='';
+}
+async function readAssistantFile() {
+  clearError('agent-error');const file=$('assistant-file').files[0];if(!file)return;
+  try {
+    if(file.size>131072)throw Error('Keep the specification within 128 KiB and 32,768 characters.');
+    if(!/\.(json|ya?ml|md|txt)$/i.test(file.name))throw Error('Choose JSON, YAML, Markdown, or a text file.');
+    const text=await file.text();
+    if(text.length>32768 || !text.trim() || text.includes('\u0000'))throw Error('Use a readable, nonempty specification within 32,768 characters.');
+    if(/\.json$/i.test(file.name))try{JSON.parse(text);}catch{throw Error('The JSON specification is invalid. Fix its syntax before attaching it.');}
+    aiWorkspace().agentAttachment={name:file.name,text};renderAssistantAttachment();syncAgentControls();
+  }catch(error){$('assistant-file').value='';showError(error,'agent-error');}
+}
+function assistantConversationMarkup(run) {
+  const message=(kind,text)=>'<article class="assistant-message '+(kind==='user'?'you':'')+'"><span class="eyebrow">'+(kind==='user'?'You':'Reqlica')+'</span><div class="agent-prose">'+agentMarkdown(text)+'</div></article>';
+  let markup=message('user',run.message),tools=[];
+  const flush=()=>{if(!tools.length)return;const failed=tools.filter(e=>e.status!=='done').length;markup+='<details class="assistant-tools"><summary>'+tools.length+' action'+(tools.length===1?'':'s')+(failed?' · '+failed+' need attention':' · completed')+'</summary><ol class="agent-ledger">'+tools.map(agentEventMarkup).join('')+'</ol></details>';tools=[];};
+  const events=run.events || [];
+  events.forEach((event,index)=>{
+    if(event.kind==='tool'){tools.push(event);return;}
+    flush();
+    if(index===events.length-1 && event.kind==='assistant' && event.text===run.answer)return;
+    markup+=message(event.kind,event.text);
+  });flush();return markup;
+}
+function renderAssistantArchive() {
+  const turns=aiWorkspace().turns || [];
+  $('assistant-legacy-chats').hidden=!turns.length;
+  $('assistant-legacy-content').innerHTML=turns.map(turn=>'<article class="assistant-message you"><span class="eyebrow">You</span><div class="agent-prose">'+agentMarkdown(turn.question)+'</div></article><article class="assistant-message"><span class="eyebrow">Reqlica</span><div class="agent-prose">'+agentMarkdown(turn.answer)+'</div><p class="help">Sources: '+(turn.sources || []).map(esc).join(', ')+'</p></article>').join('');
+}
+function syncAgentControls() {
+  if(!state.project)return;
+  const w=aiWorkspace(),run=w.agentRun,p=run?agentProvider(run):aiConfig.providers.find(p=>p.id===$('agent-provider').value);
+  const locked=!!run || state.busy;
+  for(const id of ['agent-provider','agent-draft','agent-execution','agent-allow-edits'])$(id).disabled=locked;
+  if(!state.project.active_version)$('agent-allow-edits').disabled=true;
+  const text=run?w.agentReplyDrafts?.[run.id]:w.agentMessage;
+  const hasMessage=!!(text?.trim() || w.agentAttachment?.text?.trim());
+  $('agent-start').disabled=state.busy || !!w.agentRunning || !hasMessage || !['groq','openai','compatible'].includes(p?.kind) || (!!run && !run.can_reply);
+  $('agent-start').textContent=run?'Send reply →':'Send message →';
+  $('agent-resume').disabled=state.busy || !run?.can_resume;
+  $('agent-review').disabled=state.busy || !run?.draft_id;
+  $('agent-pause').disabled=!w.agentRunning || w.agentStop;
+  $('assistant-new').disabled=state.busy || !!w.agentRunning;
+  for(const id of ['agent-message','assistant-file','assistant-spec'])$(id).disabled=state.busy || !!w.agentRunning || (!!run && !run.can_reply);
+  const edits=run?run.allow_edits!==false:!!state.project.active_version && $('agent-allow-edits').checked;
+  $('assistant-settings-summary').textContent=(p?.model || 'Choose provider')+' · '+(edits?'Draft edits allowed':'Read only')+((run?run.allow_execution:$('agent-execution').checked)?' · Checks allowed':'');
+}
+function renderAgentWorkspace() {
+  const w=aiWorkspace(),run=w.agentRun;
+  $('agent-message').value=run?w.agentReplyDrafts?.[run.id] || '':w.agentMessage || '';
+  if(run){const p=agentProvider(run);$('agent-provider').value=p?.id || '';$('agent-allow-edits').checked=run.allow_edits!==false;$('agent-execution').checked=run.allow_execution;}
+  else {$('agent-provider').value=w.agentProvider || aiConfig.defaultProvider || aiConfig.providers[0]?.id || '';$('agent-allow-edits').checked=!!state.project.active_version && (w.agentAllowEdits ?? true);$('agent-execution').checked=w.agentExecution || false;}
+  $('assistant-message-label').textContent=run?'Continue the conversation':'Message';
+  $('assistant-compose-context').textContent=run?'Same conversation, draft, permissions, and remaining budget. Ctrl/⌘ + Enter to send.':'Questions, specifications, edits, repairs, or sample data. Ctrl/⌘ + Enter to send.';
+  $('assistant-permissions-help').textContent=run?'Setup is fixed for this conversation. Start a new conversation to change permissions or provider. Publishing, live insertion, database setup, and secrets remain manual.':!state.project.active_version?'This legacy project supports read-only questions and data previews. Convert to versioned storage in Drafts & checks to enable draft edits.':'Checks execute trusted Python on disposable data with your OS permissions. Publishing, live data insertion, database setup, and secret values stay under your manual control.';
+  renderAssistantAttachment();
+  $('agent-empty').hidden=!!run;$('agent-run-content').hidden=!run;$('agent-run-actions').hidden=!run;
+  if(run) {
+    const status=w.agentRunning?(w.agentStop?'Pausing':'Running'):run.status==='ready'?'Paused':run.status==='running'?'Step unconfirmed':({completed:run.can_reply?'Reply ready':'Finished',failed:'Request failed',limit:'Budget reached',conflict:'Code changed',interrupted:'Review required'}[run.status] || run.status);
+    $('agent-status').textContent=status;$('agent-status').className='badge '+(run.status==='completed'?'':run.error?'error':'draft');
+    $('agent-counter').textContent=run.model_calls+' / '+run.limits.model_calls+' model requests · '+run.tool_calls+' / '+run.limits.tool_calls+' tool calls';
+    $('agent-request').textContent=run.message;
+    $('agent-draft-id').textContent=run.draft_id?run.draft_id.slice(0,12)+' · '+run.revision.slice(0,12):'Published API · no working draft';
+    $('agent-live').textContent=w.agentRunning?(w.agentStop?'Pausing after this step. Progress is saved.':'Working on the next step…'):run.status==='completed'?(run.can_reply?'Reply below to continue.':'Conversation budget finished. Start a new conversation to continue.'):run.can_resume?'Progress saved. Resume to continue.':'Conversation stopped. Review the notice and saved work.';
+    const ledger=$('agent-events'),follow=ledger.scrollHeight-ledger.scrollTop-ledger.clientHeight<48;
+    const opened=Array.from(ledger.querySelectorAll('details'),detail=>detail.open);
+    const markup=assistantConversationMarkup(run);
+    if(ledger.innerHTML!==markup){ledger.innerHTML=markup;ledger.querySelectorAll('details').forEach((detail,index)=>{if(opened[index])detail.open=true;});}
+    if(w.agentScroll || w.agentRenderedRun!==run.id || w.agentRenderedTurn!==(run.turn || 0) || (w.agentRunning && follow))ledger.scrollTop=ledger.scrollHeight;
+    w.agentScroll=false;w.agentRenderedRun=run.id;w.agentRenderedTurn=run.turn || 0;
+    $('agent-answer').innerHTML=agentMarkdown(run.answer);$('assistant-answer-wrap').hidden=!run.answer;
+    $('agent-checks').hidden=!run.draft_id;
+    $('agent-checks').innerHTML=['validate_draft','test_draft'].map(name=>{const check=run.checks[name],passed=check?.status==='passed' && check.revision===run.revision;return '<span class="badge '+(check?(passed?'':'error'):'neutral')+'">'+(name==='validate_draft'?'Validation':'Tests')+': '+(check?(passed?'passed':'failed / stale'):'not run')+'</span>';}).join('');
+    $('agent-notice').hidden=!run.error && !run.notice;$('agent-notice').textContent=run.error?.message || run.notice || '';
+    $('agent-pause').hidden=!w.agentRunning;$('agent-resume').hidden=w.agentRunning || !run.can_resume;$('agent-review').hidden=!run.draft_id;
+    const preview=run.data_preview;$('assistant-data-preview').hidden=!preview;
+    if(preview){const records=preview.records_by_table || preview.records,counts=dataRecordCounts(records),total=Object.values(counts).reduce((a,b)=>a+b,0);$('assistant-data-summary').textContent=total+' record'+(total===1?'':'s')+' · '+(preview.target==='related'?Object.keys(counts).length+' tables':preview.table || 'JSON fixture')+' · '+preview.validation.status+'. Review and edit before any insertion.';}
+  } else {$('agent-status').textContent='Ready';$('agent-status').className='badge neutral';$('agent-counter').textContent='Questions · draft changes · checks · data previews';}
+  const runs=w.agentRuns || [];$('agent-history').hidden=!runs.length;
+  $('agent-history-list').innerHTML=runs.map(item=>'<div class="draft-item"><div class="draft-identity"><p>'+esc(item.message.slice(0,160))+'</p><span class="help">'+esc(item.provider.model)+' · '+esc(item.status)+' · '+item.tool_calls+' tool calls</span></div><button class="btn" type="button" data-agent-run="'+esc(item.id)+'">Open conversation</button></div>').join('');
+  $('agent-history-list').querySelectorAll('button').forEach(button=>button.disabled=state.busy);
+  syncAgentControls();
+}
+async function submitAssistantMessage() {
+  try{if(aiWorkspace().agentRun)await sendAgentReply();else await startAgent();}catch(error){showError(error,'agent-error');}
+}
+async function newAssistantConversation() {
+  const w=aiWorkspace(),unsent=w.agentRun?w.agentReplyDrafts?.[w.agentRun.id]:w.agentMessage;
+  if((unsent?.trim() || w.agentAttachment) && !await confirmAction('Start a new conversation?','Discard the unsent message and attachment? Saved conversations and project changes are kept.'))return false;
+  if(w.agentRun && w.agentReplyDrafts)delete w.agentReplyDrafts[w.agentRun.id];
+  w.agentNew=true;w.agentRun=null;w.agentMessage='';w.agentDraft='';w.agentAttachment=null;w.agentReplyPending=null;
+  w.agentProvider=aiConfig.defaultProvider || aiConfig.providers[0]?.id || '';w.agentAllowEdits=!!state.project.active_version;w.agentExecution=false;
+  clearError('agent-error');renderAgentWorkspace();renderAgentDraftChoices();state.focusAfterRun='agent-message';return true;
+}
+async function openAssistantContext({draftId='',message='',checks=false,providerId}={}) {
+  if(state.dirty){showError(Error('Save or discard unsaved source edits before preparing this request.'));return false;}
+  const workspace=aiWorkspace(),current=workspace.agentRun;
+  if(draftId && current?.draft_id===draftId && current.revision===state.draft?.revision && state.draft.base_version===state.project.active_version && current.can_reply && current.allow_edits!==false && (!checks || current.allow_execution)) {
+    const unsent=workspace.agentReplyDrafts?.[current.id];
+    if((unsent?.trim() || workspace.agentAttachment) && !await confirmAction('Prepare this follow-up?','Replace the unsent message and attachment with this request? Saved conversation and draft changes are kept.'))return false;
+    workspace.agentReplyDrafts=workspace.agentReplyDrafts || {};workspace.agentReplyDrafts[current.id]=message;workspace.agentAttachment=null;
+    setView('generate');renderAgentWorkspace();state.focusAfterRun='agent-message';return true;
+  }
+  if(!await newAssistantConversation())return false;
+  const w=aiWorkspace();w.agentDraft=draftId;w.agentMessage=message;w.agentExecution=checks;
+  if(providerId)w.agentProvider=providerId;
+  setView('generate');renderAgentDraftChoices();
+  renderAgentWorkspace();state.focusAfterRun='agent-message';return true;
+}
+async function prepareAssistantData() {
+  try{const input=dataInputs();if(!input.requirements)throw Error('Describe the records you want to prepare.');await openAssistantContext({providerId:$('data-provider').value,message:'Prepare synthetic mock data for review using preview_mock_data. Do not edit code or insert live data. Read current live table definitions and application contracts before preparing database records.\n\nDataset request:\n'+JSON.stringify({...input,target:aiWorkspace().dataTarget},null,2)});}catch(error){showError(error,'ai-data-error');}
+}
+async function reviewAssistantData() {
+  const w=aiWorkspace(),preview=w.agentRun?.data_preview;if(!preview)throw Error('No data preview is available.');
+  if(w.dataRawPreview?.trim() && !await confirmAction('Open this data preview?','Replace the current unsaved Mock data preview? Live records are kept.'))return;
+  w.dataTarget=preview.target;w.dataTable=preview.table || '';w.dataPreview=preview.records_by_table || preview.records;w.dataRawPreview=pretty(w.dataPreview);w.dataValidation=null;w.dataImportResult=null;w.dataRefusal=null;
+  w.dataBrief={validation:preview.validation,schema:preview.schema_fingerprint,insertion_order:preview.insertion_order,preview_primary_keys:preview.preview_primary_keys,note:preview.note};
+  if(preview.target!=='json')await loadDataSchema();setView('data');renderDataWorkspace();syncControls();
+}
+function updateAgentRun(result) {
+  const w=aiWorkspace();w.agentRun=result;w.agentRuns=[result,...(w.agentRuns || []).filter(r=>r.id!==result.id)];renderAgentWorkspace();
+}
+async function loadAgentRuns() {
+  if(!state.project)return;
+  try {
+    const payload=await api('console',root()+'/agent-runs'),w=aiWorkspace();w.agentRuns=payload.runs;
+    w.agentRun=payload.runs.find(r=>r.id===w.agentRun?.id) || (w.agentNew?null:payload.runs[0]) || null;
+    renderAgentWorkspace();
+  } catch(error) {if(![404,405].includes(error.status))showError(error,'agent-error');}
+}
+async function selectAgentRun(id) {
+  const w=aiWorkspace();if(w.agentAttachment && !await confirmAction('Switch conversations?','Discard the unsent attachment? Unsent message text is kept per conversation.'))return;
+  clearError('agent-error');w.agentAttachment=null;w.agentNew=false;updateAgentRun(await api('console',root()+'/agent-runs/'+id));renderAgentDraftChoices();
+}
+async function continueAgent(result,p) {
+  const w=aiWorkspace(),projectId=state.project.id,buildRoot=root()+'/agent-runs/'+result.id;
+  w.agentRunning=true;w.agentStop=false;
+  // At most 24 model calls + 64 tools, enforced again by the durable backend.
+  try {
+    for(let step=0;step<90;step++) {
+      updateAgentRun(result);
+      if(w.agentStop || !result.can_resume || state.project?.id!==projectId)return;
+      if(result.status==='failed' && step>0)return;
+      const key=providerKeys.get(p.id);
+      result=await api('console',buildRoot+'/step','POST',{}, {...(key?{'X-Reqlica-Groq-Key':key}:{}),'X-Reqlica-AI-Timeout-Seconds':String(result.timeout_seconds)});
+    }
+  } catch(error) {
+    // Recover the last saved response after a browser timeout, never retry a tool
+    // automatically. The current server step may still be running.
+    try {result=await api('console',buildRoot);}catch{}
+    showError(error,'agent-error');
+  } finally {
+    w.agentRunning=false;if(state.project?.id===projectId){updateAgentRun(result);await loadDrafts();}else{w.agentRun=result;return;}
+    if(result.draft_id)w.agentDraft=result.draft_id;
+    renderAgentDraftChoices();
+    if(result.can_reply)state.focusAfterRun='agent-message';
+  }
+}
+async function startAgent() {
+  clearError('agent-error');
+  const w=aiWorkspace(),message=assistantMessage(),p=aiConfig.providers.find(p=>p.id===$('agent-provider').value);
+  if(!message || !p)throw Error('Choose a provider and describe the change.');
+  const selected=$('agent-draft').value,allow_execution=$('agent-execution').checked,allow_edits=!!state.project.active_version && $('agent-allow-edits').checked;
+  if(selected && state.dirty && state.draft?.id===selected){showError(Error('Save or discard your unsaved source edits before asking the builder to change this draft.'),'agent-error');return;}
+  if(!await confirmAction('Start Project AI conversation?', 'Send messages, specifications, source context, database definitions, and tool results to '+p.model+' at '+p.baseUrl+'? '+(allow_edits?'Requested changes may edit one unpublished draft.':'Draft editing is disabled.')+(allow_execution?' Checks may execute generated Python with your OS permissions on disposable data.':' Code execution is disabled.')+' Up to 24 model requests and 64 tool calls share this conversation’s budget. Publishing and live insertion remain manual.'))return;
+  try {
+    const current=selected?await api('console',root()+'/drafts/'+selected):null;
+    const result=await api('console',root()+'/agent-runs/'+crypto.randomUUID().replaceAll('-',''),'PUT',{message,allow_execution,allow_edits,...(current?{draft_id:current.id,expected_revision:current.revision}:{}),provider:p.kind,base_url:p.baseUrl,model:p.model,reasoning_mode:p.reasoning || 'default',temperature:aiConfig.defaults.temperature,max_tokens:aiConfig.defaults.maxTokens,timeout_seconds:aiConfig.defaults.timeoutSeconds});
+    w.agentMessage='';w.agentAttachment=null;w.agentNew=false;await continueAgent(result,p);
+  } catch(error){showError(error,'agent-error');}
+}
+async function resumeAgent() {
+  clearError('agent-error');
+  const current=aiWorkspace().agentRun;if(!current)return;
+  try {
+    const result=await api('console',root()+'/agent-runs/'+current.id),p=agentProvider(result);
+    if(!p)throw Error('Add a matching provider profile for '+result.provider.model+' in Settings to resume.');
+    if(result.draft_id && state.dirty && state.draft?.id===result.draft_id)throw Error('Save or discard unsaved edits in this draft before resuming.');
+    if(!await confirmAction('Resume this conversation?', 'Continue the saved request with '+p.model+' using its remaining budget?'+(result.allow_execution?' This run allows execution of generated Python checks.':' Checks are disabled for this run.')+' A currently running or interrupted tool is never replayed automatically.'))return;
+    await continueAgent(result,p);
+  } catch(error){showError(error,'agent-error');}
+}
+
 function renderGenerationJobs() {
   const jobs=aiWorkspace().generationJobs || [],node=$('generation-jobs');
-  node.hidden=!jobs.length || aiWorkspace().task==='ask';
-  node.innerHTML=jobs.map(job=>'<div class="section-gap"><strong>'+esc(job.summary)+'</strong><p class="help" role="status">'+esc(job.status)+' · '+job.completed_files.length+' / '+job.total_files+' files saved · '+esc(job.provider.model)+'</p>'+(job.error?'<p>'+esc(job.error.message)+'</p>':'')+(job.can_resume?'<button type="button" class="btn" data-generation-job="'+esc(job.id)+'" '+(state.busy?'disabled':'')+'>Resume generation →</button>':job.draft_id?'<button type="button" class="btn" data-job-draft="'+esc(job.draft_id)+'">Inspect saved draft →</button>':'')+'</div>').join('');
+  node.hidden=!jobs.length;
+  $('assistant-legacy-jobs').hidden=!jobs.length;
+  const opened=new Set(Array.from(node.querySelectorAll?.('details[open]') || [],item=>item.dataset.jobDetails));
+  const completed=jobs.filter(job=>job.status==='completed').length;
+  node.innerHTML='<div class="generation-history-head"><div><h2>Saved generations</h2><p>Open a draft to review it, or expand a run for details.</p></div><span class="generation-history-count">'+completed+' / '+jobs.length+' completed</span></div><div class="generation-history-list">'+jobs.map(job=>{
+    const tone=job.status==='completed'?'completed':job.error?'error':job.can_resume?'ready':'neutral';
+    const status=job.status==='completed'?'Completed':job.status==='running'?'Generating':job.can_resume?(job.error?'Needs attention':'Ready to resume'):job.status==='stale'?'Outdated':job.status.replaceAll('_',' ');
+    const files=(job.completed_files?.length || 0)+' / '+(job.total_files || 0)+' files saved';
+    const title=job.summary || 'Untitled generation';
+    const action=job.can_resume?'<button type="button" class="btn generation-job-action" data-generation-job="'+esc(job.id)+'" '+(state.busy?'disabled':'')+'>Resume generation →</button>':job.draft_id?'<button type="button" class="btn generation-job-action" data-job-draft="'+esc(job.draft_id)+'">Inspect saved draft →</button>':'';
+    return '<article class="generation-job" data-state="'+tone+'"><details data-job-details="'+esc(job.id)+'"'+(opened.has(job.id)?' open':'')+'><summary><span class="generation-job-indicator" aria-hidden="true"></span><span><span class="generation-job-title">'+esc(title)+'</span><span class="generation-job-meta"><span class="generation-job-status">'+esc(status)+'</span><span>'+esc(files)+'</span></span></span></summary><div class="generation-job-body"><p>'+esc(title)+'</p><p class="help">Model · <code>'+esc(job.provider?.model || 'Unknown')+'</code></p>'+(job.error?'<p class="generation-job-error">'+esc(job.error.message)+'</p>':'')+'</div></details>'+action+'</article>';
+  }).join('')+'</div>';
 }
 async function loadGenerationJobs() {
   const projectId=state.project?.id;if(!projectId)return;
@@ -1374,7 +1742,12 @@ function previewData() {
   } catch(error) {showError(error,'ai-data-error');}
 }
 function dataInputs() {
-  const w=aiWorkspace(),count=Number($('ai-data-count').value),raw=$('ai-data-template').value.trim() || '{}';
+  const w=aiWorkspace();
+  if(w.dataTarget==='related') {
+    if(!w.dataSchema?.tables?.length)throw Error('Load existing database tables first.');
+    return {requirements:$('ai-data-prompt').value.trim(),expected_schema:w.dataSchema.fingerprint};
+  }
+  const count=Number($('ai-data-count').value),raw=$('ai-data-template').value.trim() || '{}';
   if(!Number.isInteger(count) || count<1 || count>100)throw Error('Choose 1–100 whole records.');
   if(new TextEncoder().encode(raw).length>16384)throw Error('Keep the record template within 16 KiB.');
   let template;try{template=JSON.parse(raw);}catch{throw Error('Enter a valid JSON record template.');}
@@ -1387,23 +1760,51 @@ function readDataRecords() {
   const raw=aiWorkspace().dataRawPreview;
   if(new TextEncoder().encode(raw).length>128*1024)throw Error('Keep the record batch within 128 KiB.');
   let records;try{records=JSON.parse(raw,(key,value)=>{if(typeof value==='number' && !Number.isFinite(value))throw Error();return value;});}catch{throw Error('The record preview must contain valid JSON with finite numbers.');}
+  if(aiWorkspace().dataTarget==='related'){validateRelatedPreview(records);return records;}
   if(!Array.isArray(records) || !records.length || records.length>100 || records.some(row=>!row || typeof row!=='object' || Array.isArray(row) || !Object.keys(row).length))throw Error('Use an array of 1–100 nonempty JSON record objects.');
   return records;
+}
+function validateRelatedPreview(records) {
+  if(!records || typeof records!=='object' || Array.isArray(records) || !Object.keys(records).length || Object.keys(records).length>10)throw Error('Use an object mapping 1–10 table names to record arrays.');
+  let total=0;
+  for(const rows of Object.values(records)) {
+    if(!Array.isArray(rows) || !rows.length || rows.some(row=>!row || typeof row!=='object' || Array.isArray(row) || !Object.keys(row).length))throw Error('Each table needs an array of nonempty record objects.');
+    total+=rows.length;
+  }
+  if(total>100)throw Error('Use at most 100 records across all tables.');
+}
+function dataRecordCounts(records) {
+  if(Array.isArray(records))return {records:records.length};
+  return Object.fromEntries(Object.entries(records || {}).map(([name,rows])=>[name,Array.isArray(rows)?rows.length:0]));
+}
+function dataValidationBody(records) {
+  const w=aiWorkspace();
+  return w.dataTarget==='related'?{records_by_table:records,expected_schema:w.dataSchema?.fingerprint}:{target:w.dataTarget,records,...(w.dataTarget==='sqlite'?{table:w.dataTable,expected_schema:w.dataSchema?.fingerprint}:{})};
 }
 function renderDataWorkspace() {
   const w=aiWorkspace(),hasData=!!w.dataRawPreview;
   const tables=(w.dataSchema?.tables || []).filter(t=>!t.storage_type || t.storage_type==='table');
-  $('data-target').value=w.dataTarget;$('data-collection-field').hidden=w.dataTarget==='sqlite';$('data-table-field').hidden=w.dataTarget!=='sqlite';
+  const related=w.dataTarget==='related';
+  $('data-target').value=w.dataTarget;$('data-collection-field').hidden=w.dataTarget!=='json';$('data-table-field').hidden=w.dataTarget!=='sqlite';
+  for(const id of ['data-count-field','data-template-field','template-data-button'])$(id).hidden=related;
+  $('data-related-schema').hidden=!related;
+  $('data-related-tables').innerHTML=tables.map(table=>'<span class="badge neutral">'+esc(table.name)+'</span>').join('') || '<span class="help">No tables loaded. Reload definitions or create tables in Database setup.</span>';
+  $('data-related-relationships').textContent=(w.dataSchema?.relationships || []).map(r=>r.from_table+'.'+r.from_columns.join(', ')+' → '+r.to_table+'.'+r.to_columns.map(c=>c || 'primary key').join(', ')).join('\n') || 'No declared foreign keys.';
   $('data-table').innerHTML='<option value="">'+(tables.length?'Choose a table':'No ordinary tables; use JSON fixtures')+'</option>'+tables.map(t=>'<option value="'+esc(t.name)+'">'+esc(t.name)+'</option>').join('');
   $('data-table').value=w.dataTable;
   const table=w.dataSchema?.tables.find(t=>t.name===w.dataTable);$('data-table-schema').textContent=table?pretty({columns:table.columns,foreign_keys:table.foreign_keys,indexes:table.indexes}):'Choose an existing table. Create missing tables in Drafts & checks → Database setup, then reload here.';
-  $('ai-data-empty').hidden=hasData;$('data-preview-workspace').hidden=!hasData;
+  $('ai-data-empty').hidden=hasData;$('data-preview-workspace').hidden=!hasData;$('data-preview-actions').hidden=!hasData;
+  $('data-empty-title').textContent=w.dataRefusal?"This data can't be mocked":'Your data starts here.';
+  $('data-empty-description').textContent=w.dataRefusal || (related?'Describe the dataset in one prompt. Review the linked records here before saving.':'Generate records or use your template, then edit any values before saving.');
   $('ai-data-preview').value=w.dataRawPreview;
-  $('ai-data-preview-count').textContent=(w.dataPreview?.length || 0)+' records';
+  const counts=dataRecordCounts(w.dataPreview),total=Object.values(counts).reduce((a,b)=>a+b,0);
+  $('ai-data-preview-count').textContent=total?total+' records'+(related?' · '+Object.keys(counts).length+' tables':''):'No records yet';
+  $('data-related-counts').hidden=!related || !hasData;
+  $('data-related-counts').innerHTML=related?Object.entries(counts).map(([name,count])=>'<span class="badge neutral">'+esc(name)+' · '+count+'</span>').join(''):'';
   $('ai-data-brief').textContent=w.dataBrief?pretty(w.dataBrief):'No records prepared.';
   clearError('data-validation-error');
   const validation=w.dataValidation?.validation;
-  $('data-preview-status').textContent=w.dataImportResult?'Inserted '+w.dataImportResult.inserted_count+' records into '+w.dataImportResult.table:validation?.status==='passed'?'Validated'+(w.dataTarget==='sqlite'?' for '+w.dataTable:' as JSON')+' · ready to review':hasData?'Preview only · edit values, then validate before inserting.':'';
+  $('data-preview-status').textContent=w.dataImportResult?'Inserted '+w.dataImportResult.inserted_count+' records'+(related?' across '+Object.keys(w.dataImportResult.inserted_counts || {}).length+' tables':' into '+w.dataImportResult.table):validation?.status==='passed'?'Validated'+(related?' together across related tables':w.dataTarget==='sqlite'?' for '+w.dataTable:' as JSON')+' · ready to review':hasData?'Preview only · edit values, then validate before inserting.':'';
   if(validation?.status==='failed')showError(Error(validation.message),'data-validation-error');
 }
 function resolveChainValue(value,results,pathMode=false) {
@@ -1485,38 +1886,49 @@ async function loadDataSchema() {
 }
 async function generateDataWithGroq() {
   clearError('ai-data-error');
+  aiWorkspace().dataRefusal=null;
   try {
     const w=aiWorkspace(),input=dataInputs(),p=aiConfig.providers.find(item=>item.id===$('data-provider').value);
     if(!input.requirements)throw Error('Describe the records you want to generate.');
     if(!['groq','openai','compatible'].includes(p?.kind))throw Error('Select a Groq, OpenAI, or OpenAI-compatible provider.');
-    if(!await confirmAction('Generate mock records?', 'Send this description, template, and '+(input.target==='sqlite'?'definitions for '+input.table:'fixture field shape')+' to '+p.model+' at '+p.baseUrl+'? Existing records are not sent. Generated JSON will be previewed only; nothing is inserted.'))return;
+    const related=w.dataTarget==='related';
+    if(!await confirmAction('Generate mock records?', 'Send this description and '+(related?'database definitions and published application code':input.target==='sqlite'?'template, published application code, and definitions for '+input.table:'fixture field shape')+' to '+p.model+' at '+p.baseUrl+'? Existing records are not sent. Generated JSON will be previewed only; nothing is inserted.'))return;
     const key=providerKeys.get(p.id);
-    const preview=await api('console',root()+'/data/generate','POST',{...input,provider:p.kind,base_url:p.baseUrl,model:p.model,reasoning_mode:p.reasoning || 'default',temperature:aiConfig.defaults.temperature,max_tokens:aiConfig.defaults.maxTokens},key?{'X-Reqlica-Groq-Key':key}:{});
-    w.dataPreview=preview.records;w.dataRawPreview=pretty(preview.records);w.dataValidation=preview;w.dataImportResult=null;w.dataBrief={summary:preview.summary,assumptions:preview.assumptions,validation:preview.validation,schema:preview.schema_fingerprint};w.dataProvider=p.id;
+    const preview=await api('console',root()+(related?'/data/related/generate':'/data/generate'),'POST',{...input,provider:p.kind,base_url:p.baseUrl,model:p.model,reasoning_mode:p.reasoning || 'default',temperature:aiConfig.defaults.temperature,max_tokens:aiConfig.defaults.maxTokens},key?{'X-Reqlica-Groq-Key':key}:{});
+    w.dataPreview=related?preview.records_by_table:preview.records;w.dataRawPreview=pretty(w.dataPreview);w.dataValidation=preview;w.dataImportResult=null;w.dataBrief={summary:preview.summary,assumptions:preview.assumptions,validation:preview.validation,schema:preview.schema_fingerprint,insertion_order:preview.insertion_order,preview_primary_keys:preview.preview_primary_keys,note:preview.note};w.dataProvider=p.id;
     renderDataWorkspace();syncControls();
-  } catch(error){showError(error,'ai-data-error');}
+  } catch(error){
+    if(error.details?.code==='mock_data_unsupported') {
+      const w=aiWorkspace();w.dataRefusal=error.details.message;w.dataPreview=null;w.dataRawPreview='';w.dataValidation=null;w.dataImportResult=null;w.dataBrief=null;
+      renderDataWorkspace();syncControls();error=Error(w.dataRefusal);
+    }
+    showError(error,'ai-data-error');
+  }
 }
 async function validateDataPreview() {
   clearError('ai-data-error');
   try {
     const w=aiWorkspace(),records=readDataRecords();
-    const result=await api('console',root()+'/data/validate','POST',{target:w.dataTarget,records,...(w.dataTarget==='sqlite'?{table:w.dataTable,expected_schema:w.dataSchema?.fingerprint}:{})});
-    w.dataValidation=result;w.dataPreview=result.records;w.dataRawPreview=pretty(result.records);w.dataImportResult=null;
-    w.dataBrief={...w.dataBrief,validation:result.validation,schema:result.schema_fingerprint};renderDataWorkspace();syncControls();
-  } catch(error){showError(error,'ai-data-error');}
+    const related=w.dataTarget==='related';
+    const result=await api('console',root()+(related?'/data/related/validate':'/data/validate'),'POST',dataValidationBody(records));
+    w.dataValidation=result;w.dataPreview=related?result.records_by_table:result.records;w.dataRawPreview=pretty(w.dataPreview);w.dataImportResult=null;
+    w.dataBrief={...w.dataBrief,validation:result.validation,schema:result.schema_fingerprint,insertion_order:result.insertion_order,preview_primary_keys:result.preview_primary_keys,note:result.note};renderDataWorkspace();syncControls();
+  } catch(error){aiWorkspace().dataValidation=null;syncControls();showError(error,'ai-data-error');}
 }
 async function insertDataPreview() {
   clearError('ai-data-error');
   try {
     const w=aiWorkspace(),review=w.dataValidation,records=readDataRecords();
-    if(w.dataTarget!=='sqlite' || review?.validation?.status!=='passed' || review.table!==w.dataTable || w.dataImportResult)throw Error('Validate the current table and records before inserting.');
-    if(!await confirmAction('Insert '+records.length+' records into '+w.dataTable+'?', 'Append these reviewed records to persistent SQLite data for '+state.project.name+'? Existing records are kept. The full batch is atomic; nothing is automatically published or run through an endpoint.'))return;
-    w.dataImportResult=await api('console',root()+'/data/insert','POST',{target:'sqlite',table:w.dataTable,records,expected_schema:review.schema_fingerprint,expected_preview_digest:review.preview_digest,confirm:true});
+    const related=w.dataTarget==='related',counts=dataRecordCounts(records),total=Object.values(counts).reduce((a,b)=>a+b,0);
+    if(!['sqlite','related'].includes(w.dataTarget) || review?.validation?.status!=='passed' || (!related && review.table!==w.dataTable) || w.dataImportResult)throw Error('Validate the current tables and records before inserting.');
+    const destination=related?Object.entries(counts).map(([name,count])=>count+' '+name).join(', '):w.dataTable;
+    if(!await confirmAction('Insert '+total+' related records?', 'Append '+destination+' to '+state.project.name+'? Parent rows are inserted first; foreign keys resolve to actual IDs. The full batch is atomic across all tables. Existing records are kept.'))return;
+    w.dataImportResult=await api('console',root()+(related?'/data/related/insert':'/data/insert'),'POST',{...dataValidationBody(records),expected_schema:review.schema_fingerprint,expected_preview_digest:review.preview_digest,confirm:true});
     w.dataBrief={...w.dataBrief,insertion:w.dataImportResult};renderDataWorkspace();syncControls();
   } catch(error){aiWorkspace().dataValidation=null;$('data-preview-status').textContent='Insertion was not confirmed successful. Check live records before retrying.';showError(error,'ai-data-error');syncControls();}
 }
 function downloadData() {
-  const records=readDataRecords(),w=aiWorkspace(),name=((w.dataTarget==='sqlite'?w.dataTable:w.collection) || 'mock-data').replace(/[^a-z0-9_-]+/gi,'-').slice(0,80);
+  const records=readDataRecords(),w=aiWorkspace(),name=((w.dataTarget==='related'?'related-records':w.dataTarget==='sqlite'?w.dataTable:w.collection) || 'mock-data').replace(/[^a-z0-9_-]+/gi,'-').slice(0,80);
   const url=URL.createObjectURL(new Blob([pretty(records)+'\n'],{type:'application/json'})),link=document.createElement('a');
   link.href=url;link.download=(name || 'mock-data')+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),0);
 }
@@ -1684,13 +2096,20 @@ const actions={
   'generate-environment':()=>saveEnvironment(true),
   'restart-environment':restartEnvironment,
   'generate-draft':()=>aiWorkspace().task==='ask'?askProjectWithGroq():prepareGeneration('generate'),
+  'build-on-draft':()=>{if(state.draft)openAssistantContext({draftId:state.draft.id,message:'Continue editing this draft.\n\nRequested change: '});},
+  'new-assistant':newAssistantConversation,
+  'paste-assistant-spec':()=>{const w=aiWorkspace();w.agentAttachment=w.agentAttachment || {name:'pasted-specification.txt',text:''};renderAssistantAttachment();state.focusAfterRun='assistant-spec';},
+  'remove-assistant-attachment':()=>{aiWorkspace().agentAttachment=null;renderAssistantAttachment();syncAgentControls();},
+  'review-assistant-data':reviewAssistantData,
+  'resume-agent':resumeAgent,
+  'review-agent-draft':async()=>{const id=aiWorkspace().agentRun?.draft_id;if(id){await loadDrafts();await openDraft(id);}},
   'copy-project-answer':()=>copy(aiWorkspace().answer?.answer),
   'new-project-chat':newProjectChat,
   'review-generated-draft':async()=>{const result=aiWorkspace().generationResult;if(result?.status==='draft_created'){await refreshProject();await openDraft(result.draft.id);}},
   'add-provider':()=>openProvider(),
   'toggle-provider-key':()=>{const show=$('provider-api-key').type==='password';$('provider-api-key').type=show?'text':'password';$('toggle-provider-key').textContent=show?'Hide':'Show';$('toggle-provider-key').setAttribute('aria-pressed',String(show));},
   'reset-ai-defaults':()=>{aiConfig.defaults={...aiDefaultOptions};aiConfig.defaultProvider=aiConfig.providers[0]?.id || '';persistAIConfig();fillAIDefaults();toast('AI defaults reset in this browser.');},
-  'ai-edit-endpoint':openAIEndpoint,
+  'ai-edit-endpoint':()=>{const route=state.project?.endpoints?.[state.selectedRoute];if(route)openAssistantContext({message:'Modify '+route.method+' '+route.path+'. Preserve unrelated behavior and routes.\n\nRequested change: '});},
   'endpoint-provider-settings':()=>{$('ai-endpoint-dialog').close();setView('settings');},
   'copy-generation-preview':()=>copy(pretty(aiWorkspace().generationPreview)),
   'copy-data-preview':()=>copy(pretty(readDataRecords())),
@@ -1721,7 +2140,7 @@ const actions={
   'draft-schema':async()=>{const schema=await api('console',draftRoot()+'/openapi.json?revision='+state.draft.revision);$('check-output').textContent=pretty(schema);$('check-output-details').open=true;$('check-output-details').scrollIntoView({block:'nearest'});state.focusAfterRun='check-output';},
   'test-draft':()=>{$('request-target').value='draft'; setView('tester');},
   validate:()=>runCheck('validate'), test:()=>runCheck('test'),
-  'repair-draft':repairFailedDraft,
+  'repair-draft':()=>{if(state.draft)openAssistantContext({draftId:state.draft.id,checks:true,message:'Inspect the failed validation/tests for this draft, repair the implementation while preserving existing tests and API contracts, then rerun validation and tests. Ask about missing requirements before editing.'+((state.draft.generation?.requirements || $('repair-requirements').value.trim())?'\n\nOriginal requirements:\n'+(state.draft.generation?.requirements || $('repair-requirements').value.trim()):'')});},
   'copy-approval':()=>copy($('approval-command').textContent),
   approve:async()=>{
     if(state.dirty || !approvable())throw Error('Save changes and pass validation/tests for this revision before approval.');
@@ -1732,7 +2151,7 @@ const actions={
     if(state.project?.id===projectId && state.draft?.id===draftId){updateDraft(result);await loadDrafts();}
     toast('Checked revision approved. Activation is a separate step.');
   },
-  activate:async()=>{if(!eligible() || state.dirty) throw Error('Refresh the draft and obtain approval of the exact checked revision first.'); if(!await confirmAction('Activate approved draft?','Publish revision '+state.draft.revision+' for '+state.project.name+'? The gateway may briefly reject requests while switching versions.'))return; state.project=await api('console',root()+'/activate','POST',{draft_id:state.draft.id,expected_revision:state.draft.revision}); state.schema=null; renderProject(); await loadProjects(); await loadDrafts(); renderDraft(); toast('Approved draft activated.');},
+  activate:async()=>{if(!eligible() || state.dirty) throw Error('Refresh the draft and obtain approval of the exact checked revision first.'); if(!await confirmAction('Activate approved draft?','Publish revision '+state.draft.revision+' for '+state.project.name+'? The gateway may briefly reject requests while switching versions.'))return; state.project=await api('console',root()+'/activate','POST',{draft_id:state.draft.id,expected_revision:state.draft.revision}); state.schema=null; renderProject(); await loadProjects(); await loadDrafts(); renderAgentDraftChoices(); renderDraft(); toast('Approved draft activated.');},
   convert:async()=>{if(state.project.status==='running') throw Error('Stop the legacy project before converting it.'); if(!await confirmAction('Convert legacy project?','Convert this idle/stopped project to a versioned layout so drafts can be created.'))return; state.project=await api('console',root()+'/convert','POST'); renderProject(); await loadProjects(); await loadDrafts(); toast('Project converted to versioned storage.');},
   'delete-file':async()=>{const path=$('file-path').value.trim(); if(path!==state.editorPath || !state.draft?.files.includes(path)) throw Error('Load the saved file before deleting it.'); if(!await confirmAction('Delete draft file?','Remove '+path+' from the draft? Unsaved editor changes will be discarded. Live code and data are not deleted.'))return; const d=await api('console',draftRoot()+'/files?path='+encodeURIComponent(path),'DELETE',{expected_revision:state.editorRevision}); state.editorPath=null; state.editorRevision=null; state.dirty=false; $('file-path').value=''; $('file-content').value=''; updateDraft(d); await loadDraftManifest();},
   'remove-route':async()=>{if(!state.draft)throw Error('Select a draft first.'); const method=$('route-method').value,path=$('route-path').value.trim(); if(!await confirmAction('Remove draft route?','Remove '+method+' '+path+' from the draft manifest? The source file and persistent records are kept.'))return; updateDraft(await api('console',draftRoot()+'/endpoints','DELETE',{expected_revision:state.draft.revision,method,path})); await loadDraftManifest();},
@@ -1765,9 +2184,9 @@ function renderRepair() {
   $('draft-repair').hidden=!repairableDraft() && !d?.repair && !state.repairRun;
   $('repair-heading').textContent=d?.repair?.checks==='passed' && d.repair.revision===d.revision?'Recovery complete · review the changes':'Recover this failed revision';
   $('repair-requirements-field').hidden=!!d?.generation?.requirements;
-  $('repair-context-status').textContent=d?.generation?.requirements?'Uses this draft’s saved requirements, confirmed decisions, implementation, tests, and current failure logs.':'Older draft: paste the original specification below so repair does not guess the intended contract.';
+  $('repair-context-status').textContent=d?.generation?.requirements?'Uses this draft’s saved requirements, confirmed decisions, implementation, tests, and current failure logs.':'Add the original requirements below if available. Project AI will inspect the failure and ask about missing requirements.';
   const run=state.repairRun;
-  $('repair-status').textContent=run?run.status:d?.repair?'Last repair: '+d.repair.checks+(d.repair.revision!==d.revision?' (earlier revision)':'')+'. Review changed files before approval.':'Repair can correct faulty test fixtures and assertions while preserving coverage and the API contract. Review all changes before approval.';
+  $('repair-status').textContent=run?run.status:d?.repair?'Last repair: '+d.repair.checks+(d.repair.revision!==d.revision?' (earlier revision)':'')+'. Review changed files before approval.':'Continue in Project AI with this draft and checks enabled. Review changed files and passing checks before approval.';
   const reports=run?.reports || (d?.repair?[d.repair]:[]);
   $('repair-attempt-list').hidden=!reports.length;$('repair-attempt-list').innerHTML=repairAttemptsMarkup(reports);
   $('repair-details').hidden=!reports.length;
@@ -1851,11 +2270,15 @@ function saveConnections() {
   if(state.project)renderProject();
 }
 document.addEventListener('click',event=>{
-  const button=event.target.closest('button'); if(!button || button.disabled || state.busy)return;
+  const button=event.target.closest('button'); if(!button || button.disabled)return;
+  if(button.id==='agent-pause'){const w=aiWorkspace();w.agentStop=true;button.disabled=true;$('agent-live').textContent='Pausing after the current step finishes. Its changes will be kept.';return;}
+  if(state.busy)return;
   const data=button.dataset;
   if(data.view) { clearError(); setView(data.view); return; }
   if(data.close) { $(data.close).close(); return; }
   if(data.action && actions[data.action]) run(actions[data.action]);
+  else if(data.agentRun)run(()=>selectAgentRun(data.agentRun));
+  else if(data.agentExample){$('agent-message').value=data.agentExample;aiWorkspace().agentMessage=data.agentExample;syncAgentControls();$('agent-message').focus();}
   else if(data.projectAiTask)projectAITask(data.projectAiTask);
   else if(data.questionSuggestion){aiWorkspace().question=data.questionSuggestion;$('project-question').value=data.questionSuggestion;syncControls();$('project-question').focus();}
   else if(data.generationMode) generationMode(data.generationMode);
@@ -1894,23 +2317,31 @@ $('draft-name-form').onsubmit=event=>{event.preventDefault();run(saveDraftName);
 $('ai-defaults-form').onsubmit=event=>{event.preventDefault();run(saveAIDefaults);};
 for(const eventName of ['input','change'])$('ai-defaults-form').addEventListener(eventName,()=>{aiPrefsDirty=true;$('ai-defaults-status').textContent='UNSAVED PREFERENCES';});
 document.querySelectorAll('[data-ai-provider]').forEach(select=>select.addEventListener('change',()=>{
-  if(state.project){if(select.id==='generation-provider'){aiWorkspace().generationProvider=select.value;aiWorkspace().generationPreview=null;renderGenerationPreview();}if(select.id==='data-provider')aiWorkspace().dataProvider=select.value;}
+  if(state.project){if(select.id==='generation-provider'){aiWorkspace().generationProvider=select.value;aiWorkspace().generationPreview=null;renderGenerationPreview();}if(select.id==='data-provider')aiWorkspace().dataProvider=select.value;if(select.id==='agent-provider')aiWorkspace().agentProvider=select.value;}
   renderProviderSummaries();
   syncControls();
 }));
 for(const [id,key] of [['generation-prompt','description'],['generation-spec-text','spec'],['ai-data-collection','collection'],['ai-data-count','count'],['ai-data-prompt','dataPrompt'],['ai-data-template','template']])$(id).addEventListener('input',()=>{if(state.project){aiWorkspace()[key]=$(id).value;if(['description','spec'].includes(key)){aiWorkspace().generationPreview=null;renderGenerationPreview();}else{aiWorkspace().dataValidation=null;aiWorkspace().dataImportResult=null;if(aiWorkspace().dataRawPreview)$('data-preview-status').textContent='Inputs changed · generate again or validate the existing preview.';}syncControls();}});
+$('agent-message').oninput=()=>{if(state.project){const w=aiWorkspace();if(w.agentRun){w.agentReplyDrafts=w.agentReplyDrafts || {};w.agentReplyDrafts[w.agentRun.id]=$('agent-message').value;}else w.agentMessage=$('agent-message').value;syncAgentControls();}};
+$('agent-draft').onchange=()=>{aiWorkspace().agentDraft=$('agent-draft').value;};
+$('agent-allow-edits').onchange=()=>{aiWorkspace().agentAllowEdits=$('agent-allow-edits').checked;syncAgentControls();};
+$('agent-execution').onchange=()=>{aiWorkspace().agentExecution=$('agent-execution').checked;syncAgentControls();};
+$('agent-form').onsubmit=event=>{event.preventDefault();run(submitAssistantMessage);};
+$('agent-message').onkeydown=event=>{if(event.key==='Enter' && (event.ctrlKey || event.metaKey) && !state.busy && !$('agent-start').disabled){event.preventDefault();run(submitAssistantMessage);}};
+$('assistant-file').onchange=()=>run(readAssistantFile);
+$('assistant-spec').oninput=()=>{const w=aiWorkspace();if(w.agentAttachment)w.agentAttachment.text=$('assistant-spec').value;syncAgentControls();};
 $('project-question').oninput=()=>{if(state.project){aiWorkspace().question=$('project-question').value;syncControls();}};
 $('project-question').onkeydown=event=>{if(event.key==='Enter' && (event.ctrlKey || event.metaKey) && !state.busy && !$('generate-draft-button').disabled){event.preventDefault();run(askProjectWithGroq);}};
 $('generate-form').onsubmit=event=>{event.preventDefault();run(aiWorkspace().task==='ask'?askProjectWithGroq:previewGeneration);};
 $('generation-file').onchange=()=>run(readGenerationFile);
-$('ai-data-form').onsubmit=event=>{event.preventDefault();run(generateDataWithGroq);};
+$('ai-data-form').onsubmit=event=>{event.preventDefault();run(prepareAssistantData);};
 $('environment-form').onsubmit=event=>{event.preventDefault();run(()=>saveEnvironment(false));};
 for(const id of ['environment-name','environment-value'])$(id).oninput=syncControls;
 $('ai-endpoint-form').onsubmit=event=>{event.preventDefault();run(()=>prepareGeneration('endpoint'));};
 $('repair-requirements').addEventListener('input',syncControls);
 document.addEventListener('input',event=>{const id=event.target.dataset.clarificationAnswer;if(id){const [scope,key]=id.split(':'),review=activeClarification(scope);if(review)review.answers[key]=event.target.value;syncControls();}});
 document.addEventListener('change',event=>{const id=event.target.dataset.clarificationOption;if(id && event.target.value){const [scope,key]=id.split(':'),review=activeClarification(scope);if(review){review.answers[key]=event.target.value;document.getElementById('clarification-'+scope+'-'+key).value=event.target.value;syncControls();}}});
-$('data-target').onchange=()=>run(async()=>{const w=aiWorkspace();w.dataTemplates=w.dataTemplates || {json:w.template,sqlite:'{}'};w.dataTemplates[w.dataTarget]=w.template;w.dataTarget=$('data-target').value;w.template=w.dataTemplates[w.dataTarget];$('ai-data-template').value=w.template;w.dataValidation=null;w.dataImportResult=null;if(w.dataTarget==='sqlite')await loadDataSchema();renderDataWorkspace();syncControls();});
+$('data-target').onchange=()=>run(async()=>{const w=aiWorkspace();w.dataTemplates=w.dataTemplates || {json:w.template,sqlite:'{}',related:'{}'};w.dataTemplates[w.dataTarget]=w.template;w.dataTarget=$('data-target').value;w.template=w.dataTemplates[w.dataTarget] || '{}';w.dataRawPreview='';w.dataPreview=null;$('ai-data-template').value=w.template;w.dataValidation=null;w.dataImportResult=null;if(w.dataTarget!=='json')await loadDataSchema();renderDataWorkspace();syncControls();});
 $('data-table').onchange=()=>{const w=aiWorkspace();w.dataTable=$('data-table').value;fillTableExample();w.dataValidation=null;w.dataImportResult=null;renderDataWorkspace();syncControls();};
 $('ai-data-preview').oninput=()=>{const w=aiWorkspace();w.dataRawPreview=$('ai-data-preview').value;w.dataValidation=null;w.dataImportResult=null;$('data-preview-status').textContent='Edited records · validate before inserting.';$('ai-data-preview-count').textContent='Edited';clearError('data-validation-error');syncControls();};
 $('ai-endpoint-prompt').oninput=()=>{if(state.project && aiEndpointContext?.projectId===state.project.id){const r=aiEndpointContext.endpoint;aiWorkspace().endpointPrompts[r.method+' '+r.path]=$('ai-endpoint-prompt').value;}};
@@ -1980,7 +2411,7 @@ hop_headers = {"connection", "keep-alive", "proxy-authenticate", "proxy-authoriz
 
 def upstream_timeout(service, path, method, configured=None):
     ai_request = service == "console" and method == "POST" and re.fullmatch(
-        r"/api/projects/[^/]+/(clarify|generate|ask|edit-endpoint|data/generate|drafts/[^/]+/repair|generation-jobs/[^/]+/step)", path
+        r"/api/projects/[^/]+/(clarify|generate|ask|edit-endpoint|data/(?:related/)?generate|drafts/[^/]+/repair|generation-jobs/[^/]+/step|agent-runs/[^/]+/step)", path
     )
     if not ai_request:
         return 80
