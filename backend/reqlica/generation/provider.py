@@ -1,4 +1,4 @@
-"""One Groq chat-completion request, with no automatic retries or import effects."""
+"""One provider chat-completion request, with no automatic retries or import effects."""
 
 import json
 import os
@@ -11,7 +11,7 @@ from reqlica.generation.errors import GenerationError
 from reqlica.generation.progress import report
 from reqlica.generation.reasoning import reasoning_parameters
 from reqlica.generation.output_format import output_mode, format_parameters, format_instructions
-from reqlica.generation.catalog import OPENROUTER_BASE
+from reqlica.generation.catalog import OPENROUTER_BASE, openrouter_model
 from reqlica.generation.schemas import (
     ClarificationReview,
     GeneratedPlan,
@@ -24,6 +24,46 @@ GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 MAX_RESPONSE_BYTES = 256 * 1024
 # Best-effort reproducibility, not a promise of identical provider output.
 SAMPLING_SEED = 42
+
+
+def _tool_parameters(request, base_url, tools):
+    parameters = {"tools": tools}
+    # Custom compatible endpoints need not implement every OpenAI option. Tool
+    # calls are serialized by the agent even if a model returns a batch.
+    parallel = request.provider != "compatible"
+    if request.provider != "compatible":
+        parameters["tool_choice"] = "auto"
+    if request.provider == "compatible" and base_url == OPENROUTER_BASE:
+        metadata = openrouter_model(request.model)
+        supported = metadata.get("supported_parameters") if metadata else None
+        if isinstance(supported, list):
+            if "tools" not in supported:
+                raise GenerationError(
+                    "The selected OpenRouter model does not advertise function tools. "
+                    "Choose a tool-capable model for Build / modify; ordinary chat and generation are separate features.",
+                    422, code="tools_unsupported",
+                )
+            parallel = "parallel_tool_calls" in supported
+            if "tool_choice" in supported:
+                parameters["tool_choice"] = "auto"
+    if parallel:
+        parameters["parallel_tool_calls"] = False
+    return parameters
+
+
+def _not_found_reason(error, openrouter):
+    """Classify known 404 reasons without echoing the provider's raw response."""
+    body = error.body
+    detail = body.get("error", body) if isinstance(body, dict) else {}
+    message = detail.get("message", "") if isinstance(detail, dict) else ""
+    message = message.lower() if isinstance(message, str) else ""
+    if openrouter and "no endpoints" in message:
+        if any(value in message for value in ("data policy", "data policies", "privacy", "data collection", "zdr")):
+            return "No OpenRouter endpoint matches your account's data/privacy policy. Review the provider settings in OpenRouter."
+        if "support" in message and any(value in message for value in ("parameter", "tool")):
+            return "No OpenRouter endpoint supports all requested parameters for this model. Check tool support and reasoning settings."
+        return "No OpenRouter provider endpoint is available for the selected model. Check its availability and your account's provider settings."
+    return "The provider could not find the selected model or Chat Completions endpoint. Check the model identifier and API base URL in Settings."
 
 
 def _schema_failures(error: APIStatusError, model: type[BaseModel]) -> list[dict]:
@@ -152,7 +192,8 @@ def complete(
     api_key: SecretStr | None = None,
     *,
     response_model: type[BaseModel] = GeneratedPlan,
-) -> tuple[str, dict | None]:
+    tools: list[dict] | None = None,
+) -> tuple[str | dict, dict | None]:
     clarification = response_model is ClarificationReview
     repair = response_model is RepairPlan
     readonly = response_model is ProjectAnswer or clarification
@@ -195,19 +236,24 @@ def complete(
             if groq else "Enter an API key for the selected provider in Settings (held in page memory only)",
             503,
         )
-    mode = output_mode(request)
-    report("format_" + mode)
+    if tools is not None:
+        operation, unchanged = "AI build", "any earlier draft changes are retained"
+    mode = output_mode(request) if tools is None else "tools"
+    if tools is None:
+        report("format_" + mode)
     reasoning = reasoning_parameters(request)
     extra_body = dict(reasoning.pop("extra_body", {}))
     if request.provider == "compatible" and base_url == OPENROUTER_BASE and (mode != "text" or request.reasoning_mode != "default"):
         extra_body["provider"] = {"require_parameters": True}
     if extra_body:
         reasoning["extra_body"] = extra_body
+    tool_parameters = _tool_parameters(request, base_url, tools) if tools is not None else None
     name = ("reqlica_draft_repair" if repair else "reqlica_clarification_review" if clarification
             else "reqlica_mock_records" if data_only else "reqlica_project_answer" if readonly
             else "reqlica_endpoint_proposal")
-    wire_messages = [*messages, {"role": "system", "content":
+    wire_messages = ([*messages, {"role": "system", "content":
         format_instructions(response_model, include_schema=mode != "json_schema")}]
+        if tools is None else messages)
     try:
         # Custom destinations receive only their explicitly supplied key. Never
         # follow redirects or inherit environment proxies.
@@ -233,7 +279,7 @@ def complete(
                 **({"seed": SAMPLING_SEED, "max_completion_tokens": request.max_tokens} if groq else
                    {"max_completion_tokens" if request.provider == "openai" and request.model.startswith(("gpt-5", "o1", "o3", "o4")) else "max_tokens": request.max_tokens}),
                 **reasoning,
-                **format_parameters(mode, name, response_model),
+                **(format_parameters(mode, name, response_model) if tools is None else tool_parameters),
             )
     except APITimeoutError as error:
         raise failure(
@@ -252,6 +298,12 @@ def complete(
             message = "Groq rejected the credentials or model access"
         elif error.status_code == 429:
             message = "Groq rate limit reached; try later (no automatic retry)"
+        elif error.status_code == 404:
+            message = (
+                f"Groq rejected the {operation} request (HTTP 404): "
+                + _not_found_reason(error, request.provider == "compatible" and base_url == OPENROUTER_BASE)
+                + f" {unchanged.capitalize()}; no automatic retry was made."
+            )
         elif error.status_code == 413:
             message = (
                 f"Groq rejected the {operation} request as too large (HTTP 413). "
@@ -303,12 +355,22 @@ def complete(
             f"Increase Max output tokens or reduce the requested scope; {unchanged}",
             code="output_token_limit",
         )
-    if getattr(choice, "finish_reason", None) != "stop":
+    if getattr(choice, "finish_reason", None) not in ({"stop"} if tools is None else {"stop", "tool_calls"}):
         raise failure(
             f"Groq stopped without completing the {output}; {unchanged}"
         )
     message = getattr(choice, "message", None)
     text = getattr(message, "content", None)
+    if tools is not None:
+        if getattr(message, "refusal", None):
+            raise failure("The model refused the AI build request; earlier draft changes are retained")
+        payload = {"role": "assistant", "content": text}
+        calls = getattr(message, "tool_calls", None)
+        if calls:
+            payload["tool_calls"] = [call.model_dump(include={"id", "type", "function"}) for call in calls]
+        if (not text and not calls) or len(json.dumps(payload).encode()) > MAX_RESPONSE_BYTES:
+            raise failure("The model returned an empty or oversized tool response; earlier draft changes are retained")
+        return payload, response.usage.model_dump() if response.usage else None
     if getattr(message, "refusal", None) or not isinstance(text, str) or not text:
         raise failure(f"Groq refused the request or returned no {output}")
     if len(text.encode("utf-8")) > MAX_RESPONSE_BYTES:

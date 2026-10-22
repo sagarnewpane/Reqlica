@@ -6,6 +6,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 from reqlica.mcp.convenience import register_convenience_tools
+from reqlica.mcp.data import get_mock_data_context, preview_mock_data
 from reqlica.mcp.parameters import DraftID, ProjectID, RequestMethod, Revision
 from reqlica.projects import context, drafts, schemas
 from reqlica.projects.store import Endpoint
@@ -14,6 +15,13 @@ from starlette.concurrency import run_in_threadpool
 SERVER_INSTRUCTIONS = """Reqlica builds mock APIs from Python code supplied by you, the LLM.
 Tools do not generate Python from a prompt. They save, register, inspect, and check
 your implementation. Work only on trusted local projects and unpublished drafts.
+
+MOCK DATA
+Use get_mock_data_context for existing live definitions and published application
+field contracts without records. Use preview_mock_data for JSON, SQLite, or related
+synthetic records; inspect validation.status. Related references use $ref objects.
+Previews validate disposable copies only. Hash/encrypted/custom formats may be
+unsupported. Live insertion and table setup remain explicit dashboard actions.
 
 IDENTIFIERS
 - project_id identifies the project. Obtain it from list_projects.projects[].id.
@@ -593,6 +601,8 @@ def create_server() -> FastMCP:
         get_project_context,
         get_draft_changes,
         get_api_schema,
+        get_mock_data_context,
+        preview_mock_data,
     ):
         server.add_tool(
             operation, annotations=READ_ONLY, meta={"reqlica/category": "core"}
