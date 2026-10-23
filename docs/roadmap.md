@@ -1,124 +1,62 @@
-# Roadmap and Design
+# Backend status and product direction
 
-This document records the intended product direction and implementation progress.
-See the [README](../README.md) for the current backend and quick start.
+Reqlica turns descriptions/specifications into reviewed Python mock APIs with
+persistent SQLite data. OpenAPI specifies contracts, not every business rule;
+ambiguous behavior still requires clarification. Once published, requests execute
+Python without model calls.
 
-## Product Direction
+## Implemented backend
 
-Reqlica aims to turn feature descriptions, Markdown, plain text, or OpenAPI specs
-into stateful mock backends. For example, a bookstore API could validate orders,
-check stock, create an order, and reduce stock in a single transaction.
+- Project CLI/management APIs, independent supervised workers, persistent data,
+  startup/shutdown, explicit deletion, and revision-pinned draft approval/activation.
+- Saved Project AI conversations and follow-ups through the real MCP transport;
+  server-enforced scope, editing/execution permissions, model/tool budgets,
+  provider discovery and supported reasoning settings. Groq, OpenAI, compatible
+  endpoints and local tool-capable Ollama are supported; Anthropic is preview-only.
+- Typed API schemas, draft/published Swagger/OpenAPI, import diagnostics and
+  meaningful unittest checks on disposable code/data copies.
+- JSON/SQLite/related mock-data previews and separately confirmed live insertion.
+- Private application variables and additive database setup.
+- [Mock authentication](mock-authentication.md), [scenarios](scenarios.md),
+  [rate limits](rate-limits.md), [browser CORS](cors.md).
+- [Request/error inspection](inspection.md), including optional bounded redacted
+  body and stdout/stderr capture. Capture is disabled by default.
+- [SQLite baselines, data restore and counter reset](reset.md).
+- [Active project export/import](project-transfer.md), plus stable-ID relocation
+  and full version/draft workspace archives through [maintenance](maintenance.md).
+- Declarative add/drop/rename column/table and table rebuild migrations, preview,
+  disposable draft checks, exact-revision confirmed live apply, durable backups
+  and confirmed snapshot rollback. Schema and data limits are documented.
+- Installable backend wheel, [installation guide and stateful demo](installation.md).
 
-The planned workflow is:
+## MCP authoring boundary
 
-1. Read requirements and the existing project; surface ambiguities and assumptions.
-2. Plan endpoints, models, relationships, and business rules.
-3. Generate Python handlers, supporting files, tests, and proposed database changes.
-4. Save an unpublished draft through MCP tools.
-5. Validate and test using separate data; return failures to the AI for correction.
-6. Let the user inspect and edit the changes in a dashboard.
-7. Activate the exact tested and user-approved revision.
+Read tools include project/draft context, API contracts, mock-data metadata,
+request history and disposable migration preview. Write tools create/edit one
+unpublished draft and prepare synthetic data previews. Validation, tests and
+isolated HTTP calls require execution permission inside Project AI.
 
-OpenAPI provides routes, schemas, and documented responses, but does not supply
-every business rule. Missing behavior must appear as a proposal for review.
-Once an endpoint is active, requests execute Python directly without another AI
-call. The draft/check/approval/activation backend and initial AI-facing MCP tools
-already exist. Initial single-turn Groq generation and standalone HTML draft
-review now exist; read-only project chat has bounded tab-scoped history. Durable
-server-side conversations, unattended/background repair, broader provider support,
-and the packaged Next.js dashboard remain planned. Additive database setup is now
-available through versioned plans, disposable checks, and explicitly confirmed,
-backed-up live application. Confirmed bounded draft repair/retesting is available.
-Clarification-first generation and private per-project
-environment settings/key generation are available; secret values are excluded
-from model input. See [generation](generation.md) and
-[database setup](database-setup.md).
+There are deliberately no AI approval, activation, live migration/rollback,
+secret-setting, maintenance or live data-insertion tools. Manual management
+operations remain explicit. An exact-revision approval is a local workflow
+boundary, not authentication against another process owned by the same user.
 
-## Planned Capabilities
+## Frontend scope
 
-- AI generation from prompts, documents, and supported OpenAPI specifications.
-- Dashboard review of endpoints, fields, relationships, assumptions, and source.
-- Dashboard editing of Python, models, and routes before activation.
-- Generated CRUD, filtering, pagination, and custom actions.
-- Test-data generation with configurable counts, ranges, enums, and relationships.
-- Generated validation, uniqueness/reference checks, state transitions, and transactions.
-- Mock bearer-token/API-key authentication, including invalid and expired credentials.
-- Failure scenarios, delays, empty responses, and failure of the next N requests.
-- Per-route/test-user rate limits with `429` responses.
-- Endpoint/data browsing, request/response inspection, runtime errors, and logs.
-- Baseline data and scenario-state reset.
-- Alter/rebuild/drop migrations and recovery for schema-changing updates; additive
-  new-table setup with pre-change backups is implemented.
-- Project moving/import, complete export bundles, and OpenAPI export.
-- Configurable browser CORS behavior.
-- A packaged dashboard, installation guide, working demo, and open-weight model support.
+The packaged Next.js dashboard and frontend integration of newer management APIs
+are separate work. This backend status does not imply that all dashboard controls
+exist. The standalone HTML dashboard retains the controls described in its guide.
 
-Projects should keep stable IDs and independent data, authentication, counters,
-scenarios, and logs. Removing a route must not implicitly delete its records.
-A complete project export should contain executable source and relevant settings,
-models, migrations, and optional starting data; an OpenAPI export cannot capture
-all Python business logic.
+## Operational limits and future extensions
 
-## Runtime Architecture
+This is a trusted local application. Management APIs are unauthenticated and
+Python has OS/network access; workers are not a hostile-code sandbox. License,
+remote multi-user authorization, hostile-code isolation, real-backend scenario
+execution and a CI runner need separate product/security decisions.
 
-The console handles management APIs and eventually the dashboard. The shared
-mock gateway forwards `/mock/<project-id>/*` requests to separate project workers.
-Projects can use identical route paths without conflicts. Their SQLite databases
-live outside published code versions, and draft execution uses disposable copies.
-
-Generated code needs shared helpers for database access, transactions,
-authentication, responses, and logging. Only the SQLite helpers are currently
-implemented. A worker process is not a security sandbox; filesystem, network,
-dependency, and secret-access restrictions need a separate design.
-
-## MCP Tools
-
-The console automatically exposes Streamable HTTP MCP at `/mcp`. Tools call the
-same project operations as the console API, not duplicate their implementation.
-See the [MCP guide](mcp.md) for connection details and the initial workflow.
-
-| Tool | Purpose | Status |
-|---|---|---|
-| `get_project_context` | Read routes/source, live SQLite definitions/relationships, draft progress, contract status, project notes, and SDK helpers; supports focused reads. | Implemented |
-| `list_drafts` | Discover and page through existing draft summaries so new sessions can resume appropriate work. | Implemented |
-| `get_api_schema` | Inspect generated revision-linked OpenAPI contracts, with separate draft/published Swagger pages. | Implemented; incomplete contracts currently warn |
-| `create_draft` | Create an editable project version. | Implemented |
-| `upsert_endpoint` | Add or replace a handler's route definition. | Implemented |
-| `write_draft_file` | Save source, tests, and declarative database/schema.json plans; live setup uses a separate confirmed console action. | Implemented |
-| `remove_endpoint` | Remove a draft route. | Implemented |
-| `validate_draft` | Check syntax, imports, and route definitions. | Implemented |
-| `test_draft` | Run tests with separate data. | Implemented |
-| `call_draft_endpoint` | Make an isolated test request and return results. | Implemented |
-| `get_draft_changes` | Present changed file names and check results for review. | Implemented |
-| `activate_draft` | Publish a tested revision already approved by the user. | Planned; use CLI |
-| `read_project_logs` | Inspect request history and runtime errors. | Planned |
-
-`list_projects` is implemented for local metadata discovery. Further proposed
-project-management tools are `create_project`, `open_project`,
-`get_project_status`, `start_project`, and `stop_project`.
-
-AI tools must not expose approval or approve their own output. Approval belongs
-to the exact tested content; edits invalidate it. The current explicit local CLI
-approval is a workflow boundary, not authentication against another local process.
-
-## Development Order
-
-1. CLI startup, console, project storage, and the shared mock server. Implemented.
-2. A manually written endpoint in its own project worker. Implemented.
-3. Persistent data, drafts, testing, and version activation. Implemented for stable schemas.
-4. AI generation through MCP, starting with one simple endpoint. HTTP tools and initial single-turn Groq generation into reviewed drafts implemented; broader generation integration remains planned.
-5. Stateful workflows, authentication, failures, rate limits, and inspection.
-6. Reset, export/import, installation instructions, and a working demo.
-
-## Open Decisions
-
-- Isolation rules for generated Python, filesystem/network access, and dependencies.
-- Extensions to the existing FastAPI handler format and SQLite SDK for generated code.
-- Database migration/rollback rules when older code needs an older schema.
-- Embedded AI model/provider; initial MCP uses Streamable HTTP on the console.
-- Dashboard packaging and serving strategy for the existing Next.js scaffold.
-- Supported OpenAPI features and project export format.
-- License and whether supported installation paths require a container runtime.
-
-A later release may run approved scenarios against a real test backend and offer
-a CI runner.
+Migrations are declarative, not arbitrary SQL; rebuilds can remove indexes/triggers
+and rollback restores snapshot data. See maintenance docs before applying them.
+Inspection capture and archive sizes are bounded; log subscriptions/unbounded
+payload recording are not implemented. Agent execution advances in explicit steps,
+not as an unattended background repair service. Those extensions are not required
+for the documented local backend workflow.

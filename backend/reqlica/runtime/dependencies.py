@@ -1,7 +1,7 @@
 """Shared import policy and diagnostics. Inspect metadata/AST, never import handlers.
 
 This is a predictability check, not a sandbox or an automatic package installer.
-Only unconditional, declared Reqlica dependencies and the SDK are offered to AI.
+Only declared or explicitly user-approved dependencies and the SDK are offered to AI.
 """
 
 import ast
@@ -14,12 +14,12 @@ from pathlib import PurePosixPath
 
 DEPENDENCY_PROMPT = """Use runtime_dependencies as the shared dependency policy.
 Only Python standard-library modules available on this platform, imports listed in
-runtime_dependencies.available, local project modules, and reqlica.runtime.sdk
+runtime_dependencies.available (including user-approved UI/MCP installations), local project modules, and reqlica.runtime.sdk
 are supported for generated code. Packages installed but not declared are NOT
-approved. Do not invent dependencies, install packages, run pip/uv, or write package
+approved unless explicitly approved through the package UI or a human-authorized MCP plan. Do not invent dependencies, install packages, run pip/uv, or write package
 manifests. Clarification must not offer unavailable libraries as working choices.
 If the user explicitly requires an unavailable library, explain the dependency
-blocker and ask them to review/install it outside generation, or choose a supported
+blocker and ask them to review/install it in Settings > Python packages or through a human-authorized MCP plan, or choose a supported
 alternative. Never silently replace an explicitly requested algorithm/library.
 For password hashing, hashlib.scrypt or hashlib.pbkdf2_hmac with a random per-user
 salt, appropriate work factor and constant-time verification are stdlib options;
@@ -82,6 +82,18 @@ def _declared_modules() -> tuple[tuple[str, str], ...]:
 
 def runtime_dependency_policy() -> dict:
     modules = dict(_declared_modules())
+    from reqlica.runtime.package_state import read_state, normalize
+
+    approved = read_state()['approved']
+    if approved:
+        for root, distributions in metadata.packages_distributions().items():
+            if _MODULE.fullmatch(root) and '.' not in root:
+                for package in distributions:
+                    try:
+                        if approved.get(normalize(package)) == metadata.version(package):
+                            modules[root] = package
+                    except metadata.PackageNotFoundError:
+                        continue
     available = {root: package for root, package in modules.items() if _available(root)}
     versions = {}
     for package in sorted(set(available.values())):
@@ -97,7 +109,7 @@ def runtime_dependency_policy() -> dict:
             root: package for root, package in modules.items() if root not in available
         },
         "sdk": "reqlica.runtime.sdk",
-        "installation": "Manual, reviewed changes to Reqlica dependencies only; restart and rerun checks. No automatic installation.",
+        "installation": "User-reviewed installs through Settings > Python packages or MCP, or manual dependency changes. Shared virtual environment; restart affected APIs and rerun checks. AI never installs packages automatically.",
     }
 
 
@@ -131,7 +143,7 @@ def dependency_message(
         message += f"After reviewing the package, run `uv add {package}` in Reqlica's directory, then restart Reqlica and rerun Validate and Run tests. This changes the shared runtime. "
     else:
         message += "Check local module spelling first. Otherwise use a supported library, or review the correct distribution name and explicitly add it to Reqlica's dependencies, then restart and rerun checks. "
-    return message + "No package was installed automatically."
+    return message + "You can also review and install a distribution in Settings > Python packages. No package was installed automatically."
 
 
 def import_issues(

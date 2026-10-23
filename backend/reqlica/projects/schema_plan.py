@@ -219,6 +219,8 @@ def setup(
 
 
 def prepare_database(directory: Path, path: Path) -> list[str]:
+    from reqlica.projects.migrations import prepare_migration
+    prepare_migration(directory, path)
     plan = load_plan(directory)
     if plan is None:
         return []
@@ -238,6 +240,11 @@ def prepare_database(directory: Path, path: Path) -> list[str]:
 
 
 def require_database_ready(directory: Path, path: Path) -> None:
+    from reqlica.projects.migrations import load_migration
+    from reqlica.projects.reset import _fingerprint
+    migration = load_migration(directory)
+    if migration is not None and _fingerprint(path) != migration.target_schema:
+        raise ValueError("Apply the reviewed migration before starting this API")
     plan = load_plan(directory)
     if plan is None:
         return

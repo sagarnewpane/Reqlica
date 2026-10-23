@@ -6,6 +6,8 @@ This first version is additive: it creates new ordinary tables, primary/foreign
 keys, and single/composite unique constraints. It does **not** alter, drop, rename,
 or rebuild existing tables, create triggers/views, or run arbitrary SQL.
 
+Existing table changes use the separate [migration workflow](maintenance.md).
+
 ## Dashboard workflow
 
 1. Generate database-backed endpoints normally. Groq can include a versioned

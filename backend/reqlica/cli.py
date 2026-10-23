@@ -25,6 +25,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="reqlica")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("start", help="Start the console and mock servers")
+    demo = commands.add_parser("demo", help="Create a stateful bookstore API demo")
+    demo.add_argument("directory", type=Path)
     projects = commands.add_parser("project", help="Manage local mock projects")
     project_commands = projects.add_subparsers(dest="project_command", required=True)
     create = project_commands.add_parser(
@@ -130,6 +132,15 @@ def main() -> int:
             )
         command_parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
+    if args.command == "demo":
+        from reqlica.demo import create_demo
+        try:
+            project = create_demo(args.directory)
+        except (OSError, ValueError) as error:
+            print(str(error), file=sys.stderr)
+            return 1
+        print(json.dumps(project.model_dump(mode="json"), indent=2))
+        return 0
 
     if args.command == "project":
         if args.project_command == "create":

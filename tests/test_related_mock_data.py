@@ -1,6 +1,5 @@
 """One prompt creates related rows, with actual IDs and all-table rollback."""
 
-import json
 import os
 import sqlite3
 import tempfile
@@ -12,10 +11,9 @@ from fastapi.testclient import TestClient
 from reqlica.console.app import create_app
 from reqlica.generation.data_schemas import (
     RelatedDataImportRequest, RelatedDataValidationRequest,
-    RelatedMockDataRequest, RelatedMockDataPlan,
+
 )
 from reqlica.generation.errors import GenerationError
-from reqlica.generation.mock_data import generate_related_mock_data
 from reqlica.projects.mock_data import database_schema
 from reqlica.projects.related_data import (
     validate_related_data, insert_related_data, validate_related_records,
@@ -131,33 +129,8 @@ class RelatedDataTests(unittest.TestCase):
         self.assertEqual(preview["validation"]["status"], "failed")
         self.assertEqual(self.counts(), (1, 0))
 
-    def test_single_prompt_generates_all_tables_and_never_sends_existing_rows(self):
-        request = RelatedMockDataRequest(requirements="Create two users and two posts, one for each user", expected_schema=self.schema)
-        output = {"summary": "Two users and two related posts", "assumptions": [], "records_by_table_json": json.dumps(records())}
-        with patch("reqlica.generation.mock_data.provider.complete", return_value=(json.dumps(output), {})) as complete:
-            result = generate_related_mock_data(self.project.id, request)
-        complete.assert_called_once()
-        self.assertIs(complete.call_args.kwargs["response_model"], RelatedMockDataPlan)
-        self.assertNotIn("private-existing-name", json.dumps(complete.call_args.args[0]))
-        self.assertEqual(result["counts"], {"users": 2, "posts": 2})
-        self.assertEqual(self.counts(), (1, 0))
 
-    def test_api_generate_returns_one_reviewable_dataset_without_writes(self):
-        output = {"summary": "Related users and posts", "assumptions": [], "records_by_table_json": json.dumps(records())}
-        with patch("reqlica.generation.mock_data.provider.complete", return_value=(json.dumps(output), {})) as complete, TestClient(create_app()) as client:
-            response = client.post(f"/api/projects/{self.project.id}/data/related/generate", json={"requirements": "Create 2 users and 2 posts", "expected_schema": self.schema})
-        self.assertEqual(response.status_code, 200, response.text)
-        self.assertEqual(response.headers["cache-control"], "no-store")
-        self.assertEqual(response.json()["counts"], {"users": 2, "posts": 2})
-        complete.assert_called_once()
-        self.assertEqual(self.counts(), (1, 0))
 
-    def test_invalid_model_output_does_not_write_records(self):
-        request = RelatedMockDataRequest(requirements="Two users and posts", expected_schema=self.schema)
-        for raw in ("not JSON", json.dumps({"summary": "Bad", "assumptions": [], "records_by_table_json": "[]"})):
-            with self.subTest(raw=raw), patch("reqlica.generation.mock_data.provider.complete", return_value=(raw, {})), self.assertRaises(GenerationError):
-                generate_related_mock_data(self.project.id, request)
-        self.assertEqual(self.counts(), (1, 0))
 
     def test_api_preview_insert_and_explicit_confirmation(self):
         with TestClient(create_app()) as client:

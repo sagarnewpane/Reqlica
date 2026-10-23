@@ -12,9 +12,6 @@ from unittest.mock import patch
 import httpx
 from fastapi.testclient import TestClient
 from reqlica.console.app import create_app
-from reqlica.generation.errors import GenerationError
-from reqlica.generation.schemas import GenerationRequest
-from reqlica.generation.service import _validate_plan, generate_endpoints
 from reqlica.projects import drafts
 from reqlica.projects.context import get_project_context
 from reqlica.projects.database_setup import SetupApply, apply_setup, preview_setup
@@ -480,57 +477,3 @@ def create_user(body: NewUser) -> Count:
             response = client.post(root + "/apply", json=body)
             self.assertEqual(response.status_code, 200, response.text)
             self.assertEqual(response.headers["cache-control"], "no-store")
-
-    def test_generator_saves_a_plan_without_creating_live_tables(self):
-        plan = {
-            "summary": "Persistent account storage",
-            "assumptions": [],
-            "files": [
-                {"path": SCHEMA_PLAN_PATH, "content": json.dumps(PLAN)},
-                {"path": "endpoints/users.py", "content": HANDLER},
-                {"path": "tests/test_database.py", "content": TESTS},
-            ],
-            "endpoints": [
-                {
-                    "method": "GET",
-                    "path": "/users/count",
-                    "handler": "endpoints/users.py:user_count",
-                }
-            ],
-        }
-        with patch(
-            "reqlica.generation.service.provider.complete",
-            return_value=(json.dumps(plan), None),
-        ) as complete:
-            result = generate_endpoints(
-                self.project.id,
-                GenerationRequest(requirements="Persistent account storage"),
-            )
-        self.assertEqual(result["status"], "draft_created")
-        self.assertEqual(result["database_setup"]["path"], SCHEMA_PLAN_PATH)
-        self.assertNotIn("users", self.tables())
-        complete.assert_called_once()
-        saved = drafts.draft_directory(self.project, result["draft"]["id"])
-        self.assertEqual(json.loads((saved / SCHEMA_PLAN_PATH).read_text()), PLAN)
-
-    def test_generation_cannot_remove_or_change_a_versioned_table_declaration(self):
-        context = get_project_context(self.project.id, self.draft["id"])
-        changed = copy.deepcopy(PLAN)
-        changed["tables"][0]["columns"].pop()
-        proposal = {
-            "summary": "Change user fields",
-            "assumptions": [],
-            "files": [
-                {"path": SCHEMA_PLAN_PATH, "content": json.dumps(changed)},
-                {"path": "tests/test_database.py", "content": TESTS},
-            ],
-            "endpoints": [
-                {
-                    "method": "GET",
-                    "path": "/users/count",
-                    "handler": "endpoints/users.py:user_count",
-                }
-            ],
-        }
-        with self.assertRaisesRegex(GenerationError, "Preserve existing"):
-            _validate_plan(json.dumps(proposal), context)

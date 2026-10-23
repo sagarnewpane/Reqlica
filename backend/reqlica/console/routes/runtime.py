@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 from pydantic import Field
 from reqlica.console.dependencies import Revision, gateway_operation
+from reqlica.projects.reset import DataReset
 
 router = APIRouter(prefix="/api/projects/{project_id}", tags=["Runtime"])
 
@@ -19,3 +20,8 @@ def activate(project_id: str, body: Activation) -> dict:
 @router.post("/convert")
 def convert(project_id: str) -> dict:
     return gateway_operation(project_id, "convert")
+
+
+@router.post("/data-reset")
+def reset_data(project_id: str, body: DataReset) -> dict:
+    return gateway_operation(project_id, "data-reset", body.model_dump())

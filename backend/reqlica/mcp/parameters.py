@@ -9,8 +9,7 @@ ProjectID = Annotated[
     Field(
         pattern=r"^[0-9a-f]{32}$",
         description=(
-            "Existing project's ID from list_projects.projects[].id. "
-            "Not a project name, directory, draft ID, or version ID."
+            "Project ID from list_projects.projects[].id; not a name, directory, draft or version ID."
         ),
     ),
 ]
@@ -19,9 +18,8 @@ DraftID = Annotated[
     Field(
         pattern=r"^[0-9a-f]{32}$",
         description=(
-            "Unpublished draft's ID: use the 'id' returned by create_draft, "
-            "or list_drafts.drafts[].id for existing work in this project. The LLM obtains this "
-            "from tools; do not ask the user to invent an ID."
+            "This project's unpublished draft ID from create_draft.id or "
+            "list_drafts.drafts[].id. Obtain from tools; never ask the user to invent it."
         ),
     ),
 ]
@@ -30,10 +28,9 @@ Revision = Annotated[
     Field(
         pattern=r"^[0-9a-f]{64}$",
         description=(
-            "Latest draft 'revision' returned by create_draft, a draft edit, "
-            "list_drafts, or get_draft_changes. Use that exact value, never invent a hash. "
-            "Edits must be sequential: each edit returns the revision for the next. "
-            "On conflict, inspect changes and reread draft context before retrying."
+            "Exact latest revision from create_draft, an edit, list_drafts or "
+            "get_draft_changes; never invent it. Edit sequentially using each returned "
+            "revision. On conflict, inspect changes and reread draft context before retrying."
         ),
     ),
 ]
@@ -41,8 +38,7 @@ RequestMethod = Annotated[
     str,
     Field(
         description=(
-            "Uppercase HTTP method of the route, e.g. GET or POST. "
-            "Supported: GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD, TRACE."
+            "Uppercase HTTP method: GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD or TRACE."
         ),
     ),
 ]

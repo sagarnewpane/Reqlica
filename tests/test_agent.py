@@ -1,5 +1,6 @@
 """Real MCP client/server integration with deterministic model tool calls."""
 
+import asyncio
 import json
 import os
 import sqlite3
@@ -15,11 +16,11 @@ from fastapi.testclient import TestClient
 from reqlica.console.app import create_app
 from reqlica.generation import agent
 from reqlica.generation.errors import GenerationError
+from reqlica.mcp.server import create_server
 from reqlica.projects import drafts
 from reqlica.projects.store import create_project, get_project, registry_directory
 from reqlica.projects.versions import code_directory, content_digest, atomic_write_json, snapshot_code
-from test_generation import HANDLER, TEST_SOURCE
-import test_generation as generation_tests
+from ai_fixtures import HANDLER, TEST_SOURCE, ProviderFixture
 
 
 def tool_message(name, arguments):
@@ -42,7 +43,7 @@ class AgentTests(unittest.TestCase):
         self.headers = {"X-Reqlica-Groq-Key": "request-only-key"}
 
     def create(self, **settings):
-        response = self.client.put(f"{self.root}/{self.run_id}", json={"message": "Add reader greetings", **settings})
+        response = self.client.put(f"{self.root}/{self.run_id}", json={"message": "Add reader greetings", "model": "test-tool-model", **settings})
         self.assertEqual(response.status_code, 200, response.text)
         self.run = response.json()
         return self.run
@@ -58,6 +59,228 @@ class AgentTests(unittest.TestCase):
         result = self.step()
         self.assertEqual(result["status"], "ready", result)
         return self.step()
+
+    def test_unsupported_reasoning_is_rejected_before_creating_a_run_or_spending_budget(self):
+        with patch("reqlica.generation.reasoning.reasoning_options", return_value={"modes": ["default"]}):
+            response = self.client.put(f"{self.root}/{self.run_id}", json={
+                "message": "Explain", "reasoning_mode": "low", "provider": "compatible",
+                "base_url": "https://openrouter.ai/api/v1", "model": "test-model"})
+        self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(response.json()["detail"]["code"], "unsupported_reasoning_mode")
+        self.assertEqual(response.json()["detail"]["reasoning_mode"], "low")
+        self.assertEqual(self.client.get(self.root).json()["runs"], [])
+        self.complete.assert_not_called()
+
+    def test_ollama_conversation_can_send_and_reply_without_a_key(self):
+        self.headers = {}
+        self.create(provider="ollama", base_url="http://localhost:11434/v1", model="installed:model")
+        self.complete.return_value = ({"role": "assistant", "content": "Ready"}, None)
+        self.assertEqual(self.step()["status"], "completed")
+
+        request = self.complete.call_args.args[1]
+        self.assertEqual(request.provider, "ollama")
+        self.assertEqual(request.base_url, "http://localhost:11434")
+        self.assertIsNone(self.complete.call_args.args[2])
+        response = self.client.post(f"{self.root}/{self.run_id}/replies", json={
+            "message": "Explain more", "reply_id": uuid4().hex,
+            "expected_turn": self.run["turn"], "expected_revision": self.run["revision"],
+        })
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.step()["status"], "completed")
+
+    def test_context_inspection_captures_exact_input_without_keys_or_another_model_call(self):
+        self.create()
+        self.complete.return_value = ({"role": "assistant", "content": "Reply not in the input"}, {"prompt_tokens": 120, "completion_tokens": 15})
+        self.step()
+        sent_messages = self.complete.call_args.args[0]
+        sent_tools = self.complete.call_args.kwargs["tools"]
+        calls = self.complete.call_count
+        response = self.client.get(f"{self.root}/{self.run_id}/context")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        data = response.json()
+        self.assertEqual(data["source"], "captured")
+        self.assertEqual(data["messages"], sent_messages)
+        self.assertEqual(data["tools"], sent_tools)
+        self.assertEqual(data["summary"]["bytes"], len(json.dumps({"messages": sent_messages, "tools": sent_tools}, ensure_ascii=False, separators=(",", ":")).encode()))
+        self.assertEqual(data["last_model_response"]["usage"]["prompt_tokens"], 120)
+        self.assertNotIn("request-only-key", response.text)
+        self.assertNotIn("model_context", self.run)
+        self.assertNotIn("messages", self.run["context"])
+        self.assertEqual(self.complete.call_count, calls)
+
+    def test_older_context_reconstruction_is_read_only_and_project_scoped(self):
+        self.create()
+        path = agent._path(self.project.id, self.run_id)
+        before = path.read_bytes()
+        response = self.client.get(f"{self.root}/{self.run_id}/context")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["source"], "reconstructed")
+        self.assertEqual(path.read_bytes(), before)
+        self.complete.assert_not_called()
+        other = create_project(self.directory / "other-context", "Other")
+        self.assertEqual(self.client.get(f"/api/projects/{other.id}/agent-runs/{self.run_id}/context").status_code, 404)
+
+    def test_failed_response_keeps_actual_token_usage_and_input_snapshot(self):
+        self.create(max_tokens=65536)
+        self.complete.side_effect = GenerationError("Stopped", code="output_token_limit", diagnostics={
+            "finish_reason": "length", "max_output_tokens": 65536,
+            "usage": {"prompt_tokens": 3650, "completion_tokens": 446, "total_tokens": 4096},
+        })
+        result = self.step()
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["last_model_response"]["usage"]["completion_tokens"], 446)
+        self.assertEqual(result["usage"][-1]["prompt_tokens"], 3650)
+        snapshot = self.client.get(f"{self.root}/{self.run_id}/context").json()
+        self.assertEqual(snapshot["source"], "captured")
+        self.assertEqual(snapshot["summary"]["max_output_tokens"], 65536)
+
+    def reasoning_failure(self, **updates):
+        self.create()
+        path = agent._path(self.project.id, self.run_id)
+        saved = agent._read(path)
+        saved["request"]["reasoning_mode"] = "low"
+        saved.update(status="failed", model_calls=1, error={"message": agent.UNSUPPORTED_MODE_MESSAGE}, **updates)
+        agent._save(path, saved)
+        return path, saved, {"expected_revision": saved["revision"], "expected_reasoning_mode": "low"}
+
+    def test_manual_openrouter_id_can_create_a_conversation_without_catalog_approval(self):
+        with patch("reqlica.generation.provider.openrouter_model", side_effect=AssertionError("Discovery cannot gate creation")):
+            self.create(provider="compatible", model="unlisted/model:free", base_url="https://openrouter.ai/api/v1")
+        self.assertEqual(self.run["model_calls"], 0)
+        self.assertEqual(self.run["provider"]["model"], "unlisted/model:free")
+        self.complete.assert_not_called()
+
+    def test_compact_tool_catalog_preserves_business_parameters_and_full_conversation(self):
+        self.create(allow_execution=True)
+        before = agent._read(agent._path(self.project.id, self.run_id))
+        discovered = asyncio.run(create_server().list_tools())
+        original_catalog = [tool.model_dump(mode="json") for tool in discovered]
+        canonical = {tool.name: tool for tool in discovered if tool.name in agent._allowed(before)}
+        self.complete.return_value = ({"role": "assistant", "content": "Ready to inspect the API"}, None)
+        self.step()
+        messages = self.complete.call_args.args[0]
+        sent = self.complete.call_args.kwargs["tools"]
+        self.assertEqual(messages[1:], before["messages"])
+        self.assertTrue(messages[0]["content"].startswith(agent.INSTRUCTIONS))
+        self.assertEqual({tool["function"]["name"] for tool in sent}, set(canonical))
+        for tool in sent:
+            original = canonical[tool["function"]["name"]].inputSchema
+            schema = tool["function"]["parameters"]
+            self.assertEqual(set(schema["properties"]), set(original["properties"]) - {"project_id", "draft_id"})
+            self.assertEqual(set(schema.get("required", [])), set(original.get("required", [])) - {"project_id", "draft_id"})
+            for name, field in schema["properties"].items():
+                expected = original["properties"][name]
+                for key in expected.keys() - {"title", "description"}:
+                    self.assertEqual(field[key], expected[key], (tool["function"]["name"], name, key))
+                if name != "expected_revision" and "description" in expected:
+                    self.assertEqual(field["description"], expected["description"])
+        verbose = [{"type": "function", "function": {"name": tool.name, "description": tool.description,
+                    "parameters": tool.inputSchema}} for tool in canonical.values()]
+        self.assertLess(len(json.dumps(sent)), len(json.dumps(verbose)) * 0.8)
+        self.assertEqual([tool.model_dump(mode="json") for tool in discovered], original_catalog)
+        self.assertEqual(agent._read(agent._path(self.project.id, self.run_id))["messages"][:-1], before["messages"])
+        # The optimization preserves permission filtering for read-only conversations.
+        read_only = {**before, "allow_edits": False, "allow_execution": False}
+        tools = agent._model_tools(discovered, read_only)
+        self.assertEqual({tool["function"]["name"] for tool in tools}, agent.READ)
+
+    def test_model_calls_without_scope_ids_still_use_the_assigned_project_and_draft(self):
+        self.create()
+        calls = [
+            ("create_draft", {}),
+            ("write_draft_file", {"path": "endpoints/greetings.py", "content": HANDLER}),
+            ("upsert_endpoint", {"endpoint": {"method": "GET", "path": "/greet", "handler": "endpoints/greetings.py:greet"}}),
+        ]
+        for name, arguments in calls:
+            if name != "create_draft":
+                arguments["expected_revision"] = self.run["revision"]
+            self.complete.return_value = (tool_message(name, arguments), None)
+            self.step()
+            self.assertEqual(self.step()["status"], "ready", self.run)
+        result = drafts.inspect_draft(self.project.id, self.run["draft_id"])
+        self.assertIn("endpoints/greetings.py", result["files"])
+        manifest = json.loads((drafts.draft_directory(self.project, self.run["draft_id"]) / "manifest.json").read_text())
+        self.assertTrue(any(endpoint["path"] == "/greet" for endpoint in manifest["endpoints"]))
+
+    def test_saved_unlisted_model_can_resume_without_losing_history_or_changing_provider(self):
+        self.create()
+        self.tool("create_draft")
+        path = agent._path(self.project.id, self.run_id)
+        saved = agent._read(path)
+        saved["request"].update(provider="compatible", base_url="https://openrouter.ai/api/v1", model="unlisted/model:free")
+        saved.update(status="failed", error={"code": "model_unavailable", "message": "Old catalog check"})
+        agent._save(path, saved)
+        self.complete.return_value = ({"role": "assistant", "content": "Available"}, None)
+        with patch("reqlica.generation.provider.openrouter_model", side_effect=AssertionError("Discovery cannot gate resume")):
+            result = self.step()
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["model_calls"], saved["model_calls"] + 1)
+        after = agent._read(path)
+        for key in ("tool_calls", "events", "draft_id", "revision", "request"):
+            self.assertEqual(after[key], saved[key], key)
+        self.assertEqual(after["messages"][:-1], saved["messages"])
+        self.assertEqual(self.complete.call_args.args[1].model, "unlisted/model:free")
+
+    def test_saved_reasoning_can_reset_to_default_without_replaying_work_or_changing_budget(self):
+        path, before, body = self.reasoning_failure()
+        inspected = self.client.get(f"{self.root}/{self.run_id}").json()
+        self.assertTrue(inspected["can_reset_reasoning"])
+        self.assertEqual(inspected["provider"]["reasoning_mode"], "low")
+        self.assertEqual(self.step(), inspected)
+        response = self.client.post(f"{self.root}/{self.run_id}/reasoning-default", json=body)
+        self.assertEqual(response.status_code, 200, response.text)
+        result = response.json()
+        self.assertEqual(result["status"], "ready")
+        self.assertFalse(result["can_reset_reasoning"])
+        self.assertEqual(result["provider"]["reasoning_mode"], "default")
+        after = agent._read(path)
+        for key in ["id", "draft_id", "revision", "messages", "events", "checks", "usage", "model_calls", "tool_calls", "allow_execution", "allow_edits"]:
+            self.assertEqual(after[key], before[key], key)
+        self.assertEqual(self.client.post(f"{self.root}/{self.run_id}/reasoning-default", json=body).json(), result)
+        self.complete.assert_not_called()
+
+    def test_reasoning_reset_rejects_stale_scope_pending_tools_other_failures_and_exhausted_budget(self):
+        path, saved, body = self.reasoning_failure()
+        url = f"{self.root}/{self.run_id}/reasoning-default"
+        for changed in [{"expected_revision": "f" * 64}, {"expected_reasoning_mode": "high"}]:
+            self.assertEqual(self.client.post(url, json={**body, **changed}).status_code, 409)
+        self.assertEqual(self.client.post(url, json={**body, "allow_execution": True}).status_code, 422)
+        for changes in [{"pending": [tool_message("create_draft", {})]}, {"status": "running"},
+                        {"error": {"message": "Some unrelated error"}}, {"model_calls": agent.MAX_MODEL_CALLS}]:
+            variant = {**saved, **changes}
+            agent._save(path, variant)
+            self.assertEqual(self.client.post(url, json=body).status_code, 409, changes)
+        agent._save(path, saved)
+        (code_directory(self.project) / "endpoints/hello.py").write_text("def hello(): return {}\n")
+        self.assertEqual(self.client.post(url, json=body).status_code, 409)
+        self.assertEqual(agent._read(path)["request"]["reasoning_mode"], "low")
+        self.complete.assert_not_called()
+
+    def test_retired_routes_cannot_run_or_mutate_saved_drafts(self):
+        saved = drafts.create_draft(self.project.id)
+        before = content_digest(code_directory(self.project))
+        legacy = self.project.directory / ".reqlica" / "generation-jobs"
+        legacy.mkdir(exist_ok=True)
+        checkpoint = legacy / (uuid4().hex + ".json")
+        checkpoint.write_text('{"status":"ready","stage":"files"}')
+        original = checkpoint.read_bytes()
+        root = f"/api/projects/{self.project.id}"
+        routes = [("POST", "/generate"), ("POST", "/clarify"), ("POST", "/ask"),
+            ("POST", "/edit-endpoint"), ("GET", "/endpoint-source"),
+            ("GET", "/generation-jobs"), ("PUT", "/generation-jobs/" + self.run_id),
+            ("POST", "/generation-jobs/" + self.run_id + "/step"),
+            ("POST", "/generation-jobs/" + self.run_id + "/resume"),
+            ("POST", "/drafts/" + saved["id"] + "/repair"),
+            ("POST", "/data/generate"), ("POST", "/data/related/generate")]
+        for method, path in routes:
+            with self.subTest(method=method, path=path):
+                response = self.client.request(method, root + path, json={"requirements": "ignored"})
+                self.assertEqual(response.status_code, 404, response.text)
+        self.complete.assert_not_called()
+        self.assertEqual(drafts.inspect_draft(self.project.id, saved["id"])["revision"], saved["revision"])
+        self.assertEqual(content_digest(code_directory(self.project)), before)
+        self.assertEqual(checkpoint.read_bytes(), original)
 
     def test_read_only_conversation_answers_and_rejects_fabricated_edits(self):
         before = content_digest(code_directory(self.project))
@@ -85,7 +308,7 @@ class AgentTests(unittest.TestCase):
         atomic_write_json(registry_directory() / (legacy_id + ".json"), {"directory": str(directory)})
         self.project = get_project(legacy_id)
         self.root = f"/api/projects/{legacy_id}/agent-runs"
-        rejected = self.client.put(f"{self.root}/{uuid4().hex}", json={"message": "Explain this"})
+        rejected = self.client.put(f"{self.root}/{uuid4().hex}", json={"model": "test-tool-model", "message": "Explain this"})
         self.assertEqual(rejected.status_code, 409, rejected.text)
         self.create(allow_edits=False)
         self.tool("get_project_context", include_source=False, include_database=False)
@@ -243,7 +466,7 @@ class AgentTests(unittest.TestCase):
         selected = drafts.inspect_draft(self.project.id, selected["id"])
         self.publish_snapshot(code_directory(self.project))
         response = self.client.put(f"{self.root}/{self.run_id}", json={
-            "message": "Continue", "draft_id": selected["id"],
+            "message": "Continue", "model": "test-tool-model", "draft_id": selected["id"],
             "expected_revision": selected["revision"],
         })
         self.assertEqual(response.status_code, 409)
@@ -269,7 +492,7 @@ class AgentTests(unittest.TestCase):
     def test_creation_idempotence_and_budget_survive_reload(self):
         created = self.create()
         self.assertEqual(self.create(), created)
-        self.assertEqual(self.client.put(f"{self.root}/{self.run_id}", json={"message": "Different"}).status_code, 409)
+        self.assertEqual(self.client.put(f"{self.root}/{self.run_id}", json={"model": "test-tool-model", "message": "Different"}).status_code, 409)
         path = agent._path(self.project.id, self.run_id)
         checkpoint = agent._read(path)
         checkpoint["model_calls"] = agent.MAX_MODEL_CALLS
@@ -305,8 +528,8 @@ class AgentTests(unittest.TestCase):
         self.assertTrue(any(m["role"] == "tool" and 'failed' in m["content"] for m in messages))
 
     def test_selected_draft_revision_pair_and_run_ids_are_validated(self):
-        self.assertEqual(self.client.put(f"{self.root}/{self.run_id}", json={"message": "Change", "draft_id": "a" * 32}).status_code, 422)
-        self.assertEqual(self.client.put(f"{self.root}/bad", json={"message": "Change"}).status_code, 409)
+        self.assertEqual(self.client.put(f"{self.root}/{self.run_id}", json={"model": "test-tool-model", "message": "Change", "draft_id": "a" * 32}).status_code, 422)
+        self.assertEqual(self.client.put(f"{self.root}/bad", json={"model": "test-tool-model", "message": "Change"}).status_code, 409)
         self.assertEqual(self.client.get(f"{self.root}/{'a' * 32}").status_code, 404)
 
     def finish_with_question(self):
@@ -442,7 +665,7 @@ class AgentTests(unittest.TestCase):
 
 class ToolProviderTests(unittest.TestCase):
     def setUp(self):
-        generation_tests.GroqProviderTests.setUp(self)
+        ProviderFixture.setUp(self)
 
     def test_tools_have_no_json_response_format_and_preserve_call_ids(self):
         from reqlica.generation import provider
@@ -481,7 +704,7 @@ class ToolProviderTests(unittest.TestCase):
         wire = json.loads(self.requests[0].content)
         self.assertNotIn("parallel_tool_calls", wire)
         self.assertEqual(wire["tool_choice"], "auto")
-        self.assertEqual(wire["provider"], {"require_parameters": True})
+        self.assertNotIn("provider", wire)
         self.assertIn("tools", wire)
         self.assertEqual(str(self.requests[0].url), "https://openrouter.ai/api/v1/chat/completions")
 

@@ -20,7 +20,7 @@ in Mock data.
    Existing database rows and environment values are excluded from context; trusted
    code execution, if separately permitted, can expose values in its output.
    The AI cannot insert live data. Use **Review mock data** to return the artifact
-   to this screen. Earlier data-generation APIs below remain available.
+   to this screen. The former data-generation APIs have been removed.
 3. Review and edit **JSON records**. **Use template** instead prepares local copies
    without an AI call or adding invented fields. **Copy JSON** / **Download** export
    the reviewed array without writing project files or changing live data.
@@ -47,52 +47,34 @@ All paths below start with `/api/projects/{project_id}/data`.
 | Method/path | Purpose |
 | --- | --- |
 | `GET /schema` | Current SQLite definitions, columns/relationships and fingerprint; no rows or filesystem path. |
-| `POST /generate` | One Groq request, then a JSON/SQLite preview; no live write. |
 | `POST /validate` | Check edited records locally; SQLite uses a disposable DB copy. |
 | `POST /insert` | Explicitly confirmed, atomic append to an existing table. |
 
-Generate a fixture:
+For AI preparation use Project AI's `get_mock_data_context` and
+`preview_mock_data` MCP tools. There is no separate data-generation REST endpoint.
+The model receives field hints as guidance; validation enforces record bounds,
+SQLite constraints and supported published application formats.
 
-```json
-{
-  "target": "json",
-  "collection": "books",
-  "requirements": "Three varied fictional books; include one out of stock.",
-  "count": 3,
-  "template": {"title": "Example", "price": 14.99, "in_stock": true},
-  "model": "openai/gpt-oss-20b",
-  "temperature": 0.2,
-  "max_tokens": 8192
-}
-```
+`POST /validate` accepts `{target, table, expected_schema, records}`; omit table
+and schema for JSON fixtures. It returns `status: "preview"`, `records`,
+`schema_fingerprint`, `preview_digest`, and `validation`. A failed preview remains
+editable and cannot be inserted.
 
-For SQLite, use `target: "sqlite"`, an existing `table`, and `expected_schema`
-copied from `/schema`'s `fingerprint`. Do not supply `table`/`expected_schema` for
-JSON fixtures. A Groq key can be supplied only through `X-Reqlica-Groq-Key`, or the
-console uses `GROQ_API_KEY` / `GROQ_API`. Fixed provider origin/no retries apply.
-
-Generate/validate return `status: "preview"`, `target`, `table`, `records`,
-`schema_fingerprint`, `preview_digest`, and `validation` (`status`/`message`).
-Generation also returns a summary, assumptions, and provider usage. A preview with
-`validation.status: "failed"` is not insertable, even if the HTTP request succeeded.
-
-To validate, send `{target, table, expected_schema, records}` (omit table/schema
-for JSON). To insert, send the same SQLite fields plus
-`expected_preview_digest` from the exact passed preview and **`confirm: true`**.
-The response reports `status: "inserted"`, `inserted_count`, and new `row_ids`
-(null for WITHOUT ROWID tables). Both requests validate data independently;
-insertion rechecks constraints and schema inside its write transaction.
+`POST /insert` accepts the same SQLite fields plus the exact validated
+`expected_preview_digest` and `confirm: true`. It appends atomically and returns
+`inserted_count` and `row_ids`. Insertion rechecks schema, application contracts,
+and constraints against current live data.
 
 ## Boundaries and recovery
 
 - Maximum 100 records, 128 KiB per batch, 50 fields per object, six nesting levels,
   100 items per nested array, and 8 KiB per individual string. Numbers must be
   finite; integers must fit signed 64 bits. Templates fit within 16 KiB;
-  requirements within 16,384 characters. Model output stays within 256 KiB and
-  the complete provider prompt within 96 KiB. No silent truncation or repair.
-- JSON generation validates exact template keys/types (null permits an unspecified
-  type; a sample array defines its item shape). SQLite permits writable column
-  names only and scalar values; JSON columns must be explicitly encoded as text.
+  messages with attachments within 32,768 characters. Project AI uses a 512 KiB
+  model-context bound and a 256 KiB provider-response bound.
+- JSON previews validate bounded record objects. Templates are guidance for the
+  model, not an enforced output schema. SQLite permits writable columns and scalar
+  values; JSON columns must be explicitly encoded as text.
 - Only ordinary, existing tables are supported. Virtual/shadow/system tables,
   views, generated columns, and target tables with triggers cannot be seeded by
   this importer. SQL identifiers are checked/quoted; values use bound parameters.
@@ -132,8 +114,7 @@ triggers and virtual tables remain unsupported. References must follow declared
 foreign keys. Cyclic references are rejected; schema creation remains a separate
 Database setup action. Application-specific hashing and custom validation are refused rather than approximated.
 
-Endpoints: `POST /api/projects/{id}/data/related/generate`, `/related/validate`,
-and `/related/insert`. Validation/import use `records_by_table` and
+Endpoints: `POST /api/projects/{id}/data/related/validate` and `/related/insert`. Validation/import use `records_by_table` and
 `expected_schema`; insertion also requires the reviewed `expected_preview_digest`
 and `confirm: true`.
 

@@ -10,29 +10,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 from pydantic import SecretStr
-from reqlica.generation.clarification import review_requirements
-from reqlica.generation.errors import GenerationError
-from reqlica.generation.prompts import build_messages
-from reqlica.generation.schemas import (
-    ClarificationRequest,
-    EndpointEditRequest,
-    GenerationRequest,
-)
-from reqlica.generation.service import (
-    edit_endpoint,
-    endpoint_source,
-    generate_endpoints,
-)
 from reqlica.projects import drafts
 from reqlica.projects.environment import change_environment, get_environment
 from reqlica.projects.store import create_project
-from reqlica.projects.versions import code_directory, content_digest
+from reqlica.projects.versions import code_directory
 from reqlica.runtime import dependencies
-from reqlica.runtime.dependencies import (
-    DEPENDENCY_PROMPT,
-    dependency_message,
-    import_issues,
-)
+from reqlica.runtime.dependencies import dependency_message, import_issues
 from reqlica.runtime.worker import WorkerManager
 
 
@@ -174,149 +157,13 @@ class DependencyWorkflowTests(unittest.TestCase):
             patch.dict(os.environ, {"REQLICA_HOME": str(self.root / "registry")})
         )
         self.project = create_project(self.root / "project")
-        self.request = GenerationRequest(requirements="Add an authenticated endpoint")
 
-    def plan(self, source):
-        return {
-            "summary": "Add an auth endpoint",
-            "assumptions": [],
-            "files": [
-                {
-                    "path": "endpoints/auth.py",
-                    "content": source + "\ndef auth(): return {}\n",
-                },
-                {
-                    "path": "tests/test_auth.py",
-                    "content": "import unittest\nclass AuthTests(unittest.TestCase):\n    def test_example(self): self.assertTrue(True)\n",
-                },
-            ],
-            "endpoints": [
-                {"method": "GET", "path": "/auth", "handler": "endpoints/auth.py:auth"}
-            ],
-        }
 
-    def test_generation_rejects_dependencies_before_draft_creation_or_execution(self):
-        marker = self.root / "executed"
-        source = f"from pathlib import Path\nPath({str(marker)!r}).touch()\nimport definitely_not_declared_auth_library\n"
-        before = content_digest(code_directory(self.project))
-        with (
-            patch(
-                "reqlica.generation.service.provider.complete",
-                return_value=(json.dumps(self.plan(source)), None),
-            ) as complete,
-            self.assertRaises(GenerationError) as raised,
-        ):
-            generate_endpoints(self.project.id, self.request)
-        self.assertEqual(raised.exception.detail["code"], "dependency_error")
-        self.assertEqual(
-            raised.exception.detail["dependencies"][0]["module"],
-            "definitely_not_declared_auth_library",
-        )
-        self.assertIn("No draft was created", str(raised.exception))
-        self.assertFalse(marker.exists())
-        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
-        self.assertEqual(content_digest(code_directory(self.project)), before)
-        complete.assert_called_once()
 
-    def test_unsupported_import_in_generated_test_also_blocks_the_proposal(self):
-        plan = self.plan("")
-        plan["files"][1]["content"] = (
-            "import notdeclared\n" + plan["files"][1]["content"]
-        )
-        with (
-            patch(
-                "reqlica.generation.service.provider.complete",
-                return_value=(json.dumps(plan), None),
-            ),
-            self.assertRaises(GenerationError),
-        ):
-            generate_endpoints(self.project.id, self.request)
-        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
 
-    def test_undefined_names_block_generation_without_executing_source(self):
-        plan = self.plan("")
-        plan["files"][0]["content"] = "def auth(): return missing_response\n"
-        with (
-            patch("reqlica.generation.service.provider.complete",
-                  return_value=(json.dumps(plan), None)),
-            self.assertRaisesRegex(GenerationError, "missing_response"),
-        ):
-            generate_endpoints(self.project.id, self.request)
-        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
 
-    def test_clarification_and_generation_share_policy_and_instructions(self):
-        _, generation = build_messages(self.project.id, self.request)
-        with patch(
-            "reqlica.generation.clarification.provider.complete",
-            return_value=(json.dumps({"summary": "Ready", "questions": []}), None),
-        ) as complete:
-            review_requirements(
-                self.project.id,
-                ClarificationRequest(requirements=self.request.requirements),
-            )
-        clarification = complete.call_args.args[0]
-        self.assertIn(DEPENDENCY_PROMPT, generation[0]["content"])
-        self.assertIn(DEPENDENCY_PROMPT, clarification[0]["content"])
-        policy = json.loads(generation[1]["content"])["runtime_dependencies"]
-        self.assertEqual(
-            policy, json.loads(clarification[1]["content"])["runtime_dependencies"]
-        )
-        self.assertEqual(policy["available"]["fastapi"], "fastapi")
-        self.assertIn("fastapi", policy["package_versions"])
 
-    def test_dependency_policy_change_requires_fresh_clarification(self):
-        with patch(
-            "reqlica.generation.clarification.provider.complete",
-            return_value=(json.dumps({"summary": "Ready", "questions": []}), None),
-        ):
-            review = review_requirements(
-                self.project.id,
-                ClarificationRequest(requirements=self.request.requirements),
-            )
-        context, _ = build_messages(self.project.id, self.request)
-        changed = context["runtime_dependencies"]
-        changed["available"]["new_dependency"] = "new-dependency"
-        request = GenerationRequest(
-            requirements=self.request.requirements,
-            clarification={
-                "context_fingerprint": review["context_fingerprint"],
-                "decisions": [],
-            },
-        )
-        with (
-            patch(
-                "reqlica.projects.context.runtime_dependency_policy",
-                return_value=changed,
-            ),
-            patch("reqlica.generation.service.provider.complete") as complete,
-            self.assertRaisesRegex(ValueError, "review clarification"),
-        ):
-            generate_endpoints(self.project.id, request)
-        complete.assert_not_called()
 
-    def test_endpoint_edits_receive_the_same_preflight(self):
-        target = endpoint_source(self.project.id, "GET", "/hello")
-        plan = self.plan("import definitely_not_declared_auth_library")
-        plan["files"][0]["path"] = "endpoints/hello.py"
-        plan["files"][0]["content"] = (
-            "import definitely_not_declared_auth_library\ndef hello(): return {}\n"
-        )
-        plan["endpoints"] = [target["endpoint"]]
-        request = EndpointEditRequest(
-            requirements="Update this route",
-            endpoint=target["endpoint"],
-            expected_revision=target["revision"],
-        )
-        with (
-            patch(
-                "reqlica.generation.service.provider.complete",
-                return_value=(json.dumps(plan), None),
-            ),
-            self.assertRaises(GenerationError) as raised,
-        ):
-            edit_endpoint(self.project.id, request)
-        self.assertEqual(raised.exception.detail["code"], "dependency_error")
-        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
 
     def test_existing_draft_missing_import_fails_before_any_handler_executes(self):
         draft = drafts.create_draft(self.project.id)
@@ -359,23 +206,6 @@ class DependencyWorkflowTests(unittest.TestCase):
         )
         self.assertNotIn("Traceback", result["output"])
 
-    def test_reported_dependency_works_in_disposable_checks(self):
-        source = "import httpx\n"
-        plan = self.plan(source)
-        plan["files"][1]["content"] = (
-            "import unittest\nimport httpx\nclass DependencyTests(unittest.TestCase):\n    def test_response_decoding(self):\n        response = httpx.Response(201, json={'created': True})\n        self.assertEqual(response.status_code, 201)\n        self.assertEqual(response.json(), {'created': True})\n"
-        )
-        with patch(
-            "reqlica.generation.service.provider.complete",
-            return_value=(json.dumps(plan), None),
-        ):
-            result = generate_endpoints(self.project.id, self.request)
-        draft = result["draft"]
-        args = self.project.id, draft["id"], draft["revision"]
-        self.assertEqual(drafts.validate_draft(*args)["status"], "passed")
-        tested = drafts.test_draft(*args)
-        self.assertEqual(tested["status"], "passed", tested)
-        self.assertGreater(tested["tests_passed"], 0)
 
     def test_missing_dynamic_test_dependency_has_summary_and_preserves_failure(self):
         draft = drafts.create_draft(self.project.id)
