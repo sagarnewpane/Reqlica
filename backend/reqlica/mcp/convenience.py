@@ -25,15 +25,13 @@ RouteFilter = Annotated[
 async def get_project_urls(project_id: ProjectID, path: RouteFilter = None) -> dict:
     """Convenience only: get published endpoint URLs for the user to call directly.
 
-    Use when the user asks for live API URLs, not when implementing/checking a
-    draft. Returns kind='published', base_url, active_version, and endpoints with
-    method, path, handler, url, requires_path_parameters. Optional path filters
-    by registered route pattern. Use the listed HTTP method and replace path
-    placeholders. Published calls use persistent live data, unlike draft previews.
+    Returns kind='published', base_url, active_version and endpoints with method,
+    path, handler, url, requires_path_parameters. Optional path filters registered
+    patterns. Use the listed method and replace placeholders; published requests
+    use persistent live data. No draft-only routes or revision input.
 
-    Reads definitions only; does not start a worker, execute handlers, or guarantee
-    the gateway is running. Does not reveal draft-only endpoints. No revision is
-    needed. This helper is NOT a prerequisite for any core creation/edit/check tool.
+    Reads definitions only, without worker startup, handler execution or gateway
+    health guarantees. Optional; not required for core creation/edit/check tools.
     """
     return await run_in_threadpool(
         urls.get_project_urls, project_id, _mock_base_url(), path
@@ -45,22 +43,18 @@ async def get_draft_urls(
 ) -> dict:
     """Convenience only: get draft preview URLs for browser, curl, or Postman testing.
 
-    Use when the user wants a URL to try unpublished routes without copying a
-    revision hash. Requires an existing draft from create_draft; no revision input
-    is needed. Returns kind='draft_preview', draft_id, current revision, base_url,
-    and endpoint method/path/handler/url/requires_path_parameters. Optional path
-    filters by exact registered route pattern, e.g. '/hello'. Replace placeholders
-    in URL patterns before requesting; use GET for browser links, curl/Postman for
-    POST/etc. The console must be running. No custom request headers/cookie sessions.
+    Returns kind='draft_preview', draft_id, current revision, base_url and endpoint
+    method/path/handler/url/requires_path_parameters. Requires an existing draft,
+    no revision input. Optional path filters registered patterns. Replace placeholders;
+    use GET in browsers, curl/Postman for other methods. Console must be running.
 
-    URL generation itself executes no handler. Following a URL executes the CURRENT
-    draft at request time, with a fresh disposable database copy on EACH request;
-    writes do not persist between calls or reach live data through the SDK. JSON
-    request bodies and bounded JSON/text diagnostic responses only. These URLs are
-    not version-pinned and not a streaming/binary proxy; responses expose the actual
-    revision in X-Reqlica-Draft-Revision. They do not validate, approve, or publish.
-    Keep core call_draft_endpoint for revision-explicit LLM checks. This helper is
-    optional and is NOT a prerequisite for the core workflow. Python is not sandboxed.
+    Generating URLs executes no handler; following one executes the CURRENT draft,
+    unpinned, with a fresh disposable DB per request. SDK writes never reach live
+    data or persist between calls. JSON bodies and bounded JSON/text diagnostics
+    only; no custom headers/cookie sessions, streaming or binary proxy. Responses
+    expose X-Reqlica-Draft-Revision. Python is not sandboxed.
+    No validation, approval or publication. Optional; use call_draft_endpoint for
+    revision-explicit LLM checks.
     """
     return await run_in_threadpool(
         urls.get_draft_urls, project_id, draft_id, _console_base_url(), path

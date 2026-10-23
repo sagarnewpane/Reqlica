@@ -2,6 +2,7 @@
 
 import json
 import os
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -76,6 +77,61 @@ class MCPTests(unittest.TestCase):
     def create_draft(self):
         return self.tool("create_draft", {"project_id": self.project.id})
 
+    def test_package_discovery_compact_inventory_and_annotations(self):
+        from reqlica.console import packages
+        tools = {tool['name']: tool for tool in self.rpc('tools/list')['tools']}
+        self.assertTrue(tools['install_package']['annotations']['destructiveHint'])
+        self.assertTrue(tools['install_package']['annotations']['openWorldHint'])
+        self.assertFalse(tools['preview_package_install']['annotations']['readOnlyHint'])
+        self.assertIn('human', tools['install_package']['inputSchema']['properties']['confirm']['description'])
+        info = {'installed':{'demo':'1'}, 'jobs':[{'id':'a'*32,'status':'review','requirement':'demo', 'log':'large output'}]}
+        with patch.object(packages, 'package_info', return_value=info):
+            result = self.tool('inspect_runtime_packages', {'project_id':self.project.id})
+        self.assertEqual(result['installed_count'], 1)
+        self.assertNotIn('installed', result)
+        self.assertNotIn('log', result['jobs'][0])
+
+    def test_package_tools_preserve_plan_pins_and_require_confirmation(self):
+        from reqlica.console import packages
+        ids = {'project_id':self.project.id}
+        with patch.object(packages, 'preview_package', return_value={'id':'a'*32,'status':'resolving'}) as preview:
+            self.tool('preview_package_install', {**ids,'package':'PyJWT','version':'2.10.1','expected_environment_revision':'b'*64})
+            body = preview.call_args.args[1]
+            self.assertEqual(body.package, 'PyJWT')
+            self.assertEqual(body.expected_revision, 'b'*64)
+        self.tool_error('install_package', {**ids,'job_id':'a'*32,'expected_plan_digest':'c'*64,'confirm':False}, 'confirmation')
+        with patch.object(packages, 'install_package', return_value={'id':'a'*32,'status':'installing'}) as install:
+            self.tool('install_package', {**ids,'job_id':'a'*32,'expected_plan_digest':'c'*64,'confirm':True})
+            self.assertEqual(install.call_args.args[2].expected_plan_digest, 'c'*64)
+            self.assertTrue(install.call_args.args[2].confirm)
+        with patch.object(packages, 'install_package', side_effect=ValueError('Runtime packages changed')):
+            self.tool_error('install_package', {**ids,'job_id':'a'*32,'expected_plan_digest':'c'*64,'confirm':True}, 'Runtime packages changed')
+        with patch.object(packages, 'preview_package') as preview:
+            response = self.rpc('tools/call', {'name':'preview_package_install','arguments':{**ids,'package':'-r evil','expected_environment_revision':'b'*64}})
+            self.assertTrue(response['isError'])
+            preview.assert_not_called()
+
+    def test_package_job_polling_is_read_only_and_output_is_opt_in(self):
+        from reqlica.console import packages
+        args = {'project_id':self.project.id,'job_id':'a'*32}
+        def result(*_args):
+            return {'id':'a'*32,'status':'failed','message':'x'*3000,'log':'details'}
+        with patch.object(packages, 'inspect_job', side_effect=result) as read, patch.object(packages, 'install_package') as install:
+            compact = self.tool('get_package_install_job', args)
+            expanded = self.tool('get_package_install_job', {**args,'include_output':True})
+            self.assertNotIn('log', compact)
+            self.assertEqual(len(compact['message']), 1024)
+            self.assertEqual(expanded['log'], 'details')
+            self.assertEqual(read.call_count, 2)
+            install.assert_not_called()
+
+    def test_saved_request_history_is_readable_without_draft_or_execution(self):
+        from reqlica.projects.inspection import record_event
+        record_event(self.project.directory, {"kind": "request", "request_id": "a" * 32, "status_code": 429})
+        result = self.tool("read_project_logs", {"project_id": self.project.id, "request_id": "a" * 32})
+        self.assertEqual(result["events"][0]["status_code"], 429)
+        self.assertEqual(self.tool("list_drafts", {"project_id": self.project.id})["drafts"], [])
+
     def test_discovery_schemas_and_no_ai_approval_or_activation(self):
         tools = {tool["name"]: tool for tool in self.rpc("tools/list")["tools"]}
         self.assertEqual(
@@ -95,6 +151,27 @@ class MCPTests(unittest.TestCase):
                 "get_project_urls",
                 "get_draft_urls",
                 "get_api_schema",
+                "get_mock_data_context",
+                "preview_mock_data",
+                "read_project_logs",
+                "preview_database_migration",
+                "inspect_runtime_packages",
+                "preview_package_install",
+                "get_package_install_job",
+                "install_package",
+                "get_traffic_policies",
+                "set_traffic_policy",
+                "reset_scenario_counters",
+                "get_worker_status",
+                "control_project_worker",
+                "get_data_baseline",
+                "capture_data_baseline",
+                "reset_project_data",
+                "list_database_migrations",
+                "inspect_project_archive",
+                "export_project_archive",
+                "import_project_archive",
+                "relocate_project",
             },
         )
         self.assertTrue(tools["get_project_context"]["annotations"]["readOnlyHint"])
@@ -119,6 +196,32 @@ class MCPTests(unittest.TestCase):
             self.tool_error(name, {}, "Unknown tool")
         self.assertEqual(self.client.get("/api/health").status_code, 200)
         self.assertEqual(self.client.get("/docs").status_code, 200)
+
+    def test_mock_data_refuses_hash_columns_without_writing_live_data(self):
+        path = self.project.directory / "data.sqlite"
+        with sqlite3.connect(path) as db:
+            db.execute("CREATE TABLE users(id INTEGER PRIMARY KEY, password_hash TEXT NOT NULL)")
+        original = path.read_bytes()
+        context = self.tool("get_mock_data_context", {"project_id": self.project.id})
+        self.assertIn("users", context["application"]["unsupported_tables"])
+        self.tool_error("preview_mock_data", {"project_id": self.project.id,
+            "target": "sqlite", "table": "users", "expected_schema": context["schema"]["fingerprint"],
+            "records_json": '[{"password_hash":"invented-hash"}]'}, "application-specific hashing")
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_mock_data_tools_validate_json_and_reject_unsafe_or_stale_input(self):
+        arguments = {"project_id": self.project.id}
+        preview = self.tool("preview_mock_data", {**arguments, "records_json": '[{"name":"Example"}]'})
+        self.assertEqual(preview["validation"]["status"], "passed")
+        for records in ['[{"name":"first","name":"second"}]', '[{"value":NaN}]', '[{"value":Infinity}]']:
+            self.tool_error("preview_mock_data", {**arguments, "records_json": records}, "Error")
+        self.tool_error("preview_mock_data", {**arguments, "target": "sqlite", "table": "users",
+            "expected_schema": "f" * 64, "records_json": '[{"name":"Example"}]'}, "schema changed")
+        context = self.tool("get_mock_data_context", arguments)
+        self.assertIn("fingerprint", context["schema"])
+        self.assertIn("application", context)
+        self.tool_error("preview_mock_data", {**arguments, "target": "related", "table": "users",
+            "expected_schema": "f" * 64, "records_json": '{"users":[{"name":"Example"}]}'}, "not table")
 
     def test_context_reads_source_without_importing_and_lists_broken_projects(self):
         active = code_directory(self.project)

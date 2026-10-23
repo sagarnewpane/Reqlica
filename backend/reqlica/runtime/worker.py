@@ -18,6 +18,8 @@ from types import ModuleType
 import uvicorn
 from fastapi import FastAPI
 from reqlica.projects.environment import read_environment, redact_output
+from reqlica.projects.inspection import exception_details, record_event
+from reqlica.runtime.inspection import ErrorInspectionMiddleware
 from reqlica.projects.store import Manifest, Project, get_project, list_project_ids
 from reqlica.projects.versions import code_directory, project_lock
 from reqlica.runtime.dependencies import dependency_message
@@ -119,10 +121,14 @@ def _run_worker(
     try:
         _, project_values = read_environment(database.parent)
         os.environ.update(project_values)
+        from reqlica.projects.capture import OutputCapture
+        sys.stdout = OutputCapture(sys.stdout, database.parent, "stdout", project_values)
+        sys.stderr = OutputCapture(sys.stderr, database.parent, "stderr", project_values)
         from reqlica.runtime.activation import database_guard
 
         with database_guard(database.parent):
             app = build_app(directory, database)
+            app.add_middleware(ErrorInspectionMiddleware, directory=database.parent, code_directory=directory)
             config = uvicorn.Config(
                 app,
                 host="127.0.0.1",
@@ -135,6 +141,7 @@ def _run_worker(
             )
             asyncio.run(ReadyServer(config).serve(sockets=[listener]))
     except (Exception, SystemExit, KeyboardInterrupt) as exc:  # noqa: BLE001
+        record_event(database.parent, {"kind": "startup_error", **exception_details(exc, directory)})
         # Handler code can fail arbitrarily; report startup errors to the gateway.
         try:
             detail = (

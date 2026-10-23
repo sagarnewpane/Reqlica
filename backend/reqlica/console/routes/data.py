@@ -1,20 +1,14 @@
-"""Data-only generation, disposable validation, and explicitly confirmed appends."""
+"""Disposable data validation and explicitly confirmed appends."""
 
-from typing import Annotated
-
-from fastapi import APIRouter, Header, HTTPException, Response
-from pydantic import SecretStr
-from reqlica.console.dependencies import activity_operation, draft_operation
+from fastapi import APIRouter, HTTPException, Response
+from reqlica.console.dependencies import draft_operation
 from reqlica.generation.data_schemas import (
     DataImportRequest,
     DataValidationRequest,
-    MockDataRequest,
     RelatedDataValidationRequest,
     RelatedDataImportRequest,
-    RelatedMockDataRequest,
 )
 from reqlica.generation.errors import GenerationError
-from reqlica.generation.mock_data import generate_mock_data, generate_related_mock_data
 from reqlica.projects.related_data import validate_related_data, insert_related_data
 from reqlica.projects.mock_data import database_schema, insert_data, validate_data
 
@@ -36,24 +30,6 @@ def schema(project_id: str, response: Response) -> dict:
     return operation(response, database_schema, project_id)
 
 
-@router.post("/generate")
-def generate(
-    project_id: str,
-    body: MockDataRequest,
-    response: Response,
-    groq_key: Annotated[str | None, Header(alias="X-Reqlica-Groq-Key")] = None,
-    activity_id: Annotated[str | None, Header(alias="X-Reqlica-Activity-ID", pattern=r"^[a-f0-9]{32}$")] = None,
-) -> dict:
-    return operation(
-        response,
-        activity_operation,
-        project_id,
-        activity_id,
-        generate_mock_data,
-        project_id,
-        body,
-        SecretStr(groq_key) if groq_key else None,
-    )
 
 
 @router.post("/validate")
@@ -66,17 +42,6 @@ def insert(project_id: str, body: DataImportRequest, response: Response) -> dict
     return operation(response, insert_data, project_id, body)
 
 
-@router.post("/related/generate")
-def generate_related(
-    project_id: str,
-    body: RelatedMockDataRequest,
-    response: Response,
-    groq_key: Annotated[str | None, Header(alias="X-Reqlica-Groq-Key")] = None,
-    activity_id: Annotated[str | None, Header(alias="X-Reqlica-Activity-ID", pattern=r"^[a-f0-9]{32}$")] = None,
-) -> dict:
-    return operation(response, activity_operation, project_id, activity_id,
-                     generate_related_mock_data, project_id, body,
-                     SecretStr(groq_key) if groq_key else None)
 
 
 @router.post("/related/validate")

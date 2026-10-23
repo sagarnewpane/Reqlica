@@ -8,7 +8,7 @@ function fixture(){
   const nodes=new Map(),timers=new Map(),calls=[];let next=0;
   const node=()=>({dataset:{},textContent:'',innerHTML:'',children:new Map(),setAttribute(){},remove(){nodes.delete('ai-request-activity');},insertAdjacentElement(where,child){nodes.set(child.id,child);},querySelector(selector){if(!this.children.has(selector))this.children.set(selector,node());return this.children.get(selector);}});
   const $=id=>nodes.get(id);
-  for(const id of ['main-content','generation-error','ai-endpoint-error','ai-data-error','repair-error'])nodes.set(id,node());
+  for(const id of ['main-content','agent-error','agent-live'])nodes.set(id,node());
   let resolve,reject;
   const request=new Promise((yes,no)=>{resolve=yes;reject=no;});
   const c={$,Date,aiConfig:{defaults:{timeoutSeconds:300}},document:{createElement:node},crypto:{randomUUID:()=> 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'},
@@ -20,7 +20,7 @@ function fixture(){
   return {c,$,timers,calls,resolve,reject};
 }
 test('AI request shows confirmed progress, sends an activity ID, and cleans up timers',async()=>{
-  const f=fixture(),pending=f.c.api('console','/api/projects/p/clarify','POST',{requirements:'private'});
+  const f=fixture(),pending=f.c.api('console','/api/projects/p/agent-runs/r/step','POST',{requirements:'private'});
   const panel=f.$('ai-request-activity');
   assert.equal(panel.querySelector('[data-activity-title]').textContent,'Sending to Reqlica');
   assert.equal(f.calls[0].options.headers['X-Reqlica-Activity-ID'],'a'.repeat(32));
@@ -37,7 +37,7 @@ test('AI request shows confirmed progress, sends an activity ID, and cleans up t
   assert.equal(panel.dataset.state,'complete');assert.equal(f.timers.size,0);
 });
 test('custom AI timeout reaches backend and bridge; ordinary requests keep their timeout',async()=>{
-  for(const [path,seconds,expected] of [['/api/projects/p/clarify',600,660000],['/api/projects/p/data/generate',120,180000],['/api/projects/p/drafts/d/repair',300,360000],['/api/projects/p/drafts',600,90000]]){
+  for(const [path,seconds,expected] of [['/api/projects/p/agent-runs/r/step',600,660000],['/api/projects/p/agent-runs/r/step',120,180000],['/api/projects/p/agent-runs/r/step',300,360000],['/api/projects/p/drafts',600,90000]]){
     const f=fixture();f.c.aiConfig.defaults.timeoutSeconds=seconds;
     const pending=f.c.api('console',path,'POST',{});
     assert.equal(f.calls[0].timeoutMs,expected);
@@ -47,16 +47,16 @@ test('custom AI timeout reaches backend and bridge; ordinary requests keep their
   }
 });
 test('network failure stays a failure, stops polling and preserves the original error',async()=>{
-  const f=fixture(),pending=f.c.api('console','/api/projects/p/ask','POST',{});
+  const f=fixture(),pending=f.c.api('console','/api/projects/p/agent-runs/r/step','POST',{});
   f.reject(Error('Could not reach console'));
   await assert.rejects(pending,/Could not reach console/);
   assert.equal(f.$('ai-request-activity').dataset.state,'failed');assert.equal(f.timers.size,0);
 });
 test('activity is scoped to AI requests and to the correct form',()=>{
   const {c}=fixture();
-  assert.equal(c.aiActivityTarget('console','/api/projects/p/data/generate','POST',{}),'ai-data-error');
-  assert.equal(c.aiActivityTarget('console','/api/projects/p/clarify','POST',{endpoint:{}}),'ai-endpoint-error');
-  assert.equal(c.aiActivityTarget('console','/api/projects/p/drafts/d/repair','POST',{}),'repair-error');
+  assert.equal(c.aiActivityTarget('console','/api/projects/p/agent-runs/r/step','POST',{}),'agent-error');
+  assert.equal(c.aiActivityTarget('console','/api/projects/p/agent-runs/r/step','POST',{endpoint:{}}),'agent-error');
+  assert.equal(c.aiActivityTarget('console','/api/projects/p/agent-runs/r/step','POST',{}),'agent-error');
   assert.equal(c.aiActivityTarget('console','/api/projects/p/drafts','POST',{}),null);
   assert.equal(c.aiActivityTarget('gateway','/api/projects/p/generate','POST',{}),null);
 });
@@ -82,4 +82,21 @@ test('AI defaults save valid timeout values and reject values outside the suppor
     assert.equal(errors.length,valid?0:1);
     assert.equal(saved?.timeoutSeconds,valid?Number(value):undefined);
   }
+});
+
+test('64k output budgets save and reload while larger budgets are rejected',()=>{
+  for(const [value,valid] of [[65536,true],[65792,false]]){
+    const errors=[],nodes=new Map(),$=id=>{if(!nodes.has(id))nodes.set(id,{value:''});return nodes.get(id);};
+    $('ai-temperature').value='0';$('ai-max-tokens').value=String(value);$('ai-timeout-seconds').value='300';$('default-ai-provider').value='';
+    let saved;
+    const c={$,aiConfig:{providers:[],defaults:{}},aiStorageAvailable:true,aiStorageKey:'test',clearError(){},showError:e=>errors.push(e),persistAIConfig:()=>{saved={...c.aiConfig.defaults};},renderAIProviderChoices(){},toast(){},localStorage:{getItem:()=>JSON.stringify({defaults:{maxTokens:value}})}};
+    vm.createContext(c);vm.runInContext(html.match(/^const aiDefaultOptions=.*$/m)[0],c);
+    vm.runInContext(html.slice(html.indexOf('function loadAIConfig('),html.indexOf('function persistAIConfig(')),c);
+    vm.runInContext(html.slice(html.indexOf('function saveAIDefaults('),html.indexOf('// Chat persistence:')),c);
+    c.saveAIDefaults();
+    assert.equal(errors.length,valid?0:1);
+    assert.equal(saved?.maxTokens,valid?value:undefined);
+    assert.equal(c.loadAIConfig().defaults.maxTokens,valid?value:8192);
+  }
+  assert.match(html, /id="ai-max-tokens"[^>]*max="65536"/);
 });

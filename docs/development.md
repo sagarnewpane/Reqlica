@@ -31,11 +31,13 @@ variables take precedence over `.env`. Set `REQLICA_HOME` to override the defaul
 registry location, `~/.reqlica/projects/`. Use the same value for project creation,
 both servers, and local draft approval. Projects themselves can live in any
 directory Reqlica can access; keep registered directories in place because
-moving/importing projects is not implemented.
+use the [relocation API](maintenance.md) when moving a registered project.
+Active projects can also be copied with [ZIP export/import](project-transfer.md).
 
 Keep servers bound to loopback. Management APIs are unauthenticated, and Python
 endpoint code runs with the user's permissions, not inside a security sandbox.
-Browser CORS configuration is not implemented.
+Published project browser access is configurable through [CORS settings](cors.md).
+Management APIs retain their existing local-only access model.
 
 ## Startup and Debugging
 

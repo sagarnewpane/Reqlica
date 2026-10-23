@@ -14,8 +14,6 @@ import httpx
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from reqlica.console.app import create_app
-from reqlica.generation.prompts import build_messages
-from reqlica.generation.schemas import GenerationRequest
 from reqlica.projects import drafts
 from reqlica.projects.context import get_project_context
 from reqlica.projects.environment import (
@@ -207,12 +205,6 @@ class EnvironmentTests(unittest.TestCase):
         self.assertNotIn(ENV_PATH, context["files"])
         self.assertEqual(context["environment"]["names"], [NAME])
         self.assertNotIn(SECRET, json.dumps(context))
-        _, messages = build_messages(
-            self.project.id,
-            GenerationRequest(requirements="Use the configured JWT key"),
-        )
-        self.assertIn(NAME, json.dumps(messages))
-        self.assertNotIn(SECRET, json.dumps(messages))
         destination = self.root / "snapshot"
         snapshot_code(code_directory(self.project), destination)
         self.assertFalse((destination / ENV_PATH).exists())

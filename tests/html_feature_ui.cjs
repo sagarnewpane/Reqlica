@@ -10,7 +10,7 @@ function fixture(){
   const context={$,state:{},pretty:JSON.stringify};vm.createContext(context);
   vm.runInContext(html.match(/^const esc =.*$/m)[0],context);
   vm.runInContext(html.match(/^function badge\(.*$/m)[0],context);
-  for(const [start,end] of [['function failureCause(','function renderDraft('],['function repairAttemptsMarkup(','function renderRepair('],['function clarificationMarkup(','function syncDecisionProgress('],['function renderDatabaseSetup(','async function editDatabasePlan('],['function renderEnvironment(','async function loadEnvironment(']])vm.runInContext(section(start,end),context);
+  for(const [start,end] of [['function failureCause(','function renderDraft('],['function renderDatabaseSetup(','async function editDatabasePlan('],['function renderEnvironment(','async function loadEnvironment(']])vm.runInContext(section(start,end),context);
   return {context,$};
 }
 test('failure summaries show causes without interpreting logs as HTML and ignore stale checks',()=>{
@@ -19,17 +19,6 @@ test('failure summaries show causes without interpreting logs as HTML and ignore
   const markup=c.checkFailureMarkup(draft);
   assert.match(markup,/AttributeError/);assert.match(markup,/&lt;script&gt;/);assert.doesNotMatch(markup,/<script>|<img/);
   draft.test.revision='old';assert.equal(c.checkFailureMarkup(draft),'');
-});
-test('repair history offers escaped diagnoses, changed files, diffs and blockers',()=>{
-  const {context:c}=fixture();
-  const markup=c.repairAttemptsMarkup([{status:'repaired',summary:'Fixed <b>injection</b>',changed_files:['endpoints/auth.py'],diff:'- <script>old</script>\n+ request: Request',test:{status:'passed',tests_passed:10,tests_run:10}},{status:'needs_information',summary:'Need a decision',blockers:['Choose <key> name']}]);
-  assert.match(markup,/10 \/ 10 tests passed/);assert.match(markup,/data-file="endpoints\/auth.py"/);assert.match(markup,/Review repair diff/);assert.match(markup,/&lt;key&gt;/);assert.doesNotMatch(markup,/<script>|<b>/);
-});
-test('clarification cards expose answer progress and preserve safe editable inputs',()=>{
-  const {context:c}=fixture();
-  const review={summary:'Confirm fields',questions:[{id:'fields',kind:'field',question:'Which <fields>?',options:['Email only']}],answers:{},prior_decisions:[]};
-  let markup=c.clarificationMarkup(review,'generate');assert.match(markup,/0 \/ 1 answered/);assert.match(markup,/data-decision-card="generate:fields"/);assert.match(markup,/&lt;fields&gt;/);
-  review.answers.fields='Email only';markup=c.clarificationMarkup(review,'generate');assert.match(markup,/1 \/ 1 answered/);assert.match(markup,/data-answered="true"/);
 });
 test('database preview status and table names are scoped to the selected saved revision',()=>{
   const {context:c,$}=fixture();

@@ -13,12 +13,8 @@ from reqlica.console.app import create_app
 from reqlica.generation.data_schemas import (
     DataImportRequest,
     DataValidationRequest,
-    MockDataPlan,
-    MockDataRequest,
 )
 from reqlica.generation.errors import GenerationError
-from reqlica.generation.mock_data import generate_mock_data
-from reqlica.projects import drafts
 from reqlica.projects.mock_data import (
     database_schema,
     insert_data,
@@ -27,7 +23,6 @@ from reqlica.projects.mock_data import (
     validate_records,
 )
 from reqlica.projects.store import create_project
-from reqlica.projects.versions import code_directory, content_digest
 
 
 def rows():
@@ -64,10 +59,6 @@ class MockDataTests(unittest.TestCase):
                     author_id INTEGER REFERENCES authors(id)
                 );
             """)
-        self.complete = self.enterContext(
-            patch("reqlica.generation.mock_data.provider.complete")
-        )
-        self.complete.return_value = (json.dumps(proposal()), {"total_tokens": 123})
 
     def batch(self, records=None):
         return DataValidationRequest(
@@ -88,41 +79,7 @@ class MockDataTests(unittest.TestCase):
         with sqlite3.connect(self.database) as db:
             return db.execute("SELECT title, price FROM books ORDER BY id").fetchall()
 
-    def test_json_generation_uses_template_and_never_creates_drafts_or_writes_data(
-        self,
-    ):
-        before = content_digest(code_directory(self.project))
-        request = MockDataRequest(
-            requirements="Two varied synthetic books", count=2, template=rows()[0]
-        )
-        result = generate_mock_data(self.project.id, request)
-        self.assertEqual(result["records"], rows())
-        self.assertEqual(result["validation"]["status"], "passed")
-        self.assertIs(self.complete.call_args.kwargs["response_model"], MockDataPlan)
-        self.complete.assert_called_once()
-        self.assertEqual(self.contents(), [])
-        self.assertEqual(content_digest(code_directory(self.project)), before)
-        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
-        messages = json.dumps(self.complete.call_args.args[0])
-        self.assertNotIn("private-live-author-name", messages)
-        self.assertNotIn(str(self.project.directory), messages)
 
-    def test_sqlite_generation_sends_definitions_not_records_and_only_previews(self):
-        batch = self.batch()
-        request = MockDataRequest(
-            target="sqlite",
-            table="books",
-            expected_schema=batch.expected_schema,
-            requirements="Generate two books for author 1",
-            count=2,
-            template={"author_id": 1},
-        )
-        result = generate_mock_data(self.project.id, request)
-        self.assertEqual(result["validation"]["status"], "passed")
-        payload = json.loads(self.complete.call_args.args[0][1]["content"])
-        self.assertIn("columns", payload["table_definition"])
-        self.assertNotIn("private-live-author-name", json.dumps(payload))
-        self.assertEqual(self.contents(), [])
 
     def test_disposable_validation_then_explicit_atomic_insert(self):
         batch = self.batch()
@@ -209,22 +166,6 @@ class MockDataTests(unittest.TestCase):
         with self.assertRaisesRegex(GenerationError, "generated columns"):
             validate_data(self.project.id, batch)
 
-    def test_bad_generated_data_counts_shapes_duplicate_keys_and_code_are_rejected(
-        self,
-    ):
-        request = MockDataRequest(requirements="Two books", count=2, template=rows()[0])
-        cases = [
-            json.dumps(proposal(rows()[:1])),
-            json.dumps(proposal([{**r, "price": "not numeric"} for r in rows()])),
-            json.dumps(proposal([{"sql": "DROP TABLE books"}] * 2)),
-            '{"summary":"a","summary":"b","assumptions":[],"records_json":"[]"}',
-            "```python\nraise RuntimeError('not run')\n```",
-        ]
-        for text in cases:
-            with self.subTest(text=text[:80]), self.assertRaises(GenerationError):
-                self.complete.return_value = (text, None)
-                generate_mock_data(self.project.id, request)
-        self.assertEqual(self.contents(), [])
 
     def test_record_limits_and_nonfinite_values_are_enforced(self):
         for records in (
@@ -260,17 +201,6 @@ class MockDataTests(unittest.TestCase):
                 db.execute("SELECT COUNT(*) FROM deferred_books").fetchone()[0], 0
             )
 
-    def test_stale_schema_is_rejected_before_model_request(self):
-        request = MockDataRequest(
-            target="sqlite",
-            table="books",
-            expected_schema="a" * 64,
-            requirements="Books",
-            count=2,
-        )
-        with self.assertRaisesRegex(ValueError, "schema changed"):
-            generate_mock_data(self.project.id, request)
-        self.complete.assert_not_called()
 
     def test_sql_like_values_and_quoted_identifiers_are_bound_as_data(self):
         with sqlite3.connect(self.database) as db:
@@ -292,26 +222,6 @@ class MockDataTests(unittest.TestCase):
                 "'); DROP TABLE authors; --",
             )
 
-    def test_virtual_shadow_tables_are_rejected_before_provider(self):
-        with sqlite3.connect(self.database) as db:
-            try:
-                db.execute("CREATE VIRTUAL TABLE search USING fts5(content)")
-            except sqlite3.OperationalError:
-                self.skipTest("SQLite FTS5 is unavailable")
-        schema = database_schema(self.project.id)
-        shadow = next(
-            table for table in schema["tables"] if table.get("storage_type") == "shadow"
-        )
-        request = MockDataRequest(
-            target="sqlite",
-            table=shadow["name"],
-            expected_schema=schema["fingerprint"],
-            requirements="Generate a row",
-            count=1,
-        )
-        with self.assertRaises(GenerationError):
-            generate_mock_data(self.project.id, request)
-        self.complete.assert_not_called()
 
     def test_http_preview_validate_and_confirmed_insert_keep_credentials_out_of_data(
         self,
@@ -321,17 +231,6 @@ class MockDataTests(unittest.TestCase):
             schema = client.get(root + "/schema")
             self.assertEqual(schema.status_code, 200)
             self.assertNotIn("path", schema.json())
-            preview = client.post(
-                root + "/generate",
-                json={"requirements": "Two books", "count": 2, "template": rows()[0]},
-                headers={"X-Reqlica-Groq-Key": "private-data-key"},
-            )
-            self.assertEqual(preview.status_code, 200, preview.text)
-            self.assertEqual(preview.headers["cache-control"], "no-store")
-            self.assertNotIn("private-data-key", preview.text)
-            self.assertEqual(
-                self.complete.call_args.args[2].get_secret_value(), "private-data-key"
-            )
             batch = self.batch()
             reviewed = client.post(root + "/validate", json=batch.model_dump()).json()
             body = self.import_request(batch, reviewed).model_dump()

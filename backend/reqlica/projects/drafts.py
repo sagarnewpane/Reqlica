@@ -89,7 +89,13 @@ def _state(
         != environment_revision
         for name in ("validation", "test")
     )
-    if state["revision"] != revision or environment_changed:
+    from reqlica.runtime.package_state import dependency_revision, EMPTY_REVISION as EMPTY_PACKAGES
+
+    package_revision = dependency_revision()
+    packages_changed = any(state.get(name) and
+        state[name].get('dependency_revision', EMPTY_PACKAGES) != package_revision
+        for name in ('validation', 'test'))
+    if state["revision"] != revision or environment_changed or packages_changed:
         state.update(revision=revision, validation=None, test=None, approval=None)
         _save_state(project, draft_id, state)
     if expected_revision is not None and revision != expected_revision:

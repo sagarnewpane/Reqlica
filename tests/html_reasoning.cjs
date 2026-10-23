@@ -35,6 +35,24 @@ test('failed or stale model lookups cannot enable an unsupported reasoning choic
   assert.match($('provider-reasoning-help').textContent,/Support check failed/);
   assert.doesNotMatch($('provider-reasoning').innerHTML,/value="off"/);
 });
+test('Groq support choices use the selected model and exclude Off',async()=>{
+  const {c,$}=fixture();
+  $('provider-kind').value='groq';
+  $('provider-base-url').value='https://api.groq.com/openai/v1';
+  $('provider-model').value='new-groq-model';
+  c.api=async(...args)=>{
+    assert.equal(args[1],'/api/ai/reasoning-options');
+    assert.equal(args[3].provider,'groq');assert.equal(args[3].model,'new-groq-model');
+    return {modes:['default','low','medium','high'],message:'Provider reported controls'};
+  };
+  await c.loadProviderReasoning('high');
+  assert.equal($('provider-reasoning').value,'high');
+  assert.match($('provider-reasoning').innerHTML,/value="low"/);
+  assert.match($('provider-reasoning').innerHTML,/value="medium"/);
+  assert.match($('provider-reasoning').innerHTML,/value="high"/);
+  assert.doesNotMatch($('provider-reasoning').innerHTML,/value="off"/);
+  assert.match($('provider-reasoning-help').textContent,/Provider reported/);
+});
 test('provider validation preserves reasoning but ignores unrelated credential fields',()=>{
   const c={URL,providerPresets:{compatible:{}}};vm.createContext(c);
   vm.runInContext(html.slice(html.indexOf('function validateProvider('),html.indexOf('function loadAIConfig(')),c);
