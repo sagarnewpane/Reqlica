@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const html=fs.readFileSync(require('node:path').join(__dirname,'../backend/reqlica/reqlicav1.html'),'utf8');
-const code=html.slice(html.indexOf('const agentToolLabels='),html.indexOf('function renderGenerationJobs('));
+const code=html.slice(html.indexOf('const agentToolLabels='),html.indexOf('function previewData('));
 function fixture(){
   const nodes=new Map(),workspace={agentMessage:'Build a status endpoint',agentRun:null,agentRuns:[],agentDraft:''};
   const $=id=>{if(!nodes.has(id))nodes.set(id,{value:'',textContent:'',innerHTML:'',hidden:false,disabled:false,scrollTop:0,scrollHeight:0,clientHeight:0,querySelectorAll:()=>[]});return nodes.get(id);};
@@ -75,7 +75,7 @@ test('current draft selection is retained and backend rollover notice is visible
   const {c,w,$}=fixture();w.agentDraft='current';c.state.drafts=[{id:'current',name:'Current draft',base_version:'v'}];
   c.renderAgentDraftChoices();assert.equal($('agent-draft').value,'current');
   w.agentRun=run({notice:'The selected draft matches the published API. Changes will use a new draft.'});
-  c.renderAgentWorkspace();assert.equal($('agent-notice').hidden,false);assert.match($('agent-notice').textContent,/new draft/);
+  c.renderAgentWorkspace();assert.equal($('agent-notice').hidden,false);assert.match($('agent-notice-text').textContent,/new draft/);
 });
 
 test('AI Markdown formats options and code while treating HTML as text',()=>{
@@ -171,4 +171,68 @@ test('failed attachment reply retains the original text without duplicating the 
   c.api=async()=>{throw Error('offline');};await c.sendAgentReply();c.renderAgentWorkspace();
   assert.equal($('agent-message').value,'Use this shape');
   assert.equal(c.assistantMessage().match(/Attached specification/g).length,1);
+});
+
+
+test('saved conversations show their own reasoning choice and expose a reset for unsupported settings',()=>{
+  const {c,w,$}=fixture();w.agentRun=run({status:'failed',can_reset_reasoning:true,error:{message:'Unsupported reasoning'},provider:{provider:'compatible',model:'model',base_url:'http://127.0.0.1:9000/v1',reasoning_mode:'low'}});
+  c.renderAgentWorkspace();assert.match($('assistant-settings-summary').textContent,/Reasoning: low/);assert.equal($('agent-reasoning-default').hidden,false);assert.equal($('agent-resume').disabled,true);
+});
+
+test('reasoning reset updates the same conversation without contacting the model',async()=>{
+  const {c,w}=fixture();w.agentRun=run({status:'failed',can_reset_reasoning:true,provider:{provider:'compatible',model:'model',base_url:'http://127.0.0.1:9000/v1',reasoning_mode:'low'}});
+  let request;c.api=async(...args)=>{request=args;return run({provider:{...w.agentRun.provider,reasoning_mode:'default'},model_calls:1});};
+  c.continueAgent=()=>{throw Error('Must not advance the conversation');};
+  await c.useAgentDefaultReasoning();assert.match(request[1],/reasoning-default$/);assert.equal(request[3].expected_reasoning_mode,'low');assert.equal(w.agentRun.provider.reasoning_mode,'default');
+});
+
+test('new conversations disclose and use Default when a saved profile reasoning choice is unsupported',async()=>{
+  const {c,w,$,provider}=fixture();provider.reasoning='low';$('agent-message').value='Explain the API';let sent,disclosure;
+  c.api=async(service,url,method,body)=>{if(url==='/api/ai/reasoning-options')return {modes:['default']};sent=body;return run();};
+  c.confirmAction=async(title,message)=>{disclosure=message;return true;};c.continueAgent=async()=>{};
+  await c.startAgent();assert.equal(sent.reasoning_mode,'default');assert.match(disclosure,/saved low reasoning choice is unavailable/);assert.equal(provider.reasoning,'low');
+});
+
+test('Ollama profiles enable Send while unsupported profiles stay disabled',()=>{
+  const {c,provider,$}=fixture();provider.kind='ollama';provider.baseUrl='http://localhost:11434';
+  c.syncAgentControls();assert.equal($('agent-start').disabled,false);
+  provider.kind='anthropic';c.syncAgentControls();assert.equal($('agent-start').disabled,true);
+  assert.match($('agent-start').title,/preview-only/);
+});
+
+test('Ollama saved conversations match native and compatibility URL aliases',()=>{
+  const {c,provider,w,$}=fixture();provider.kind='ollama';provider.baseUrl='http://localhost:11434/v1/chat/completions/';
+  w.agentRun=run({provider:{provider:'ollama',model:'model',base_url:'http://localhost:11434'},can_reply:true});
+  w.agentReplyDrafts={[w.agentRun.id]:'Continue'};
+  assert.equal(c.agentProvider(w.agentRun),provider);
+  c.syncAgentControls();assert.equal($('agent-start').disabled,false);
+  provider.kind='compatible';assert.equal(c.agentProvider(w.agentRun),undefined);
+});
+
+test('context inspector shows measured bytes separately from actual token usage and renders source as text',async()=>{
+  const {c,w,$}=fixture();w.agentRun=run({status:'failed',updated_at:1,context:{bytes:20480,message_count:5,tool_count:9,max_output_tokens:64256,model_call:3},last_model_response:{model_call:3,finish_reason:'length',usage:{prompt_tokens:3650,completion_tokens:446,completion_tokens_details:{reasoning_tokens:100}}}});
+  c.renderAgentWorkspace();assert.match($('agent-context-summary').textContent,/20.0 KiB/);
+  assert.match($('agent-usage-summary').textContent,/3,650 input · 446 generated/);
+  let calls=[];c.api=async(...args)=>{calls.push(args);return {source:'captured',summary:w.agentRun.context,messages:[{role:'user',content:'<script>source</script>'}],tools:[]};};
+  await c.viewAgentContext();
+  assert.equal(calls.length,1);assert.match(calls[0][1],/\/context$/);assert.equal(calls[0][2],undefined);
+  assert.match($('agent-context-messages').textContent,/<script>source<\/script>/);
+  assert.equal($('agent-context-messages').innerHTML,'');
+  assert.equal($('agent-context-details').open,true);assert.equal($('agent-context-details').hidden,false);
+  assert.match($('agent-context-note').textContent,/Captured input/);
+});
+
+test('older failed requests label missing usage and reconstructed context honestly',async()=>{
+  const {c,w,$}=fixture();w.agentRun=run({status:'failed',usage:[{prompt_tokens:3650,completion_tokens:181}]});
+  c.renderAgentWorkspace();assert.match($('agent-usage-summary').textContent,/Failed request: token usage was not recorded/);
+  assert.match($('agent-usage-summary').textContent,/Last recorded successful request/);
+  c.api=async()=>({source:'reconstructed',summary:{bytes:10000,message_count:5,tool_count:9,max_output_tokens:64256,model_call:3},messages:[],tools:[]});
+  await c.viewAgentContext();assert.match($('agent-context-note').textContent,/not an exact historical snapshot/);
+});
+
+test('context loaded for a previous conversation is discarded after switching',async()=>{
+  const {c,w,$}=fixture();w.agentRun=run();let resolve;c.api=()=>new Promise(yes=>{resolve=yes;});
+  const pending=c.viewAgentContext();w.agentRun=run({id:'e'.repeat(32)});
+  resolve({source:'captured',summary:{},messages:[{content:'old private source'}],tools:[]});await pending;
+  assert.equal(w.agentContext,undefined);assert.equal($('agent-context-messages').textContent,'');
 });

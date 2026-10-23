@@ -10,8 +10,6 @@ from unittest.mock import patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from reqlica.generation.repair import repair_draft
-from reqlica.generation.schemas import RepairRequest
 from reqlica.projects import drafts
 from reqlica.projects.store import Endpoint, create_project
 from reqlica.projects.versions import atomic_write_json
@@ -253,18 +251,6 @@ class ContractPipelineTests(unittest.TestCase):
         self.assertEqual(result["status"], "failed", result)
         self.assertIn("violates required", json.dumps(result["failures"]))
 
-    def test_repair_consumes_independent_failures_without_changing_tests(self):
-        drafts.test_draft(*self.arguments())
-        directory = drafts.draft_directory(self.project, self.draft["id"])
-        before = (directory / "tests/test_reservations.py").read_bytes()
-        plan = {"summary": "Preserve original minimum label length", "blockers": [], "files": [{"path": "endpoints/reserve.py", "content": SOURCE.replace("min_length=8", "min_length=1")}]}
-        with patch("reqlica.generation.provider.complete", return_value=(json.dumps(plan), None)) as provider:
-            result = repair_draft(self.project.id, self.draft["id"], RepairRequest(expected_revision=self.draft["revision"], confirm=True))
-        self.assertEqual(result["status"], "repaired", result)
-        self.assertIn("body.label", provider.call_args.args[0][1]["content"])
-        self.assertEqual((directory / "tests/test_reservations.py").read_bytes(), before)
-        self.assertIsNone(result["draft"]["approval"])
-        self.assertEqual(result["test"]["contract_checks"]["responses_checked"], 1)
 
     def test_environment_matrix_catches_time_bug_outside_auth_with_fresh_imports(self):
         self.save_requirements("Schedule reservations with a fifteen-minute expiry.")

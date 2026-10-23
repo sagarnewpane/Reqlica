@@ -8,8 +8,8 @@ Connect an AI client using **Streamable HTTP** and that URL. MCP uses JSON-RPC
 tool discovery and calls, not one REST URL per tool. In this MCP workflow, the
 connected AI reads requirements and uses tools to save and check generated Python.
 The standalone dashboard uses the same MCP interface through **Project AI**.
-The older [generation APIs](generation.md) remain available for compatibility and
-saved generation jobs; new dashboard work uses the conversation.
+The old generation, clarification, separate chat, and repair engines have been
+removed. See [Project AI](generation.md) for API and migration details.
 
 ## Project AI inside the dashboard
 
@@ -48,8 +48,9 @@ remain refused. Related rows use references such as `{"$ref":"users.0.id"}`.
 fresh validation. Insertion remains separately confirmed; there is no live-insert
 MCP tool. A preview never creates database tables.
 
-Saved conversations appear under **Conversations**; earlier browser chats and
-checkpointed generations are archived separately. Replies are idempotent after a
+Saved conversations appear under **Conversations**; earlier browser chats remain
+viewable as read-only archives. Drafts created by the retired generation engine
+remain available in **Drafts & checks**. Old generation jobs cannot resume. Replies are idempotent after a
 lost acknowledgement. Outside code changes or newer publication stop continuation
 for review; follow-ups cannot reset conflicts, permissions, or exhausted budgets.
 
@@ -157,7 +158,7 @@ SQLite metadata is observed in one read transaction with explicit object/item/SQ
 limits and a bounded inspection time. Its fingerprint describes schema metadata,
 not row changes. **Even in draft context, this is the current live schema**, not a
 prediction of proposed migrations. Business rules still come from source/tests;
-schema migrations are not implemented.
+live schema changes require the explicit [migration management workflow](maintenance.md).
 
 To resume work, inspect draft changes and notes against the user's task. Draft
 summaries distinguish editing, validated, checks failed/stale, ready for review,
@@ -326,3 +327,130 @@ AI tools cannot approve their own output, and this initial tool set does not
 activate drafts. Approval remains explicit and CLI-only; generated endpoints do
 not appear on the live gateway until activation. See the
 [draft guide](persistence-drafts-versions.md) for the exact approval requirements.
+
+Schema changes can be prepared with read-only `preview_database_migration`. Save
+its returned plan in the task draft, run checks, and leave live apply/rollback to
+the explicit management APIs. No AI approval or activation tools are exposed.
+
+
+## Reviewed package installation
+
+External MCP clients now have four package tools:
+
+| Tool | Purpose |
+| --- | --- |
+| `inspect_runtime_packages` | Missing imports, target environment, environment revision, recent job IDs. Full inventory is opt-in. |
+| `preview_package_install` | Resolve a verified distribution and optional exact version; downloads metadata but installs nothing. |
+| `get_package_install_job` | Read exact resolved versions, plan digest, progress, or saved result. Output is opt-in. |
+| `install_package` | Install the reviewed job after explicit human authorization, with its exact plan digest and `confirm=true`. |
+
+Inspect first, pass the returned environment revision to preview, and poll the
+returned job ID until status is `review`. Show the human the target Python
+environment and every package/version marked `install`. Only after approval call
+`install_package`; poll the same saved job to completion. Lost acknowledgements
+must be followed by job inspection, never automatic resubmission. Plans expire
+and refuse changed environments or altered lock contents.
+
+The same installer backs the dashboard and MCP: writable shared virtualenv,
+matching gateway/console environments, existing-version constraints, hash-pinned
+wheels, no source builds, no arbitrary URLs/flags, and no upgrades/removals. Installs
+invalidate draft checks and approval. Restart affected APIs and rerun checks.
+No real package is installed merely by tool discovery or endpoint generation.
+`confirm=true` is a caller assertion of human approval, not an independent human
+verification mechanism; use a trusted local MCP client with tool approvals.
+
+The built-in **Project AI** allowlist still excludes installation tools: enabling
+draft edits or disposable execution does not grant environment modification.
+Use an external MCP client with explicit human approval, or the package panel.
+See [installation details](installation.md#install-missing-libraries-from-the-html-dashboard)
+for persistence and reproducibility limits.
+
+## Project operations
+
+These thirteen tools reuse the existing gateway/domain operations; they are tagged
+`core` and require no additional MCP server. They make the following tasks useful
+from an external client:
+
+| Capability | User benefit | Tools |
+| --- | --- | --- |
+| Traffic policies | Reproduce latency, failures, empty responses and quotas; fix browser CORS settings. | `get_traffic_policies`, `set_traffic_policy`, `reset_scenario_counters` |
+| Workers | Diagnose worker health and explicitly start/stop/restart a published API. | `get_worker_status`, `control_project_worker` |
+| Baselines/reset | Capture a known dataset and repeat tests against the same starting state. | `get_data_baseline`, `capture_data_baseline`, `reset_project_data` |
+| Migration history | Explain applied, rolled-back or interrupted changes using saved receipts. | `list_database_migrations` |
+| Transfers | Clone an active project, archive a workspace, restore it, or move its directory. | `inspect_project_archive`, `export_project_archive`, `import_project_archive`, `relocate_project` |
+
+All writes require explicit human authorization of the operation/target and
+`confirm=true`. This is a caller assertion, not a separate human verification
+mechanism; use a trusted local client with human tool approvals. Diagnosis or
+endpoint generation alone does not authorize live changes. Never automatically
+replay a mutation after a timeout or lost acknowledgement: inspect the worker,
+baseline, policies, registration or destination file first. Restart the console
+and gateway after upgrading; reconnect MCP clients to refresh tool discovery.
+
+`get_traffic_policies` returns independent revisions for scenarios, CORS and
+authentication metadata. It never returns credential values/hashes. For
+`set_traffic_policy`, send `policy=scenarios|cors`, that policy's revision, and a
+replacement `settings_json` object. Scenario JSON contains `rules`; omit output-only
+`remaining_failures`. Replacing scenarios resets all counters, and `rules: []`
+disables them. CORS JSON uses the fields returned by inspection, omitting
+`project_id`/`revision`; omitted fields use defaults. Authentication writes remain
+in the dashboard to keep credentials out of tool arguments.
+
+For workers, first read `get_worker_status`: it returns gateway status, directory,
+and current `active_revision` without starting Python. Control pins that published
+code hash and accepts `start|stop|restart`. Start/restart executes trusted Python
+with OS/network access; stop can interrupt requests and prevents lazy startup.
+Control never activates drafts. Read status after any failure, including restart
+failure (which can leave the worker stopped). A gateway outage is reported as an
+error, never inferred as stopped status.
+
+For data, read `get_data_baseline`. Capture pins its 32-character baseline revision
+(all zeros before first capture); reset additionally pins the returned current
+schema fingerprint. Reset discards SQLite changes since capture, retains a
+pre-reset safety backup, and leaves the worker stopped. Capture changes the
+baseline pointer and retains older snapshots; it does not stop workers. Scenario
+counter reset is separate and uses the scenario revision. See [reset details](reset.md).
+
+Migration history is read-only and paginated (`limit=20`, maximum 100, `offset`,
+`next_offset`). Only the requested page is loaded. Receipts contain schema/draft
+pins, phase and backup paths, not database records. Ordering is by receipt filename,
+not execution time; pages may shift during concurrent maintenance. Existing
+`preview_database_migration` prepares changes; live apply/rollback/recovery remain
+in the explicit [maintenance workflow](maintenance.md).
+
+Transfers use absolute paths on the **Reqlica server**, not the MCP client's
+computer. Export requires a new ZIP file outside registered project directories
+and pins `active_revision` from worker inspection. Files are created private
+(`0600`), never overwritten. `kind=active` exports portable source/data/policies
+and environment names; `kind=workspace` drains/stops the worker and includes
+drafts/history. Only workspace exports accept `include_secrets=true`, after a
+separate explicit human opt-in to include private environment values. Source and
+SQLite may contain sensitive data even when private environment export is disabled.
+
+Inspect the file with `inspect_project_archive` to review its format, identity,
+secret-export flag, size and SHA-256 digest; this metadata inspection does not
+fully validate the archive. Import pins that digest and a new absolute destination;
+it fully validates paths, checksums, SQLite and configuration, and executes no
+handlers. Use `clone=true` for a new ID from an active bundle. Workspace restore
+preserves identity/name and requires the original ID to be unregistered; it cannot
+clone. Imports are idle registrations; later live requests can lazily start Python.
+ZIP files never appear in tool responses. Remote clients must arrange file transfer
+separately; HTTP upload/download remains available in the dashboard. See
+[transfer details](project-transfer.md).
+
+`relocate_project` pins both current directory and active revision. It moves the
+entire workspace on the same filesystem and leaves the worker stopped; use
+export/import across filesystems. No replacement or overlapping destination.
+
+Built-in **Project AI** gets only the four project-scoped read tools:
+`get_traffic_policies`, `get_worker_status`, `get_data_baseline`, and
+`list_database_migrations`. Live writes, archive paths and lifecycle controls are
+excluded regardless of draft-edit/execution permissions. External MCP clients
+can use the confirmed write tools. Approval and activation remain outside MCP.
+
+## Remaining API-only capabilities
+
+Project creation/conversion/deletion, secret writes, migration apply/rollback/
+recovery, draft housekeeping, live mock-data insertion, and inspection capture
+settings still use their explicit management APIs/dashboard. Names and redacted
+inspection remain discoverable; adding tools for these is separate work.

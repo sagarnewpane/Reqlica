@@ -40,11 +40,11 @@ test('failed or stale deletion preserves selected draft and editor',async()=>{
   assert.equal(f.context.state.draft.id,f.current.id);assert.equal(f.context.state.drafts.length,2);assert.equal(f.$('file-content').value,'unsaved source');
 });
 test('deleting selected draft pins revision and clears its references only after success',async()=>{
-  const f=fixture();f.workspace.generationResult={draft:f.current};
+  const f=fixture();f.workspace.agentDraft=f.current.id;
   await f.context.deleteDraft(f.current.id);
   assert.equal(f.calls[0][2],'DELETE');assert.equal(f.calls[0][3].expected_revision,f.current.revision);assert.equal(f.calls[0][3].confirm,true);
   assert.match(f.confirmations[0][1],/Unsaved/);assert.match(f.confirmations[0][1],/Published versions/);
-  assert.equal(f.context.state.draft,null);assert.equal(f.context.state.dirty,false);assert.equal(f.$('file-content').value,'');assert.equal(f.workspace.generationResult,null);
+  assert.equal(f.context.state.draft,null);assert.equal(f.context.state.dirty,false);assert.equal(f.$('file-content').value,'');assert.equal(f.workspace.agentDraft,'');
   assert.equal(f.context.state.drafts[0].id,f.other.id);
 });
 test('deleting another draft preserves selected unsaved source',async()=>{
