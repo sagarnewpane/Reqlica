@@ -80,7 +80,3 @@ See [development](docs/guides/development.md) for more commands.
 
 Reqlica is for trusted local use. Management APIs are unauthenticated, and
 workers run Python with your OS permissions. Keep both servers on loopback.
-
-## License
-
-[MIT](LICENSE).
