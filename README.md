@@ -1,17 +1,13 @@
 # Reqlica
 
-![Reqlica logo](logo.png)
+<img src="logo.png" alt="Reqlica logo" width="240">
 
 Reqlica creates stateful mock APIs from a description or OpenAPI specification.
 You review the generated Python, run checks, then approve and publish it.
 Endpoints run with FastAPI and SQLite; serving requests does not call an AI model.
 
-Use Reqlica through either:
-
-- **The web interface:** create projects, chat with Project AI, review drafts,
-  and test requests in the browser.
-- **An agent of your choice:** connect any MCP-capable agent, such as OpenCode,
-  to Reqlica's MCP server. The agent uses its own model and credentials.
+Use the web interface or connect an MCP-capable agent of your choice, such as
+OpenCode, with its own model and credentials.
 
 ![Reqlica project chat dashboard](docs/images/project-chat.png)
 
@@ -34,6 +30,55 @@ Use Reqlica through either:
 - **Runtime management:** start and stop APIs, configure environment variables,
   review package installs, and apply database changes.
 
+## Quick start
+
+Requires macOS or Linux, Git, Python 3.12+, and
+[uv](https://docs.astral.sh/uv/getting-started/installation/).
+The built dashboard is included; Node.js is only needed for frontend development.
+
+```bash
+git clone https://github.com/sagarnewpane/Reqlica.git
+cd Reqlica
+uv sync --locked
+cp .env.example .env
+uv run reqlica start
+```
+
+Open http://127.0.0.1:3000. `uv` creates and uses `.venv` automatically.
+[.env.example](.env.example) documents the defaults; edit `.env` to change ports
+or the app-state directory. `Ctrl+C` stops the servers without deleting data.
+See [installation](docs/guides/installation.md) for the full setup.
+
+## Use Reqlica
+
+**Web interface:** create a project, configure a tool-capable model in Settings,
+and describe your API in Project chat or attach an OpenAPI specification.
+Review the draft, run validation and tests, then approve and activate it.
+
+**External agent:** connect your MCP-capable agent to:
+
+```text
+Transport: Streamable HTTP
+URL: http://127.0.0.1:3000/mcp
+```
+
+The agent uses its own model/provider connection. Ask it to inspect your project
+and create or update a draft. Review, approve, and activate through the web
+interface or CLI. See [MCP tools](docs/guides/mcp.md) for details.
+
+Published endpoints are available at
+`http://127.0.0.1:4000/mock/PROJECT_ID/YOUR_PATH`. Test them with the built-in
+request tester or your frontend.
+
+## AI use
+
+Use a model that supports tool calls. Project AI supports Groq, OpenAI,
+OpenAI-compatible APIs, and Ollama.
+
+AI output becomes draft files, routes, and validated records. `step_run()` and
+`_execute_tool()` in [agent.py](backend/reqlica/generation/agent.py) consume the
+model's tool calls. See the [disclosure](docs/ai-usage.md) for details.
+
 ## Documentation
 
 - [Installation](docs/guides/installation.md)
@@ -42,33 +87,6 @@ Use Reqlica through either:
 - [Limitations](docs/limitations.md) and [future work](docs/roadmap.md)
 - [AI usage disclosure](docs/ai-usage.md)
 - [Other guides](docs/guides/README.md)
-
-## Quick start
-
-Requires macOS or Linux, Python 3.12+, and uv. The built dashboard is included.
-Run from the repository root:
-
-```bash
-uv sync --locked
-cp .env.example .env
-uv run reqlica start
-```
-
-Open the dashboard at http://127.0.0.1:3000. Mock requests use port `4000`.
-MCP clients connect to `http://127.0.0.1:3000/mcp` using Streamable HTTP.
-[.env.example](.env.example) documents the defaults. Edit `.env` to change ports
-or the app-state directory. See [installation](docs/guides/installation.md)
-for the full setup.
-
-## AI use
-
-Use a model that supports tool calls. Project AI supports Groq, OpenAI,
-OpenAI-compatible APIs, and Ollama. Reqlica exposes MCP tools so other agents, including OpenCode, can use them
-with a tool-capable model and their own provider connection.
-
-AI output becomes draft files, routes, and validated records. `step_run()` and
-`_execute_tool()` in [agent.py](backend/reqlica/generation/agent.py) consume the
-model's tool calls. See the [disclosure](docs/ai-usage.md) for details.
 
 ## Development
 
