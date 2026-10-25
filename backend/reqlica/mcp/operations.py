@@ -53,7 +53,7 @@ def gateway_request(project_id, command, body=None, *, method="POST", binary=Fal
 
 
 async def get_traffic_policies(project_id: ProjectID) -> dict:
-    """Read scenarios/quotas, CORS and authentication metadata; never returns credentials.
+    """Read live scenarios, CORS and authentication metadata before policy changes; no credentials. Returns each policy's own revision: copy that policy's revision, not a draft/code revision, into writes.
 
     Each policy has its own revision. Scenarios affect published traffic only;
     remaining_failures is output-only. Authentication changes stay in the dashboard.
@@ -69,10 +69,10 @@ async def set_traffic_policy(
     project_id: ProjectID,
     policy: Annotated[Literal["scenarios", "cors"], Field(description="Published gateway policy to replace; authentication secrets use the dashboard.")],
     expected_revision: Annotated[str, Field(pattern=r"^(?:[0-9a-f]{32}|[0-9a-f]{64})$", description="Exact revision of the selected policy from get_traffic_policies.")],
-    settings_json: Annotated[str, Field(max_length=65536, description='Replacement JSON object, without revision/project_id. scenarios: {"rules":[{"method":"GET","path":"/hello","delay_ms":100,"response":"failure","status_code":503,"failure_count":2,"rate_limit":{"requests":5,"window_seconds":60,"scope":"route"}}]}; response also passthrough/empty. cors: enabled,allow_origins,allow_methods,allow_headers,expose_headers,allow_credentials,max_age; omitted fields use defaults. Never copy remaining_failures.')],
+    settings_json: Annotated[str, Field(max_length=65536, description='Replacement JSON object encoded as a STRING, not a native object or patch. No revision/project_id or output-only counters. scenarios: {"rules":[{"method":"GET","path":"/hello","delay_ms":100,"response":"failure","status_code":503,"failure_count":2,"rate_limit":{"requests":5,"window_seconds":60,"scope":"route"}}]}. Rules use registered patterns, not concrete URLs; response is passthrough/failure/empty; failure_count requires failure; rate scope is route/test_user; {"rules":[]} clears all rules. cors: {"enabled":true,"allow_origins":["https://example.com"],"allow_credentials":false}; optional allow_methods,allow_headers,expose_headers,max_age (0–86400). Origins are scheme/host/port without a path. Omitted fields reset to defaults; preserve desired settings from get_traffic_policies. Credentials forbid wildcards. Never copy remaining_failures/rate_buckets.')],
     confirm: Confirm,
 ) -> dict:
-    """Replace a reviewed live traffic policy with an exact revision and human approval.
+    """Replace the ENTIRE selected live scenarios/CORS policy after human approval. First read get_traffic_policies, preserve desired values, and supply that policy's revision plus JSON-string settings. Not a patch; resets omitted fields and scenario counters.
 
     Scenarios replace ALL rules and reset quotas/failure counters; [] disables them.
     CORS requires explicit origins when credentials are enabled. No worker restart.
@@ -87,7 +87,7 @@ async def set_traffic_policy(
 
 
 async def reset_scenario_counters(project_id: ProjectID, expected_revision: ScenarioRevision, confirm: Confirm) -> dict:
-    """Reset published failure counts and rate-limit buckets, preserving rules.
+    """Reset live scenario failure/rate counters after human approval, preserving rules. Use get_traffic_policies.scenarios.revision; returns a new scenario revision. Does not reset records or modify routes.
 
     Require explicit human approval; returns a new scenario revision.
     """
@@ -96,7 +96,7 @@ async def reset_scenario_counters(project_id: ProjectID, expected_revision: Scen
 
 
 async def get_worker_status(project_id: ProjectID) -> dict:
-    """Read gateway worker health plus current directory/active_revision; never starts it.
+    """Read published worker status, current directory and active_revision before worker/export/relocation actions. Never starts or stops it. Gateway unavailability is an error, not evidence the worker is stopped.
 
     Code revision is read separately from worker state; control rechecks it atomically.
     An unavailable gateway is an error, never inferred stopped status.
@@ -109,7 +109,7 @@ async def get_worker_status(project_id: ProjectID) -> dict:
 async def control_project_worker(project_id: ProjectID,
     action: Annotated[Literal["start", "stop", "restart"], Field(description="Explicit lifecycle action for this published API only.")],
     expected_revision: ActiveRevision, confirm: Confirm) -> dict:
-    """Control a published worker after human approval and a current code revision check.
+    """Start/stop/restart the published worker after human approval of that exact action. Use active_revision from get_worker_status; this executes active code on start/restart but never publishes a draft. Inspect status after uncertain replies before retrying.
 
     Start/restart executes trusted project Python with OS/network access. Stop may
     interrupt requests and prevents lazy restart. Restart does not publish drafts.
@@ -120,12 +120,12 @@ async def control_project_worker(project_id: ProjectID,
 
 
 async def get_data_baseline(project_id: ProjectID) -> dict:
-    """Read baseline metadata and current SQLite schema fingerprint; no records."""
+    """Read the saved reset baseline revision and current_schema_fingerprint before capture/reset. No records or mutations; all-zero revision means no baseline exists, so capture one before reset."""
     return await run_in_threadpool(reset.baseline_info, project_id)
 
 
 async def capture_data_baseline(project_id: ProjectID, expected_revision: BaselineRevision, confirm: Confirm) -> dict:
-    """Snapshot current SQLite data as the reset baseline after human approval.
+    """Capture current live SQLite as a new reset baseline after human approval. Use get_data_baseline.revision, including the all-zero value for first capture. Replaces the baseline pointer, not live data; returns a new revision.
 
     Replaces the baseline pointer; retains older snapshots. Does not restore data
     or stop workers. The snapshot may contain sensitive application records.
@@ -136,7 +136,7 @@ async def capture_data_baseline(project_id: ProjectID, expected_revision: Baseli
 
 async def reset_project_data(project_id: ProjectID, expected_revision: BaselineRevision,
     expected_schema: Schema, confirm: Confirm) -> dict:
-    """Restore live SQLite from the reviewed baseline; discards changes since capture.
+    """Restore live SQLite from an existing reviewed baseline after human approval; discards changes since capture. Use get_data_baseline.revision and current_schema_fingerprint. Drains/stops the worker, keeps a backup and leaves the worker stopped.
 
     Requires human approval, matching baseline/schema. Gateway drains/stops the
     worker and keeps a pre-reset backup; worker stays stopped. Inspect baseline
@@ -149,7 +149,7 @@ async def reset_project_data(project_id: ProjectID, expected_revision: BaselineR
 async def list_database_migrations(project_id: ProjectID,
     limit: Annotated[int, Field(ge=1, le=100, description="Maximum receipts per page.")] = 20,
     offset: Annotated[int, Field(ge=0, description="Zero-based page offset; use returned next_offset.")] = 0) -> dict:
-    """Read saved migration receipts, phases, schema/draft pins and backup paths.
+    """List saved migration receipts, phases and backup metadata, not current table definitions or proposed plans. Page using next_offset. Read live schema with get_project_context(include_database=true); new tables use a draft database/schema.json plan.
 
     No database records or live migration execution. Ordered by receipt filename,
     not execution time; pagination can shift during concurrent maintenance.
@@ -161,7 +161,7 @@ async def relocate_project(project_id: ProjectID, expected_revision: ActiveRevis
     expected_directory: Annotated[str, Field(description="Exact current directory from get_worker_status.")],
     directory: Annotated[str, Field(description="New absolute server-local directory with an existing parent, on the same filesystem.")],
     confirm: Confirm) -> dict:
-    """Move the complete project, preserving identity, after human destination approval.
+    """Move the whole project after human destination approval. Use directory and active_revision from get_worker_status as expected_directory/expected_revision; directory is a NEW absolute server-local path on the same filesystem. Stops the worker and leaves it stopped.
 
     Gateway drains/stops the worker; it stays stopped. Rejects overlap, replacement
     and cross-filesystem moves. Inspect registry/worker status after uncertain reply.

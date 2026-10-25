@@ -38,8 +38,8 @@ def _usage(response):
 
 def _tool_parameters(request, base_url, tools):
     parameters = {"tools": tools}
-    # Custom compatible endpoints need not implement every OpenAI option. Tool
-    # calls are serialized by the agent even if a model returns a batch.
+    # Permit one response to plan several calls where supported. The agent still
+    # executes them sequentially with revision checks; this is not concurrent I/O.
     parallel = request.provider in {"groq", "openai"}
     if parallel:
         parameters["tool_choice"] = "auto"
@@ -62,7 +62,7 @@ def _tool_parameters(request, base_url, tools):
             if "tool_choice" in supported:
                 parameters["tool_choice"] = "auto"
     if parallel:
-        parameters["parallel_tool_calls"] = False
+        parameters["parallel_tool_calls"] = True
     return parameters
 
 

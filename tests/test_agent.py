@@ -32,6 +32,182 @@ def tool_message(name, arguments):
 
 
 class AgentTests(unittest.TestCase):
+    def test_failed_write_cancels_dependent_batch_and_recovers_without_user_error(self):
+        self.create()
+        self.tool("create_draft")
+        revision = self.run["revision"]
+        batch = tool_message("write_draft_file", {"path": "endpoints/greetings.py", "content": "def broken(:\n"})
+        batch["tool_calls"] += tool_message("upsert_endpoint", {"endpoint": {
+            "method": "GET", "path": "/greet", "handler": "endpoints/greetings.py:greet"}})["tool_calls"]
+        batch["tool_calls"] += tool_message("finish_task", {})["tool_calls"]
+        self.complete.return_value = (batch, None)
+        self.step()
+        result = self.step()
+        self.assertEqual(result["status"], "ready")
+        self.assertIsNone(result["error"])
+        self.assertEqual(result["revision"], revision)
+        saved = agent._read(agent._path(self.project.id, self.run_id))
+        self.assertFalse(saved["pending"])
+        self.assertEqual([e["status"] for e in saved["events"][-3:]], ["error", "skipped", "skipped"])
+        results = {m["tool_call_id"]: json.loads(m["content"]) for m in saved["messages"] if m["role"] == "tool"}
+        for call in batch["tool_calls"][1:]:
+            self.assertEqual(results[call["id"]]["code"], "batch_cancelled")
+        feedback = results[batch["tool_calls"][0]["id"]]
+        self.assertEqual(feedback["line"], 1)
+        self.assertEqual(feedback["recovery"]["remaining"], 2)
+        self.tool("write_draft_file", path="endpoints/greetings.py", content=HANDLER)
+        self.tool("upsert_endpoint", endpoint={"method": "GET", "path": "/greet", "handler": "endpoints/greetings.py:greet"})
+        self.complete.return_value = (tool_message("finish_task", {}), None)
+        self.step()
+        self.step()
+        self.assertEqual(self.run["status"], "completed")
+        self.assertIsNone(self.run["error"])
+
+    def test_identical_failed_call_is_blocked_before_mcp_and_changed_arguments_can_recover(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+        self.create()
+        run = agent._read(agent._path(self.project.id, self.run_id))
+        session = SimpleNamespace(call_tool=AsyncMock(return_value=SimpleNamespace(
+            isError=True, structuredContent={"error": "Invalid source path", "issues": [{"loc": ["source_paths", 0], "msg": "Missing file"}]})))
+        call = tool_message("get_project_context", {"source_paths": ["missing.py"]})["tool_calls"][0]
+        asyncio.run(agent._tool(session, self.project.id, run, call))
+        asyncio.run(agent._tool(session, self.project.id, run, call))
+        self.assertEqual(session.call_tool.await_count, 1)
+        feedback = json.loads(run["messages"][-1]["content"])
+        self.assertTrue(feedback["recovery"]["unchanged_call_blocked"])
+        self.assertEqual(feedback["issues"][0]["loc"], ["source_paths", 0])
+        session.call_tool.return_value = SimpleNamespace(isError=False, structuredContent={"source": {}})
+        corrected = tool_message("get_project_context", {"include_source": False})["tool_calls"][0]
+        asyncio.run(agent._tool(session, self.project.id, run, corrected))
+        self.assertEqual(session.call_tool.await_count, 2)
+        self.assertNotIn("unresolved_tool_failure", run)
+
+    def test_three_consecutive_tool_failures_stop_automatic_repair(self):
+        self.create()
+        self.tool("create_draft")
+        for index in range(3):
+            self.tool("write_draft_file", path="endpoints/broken.py", content=f"def broken_{index}(:\n")
+            self.assertEqual(self.run["status"], "failed" if index == 2 else "ready")
+        self.assertEqual(self.run["error"]["code"], "repeated_tool_rejection")
+
+    def test_unresolved_tool_error_cannot_be_hidden_by_final_success_claim(self):
+        self.create()
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="endpoints/broken.py", content="def broken(:\n")
+        self.complete.return_value = ({"role": "assistant", "content": "Everything succeeded."}, None)
+        self.assertEqual(self.step()["status"], "ready")
+        self.assertEqual(self.step()["status"], "failed")
+        self.assertIsNone(self.run["answer"])
+        self.assertEqual(self.run["error"]["code"], "repair_exhausted")
+
+    def test_path_only_write_batch_retries_before_any_tools_execute(self):
+        self.create()
+        invalid = tool_message("write_draft_file", {"path": "endpoints/qr_codes.py"})
+        invalid["tool_calls"].insert(0, tool_message("create_draft", {})["tool_calls"][0])
+        self.complete.return_value = (invalid, {"total_tokens": 10})
+        self.assertEqual(self.step()["status"], "ready")
+        saved = agent._read(agent._path(self.project.id, self.run_id))
+        self.assertFalse(saved["pending"])
+        self.assertEqual(saved["tool_calls"], 0)
+        self.assertIsNone(saved["draft_id"])
+        self.assertIn("required complete file text", saved["tool_call_feedback"]["issues"][0])
+        self.assertEqual(len(saved["messages"]), 1)
+        self.complete.return_value = (tool_message("get_project_context", {"source_paths": ["endpoints/qr_codes.py"]}), {"total_tokens": 10})
+        self.assertEqual(self.step()["status"], "ready")
+        self.assertNotIn("tool_call_feedback", agent._read(agent._path(self.project.id, self.run_id)))
+
+    def test_copied_context_marker_cannot_overwrite_saved_source_and_can_recover(self):
+        from reqlica.generation.context import OMITTED_SOURCE_MARKERS
+        self.create()
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="endpoints/qr_codes.py", content=HANDLER)
+        revision = self.run["revision"]
+        for marker in OMITTED_SOURCE_MARKERS:
+            self.tool("write_draft_file", path="endpoints/qr_codes.py", content=marker)
+            self.assertEqual(self.run["revision"], revision)
+            saved = agent._read(agent._path(self.project.id, self.run_id))
+            feedback = json.loads(saved["messages"][-1]["content"])
+            self.assertEqual(feedback["code"], "source_reference")
+            self.assertIn("get_project_context", feedback["next_step"])
+        self.tool("get_project_context", source_paths=["endpoints/qr_codes.py"])
+        saved = agent._read(agent._path(self.project.id, self.run_id))
+        self.assertEqual(json.loads(saved["messages"][-1]["content"])["source"]["endpoints/qr_codes.py"], HANDLER)
+        self.tool("write_draft_file", path="endpoints/qr_codes.py", content=HANDLER + "\n# recovered\n")
+        self.assertNotEqual(self.run["revision"], revision)
+
+    def test_code_fences_are_rejected_but_fenced_markdown_notes_are_allowed(self):
+        self.create()
+        self.tool("create_draft")
+        revision = self.run["revision"]
+        self.tool("write_draft_file", path="endpoints/example.py", content="```python\ndef hello(): return {}\n```")
+        saved = agent._read(agent._path(self.project.id, self.run_id))
+        self.assertEqual(json.loads(saved["messages"][-1]["content"])["code"], "source_format")
+        self.assertEqual(self.run["revision"], revision)
+        self.tool("write_draft_file", path="PROJECT_CONTEXT.md", content="```python\ndef example(): pass\n```\n")
+        self.assertEqual(self.run["events"][-1]["status"], "done")
+
+    def test_invalid_tool_diagnostics_cover_envelope_and_json_without_echoing_values(self):
+        for value, expected in [(None, "assistant message"), ({"tool_calls": {}}, "array"),
+                ({"tool_calls": [None]}, "object")]:
+            with self.subTest(value=value):
+                self.assertIn(expected, " ".join(agent._tool_call_issues(value)))
+        for raw, expected in [("[]", "JSON object"), ({"secret": "value"}, "JSON-encode"),
+                              ('{"secret":"value",}', "invalid JSON")]:
+            message = tool_message("get_project_context", {})
+            message["tool_calls"][0]["function"]["arguments"] = raw
+            issues = " ".join(agent._tool_call_issues(message))
+            self.assertIn(expected, issues)
+            self.assertNotIn("secret", issues)
+        message = tool_message("get_project_context", {})
+        message["tool_calls"] *= 2
+        self.assertIn("duplicate", " ".join(agent._tool_call_issues(message)))
+
+    def test_invalid_batch_retries_with_feedback_without_executing_or_growing_history(self):
+        self.create()
+        invalid = tool_message("create_draft", {"name": "must not execute"})
+        invalid["tool_calls"] *= 9
+        self.complete.return_value = (invalid, {"total_tokens": 10})
+        for attempt in range(2):
+            result = self.step()
+            self.assertEqual(result["status"], "ready")
+            saved = agent._read(agent._path(self.project.id, self.run_id))
+            self.assertFalse(saved["pending"])
+            self.assertEqual(len(saved["messages"]), 1)
+            self.assertEqual(len(saved["usage"]), attempt + 1)
+            self.assertEqual(saved["last_model_response"]["usage"]["total_tokens"], 10)
+        prompt = self.complete.call_args.args[0][0]["content"]
+        self.assertIn("maximum is 8", prompt)
+        self.assertNotIn("must not execute", prompt)
+        result = self.step()
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"]["code"], "invalid_tool_calls")
+        self.assertEqual(self.complete.call_count, 3)
+
+    def test_corrected_tool_batch_clears_retry_feedback(self):
+        self.create()
+        invalid = tool_message("get_project_context", {})
+        invalid["tool_calls"][0]["function"]["arguments"] = '{"broken":'
+        self.complete.return_value = (invalid, {"total_tokens": 10})
+        self.assertEqual(self.step()["status"], "ready")
+        self.complete.return_value = (tool_message("get_project_context", {}), {"total_tokens": 10})
+        self.assertEqual(self.step()["status"], "ready")
+        saved = agent._read(agent._path(self.project.id, self.run_id))
+        self.assertNotIn("tool_call_feedback", saved)
+        self.assertNotIn("invalid_tool_responses", saved)
+        self.assertEqual(len(saved["pending"]), 1)
+        self.assertEqual(len(saved["usage"]), 2)
+        self.step()
+        self.assertEqual(self.complete.call_count, 2)
+
+    def test_invalid_batch_does_not_retry_past_token_budget(self):
+        self.create()
+        invalid = tool_message("get_project_context", {})
+        invalid["tool_calls"][0]["id"] = ""
+        self.complete.return_value = (invalid, {"total_tokens": 100000})
+        self.assertEqual(self.step()["status"], "limit")
+        self.assertEqual(self.complete.call_count, 1)
+
     def setUp(self):
         self.directory = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
         self.enterContext(patch.dict(os.environ, {"REQLICA_HOME": str(self.directory / "home")}))
@@ -59,6 +235,40 @@ class AgentTests(unittest.TestCase):
         result = self.step()
         self.assertEqual(result["status"], "ready", result)
         return self.step()
+
+    def test_ai_created_draft_persists_short_title(self):
+        self.create(message="Create a bookstore demo with books, stock, and reader greetings")
+        self.complete.return_value = (tool_message("create_draft", {"name": "Bookstore API demo"}), None)
+        self.step()
+        self.step()
+        saved = drafts.inspect_draft(self.project.id, self.run["draft_id"])
+        self.assertEqual(saved["name"], "Bookstore API demo")
+        listed = drafts.list_drafts(self.project.id)
+        self.assertEqual(listed["drafts"][0]["name"], "Bookstore API demo")
+
+    def test_chat_uses_saved_project_key_without_browser_key_or_checkpoint_leak(self):
+        self.headers = {}
+        response = self.client.put(f"/api/projects/{self.project.id}/ai/key", json={
+            "provider": "groq", "api_key": "persistent-project-key"})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.create()
+        self.complete.return_value = ({"role": "assistant", "content": "Ready"}, None)
+        self.assertEqual(self.step()["status"], "completed")
+        self.assertEqual(self.complete.call_args.args[2].get_secret_value(), "persistent-project-key")
+        self.assertNotIn("persistent-project-key", agent._path(self.project.id, self.run_id).read_text())
+        self.assertNotIn("persistent-project-key", self.client.get(f"{self.root}/{self.run_id}/context").text)
+
+    def test_public_progress_identifies_next_model_or_tool_without_exposing_arguments(self):
+        self.create()
+        self.assertEqual(self.run["next_action"], {"kind": "model"})
+        self.complete.return_value = (tool_message("get_project_context", {"include_source": False}), None)
+        self.step()
+        self.assertEqual(self.run["next_action"], {"kind": "tool", "name": "get_project_context"})
+        self.step()
+        self.assertEqual(self.run["next_action"], {"kind": "model"})
+        self.complete.return_value = ({"role": "assistant", "content": "Ready"}, None)
+        self.step()
+        self.assertIsNone(self.run["next_action"])
 
     def test_unsupported_reasoning_is_rejected_before_creating_a_run_or_spending_budget(self):
         with patch("reqlica.generation.reasoning.reasoning_options", return_value={"modes": ["default"]}):
@@ -167,14 +377,16 @@ class AgentTests(unittest.TestCase):
         for tool in sent:
             original = canonical[tool["function"]["name"]].inputSchema
             schema = tool["function"]["parameters"]
-            self.assertEqual(set(schema["properties"]), set(original["properties"]) - {"project_id", "draft_id"})
-            self.assertEqual(set(schema.get("required", [])), set(original.get("required", [])) - {"project_id", "draft_id"})
+            self.assertEqual(set(schema["properties"]), set(original["properties"]) - {"project_id", "draft_id", "expected_revision"})
+            self.assertEqual(set(schema.get("required", [])), set(original.get("required", [])) - {"project_id", "draft_id", "expected_revision"})
             for name, field in schema["properties"].items():
                 expected = original["properties"][name]
                 for key in expected.keys() - {"title", "description"}:
                     self.assertEqual(field[key], expected[key], (tool["function"]["name"], name, key))
-                if name != "expected_revision" and "description" in expected:
+                if "description" in expected:
                     self.assertEqual(field["description"], expected["description"])
+            if tool["function"]["name"] == "write_draft_file":
+                self.assertIn("Reqlica supplies the current revision", tool["function"]["description"])
         verbose = [{"type": "function", "function": {"name": tool.name, "description": tool.description,
                     "parameters": tool.inputSchema}} for tool in canonical.values()]
         self.assertLess(len(json.dumps(sent)), len(json.dumps(verbose)) * 0.8)
@@ -238,6 +450,46 @@ class AgentTests(unittest.TestCase):
         for key in ["id", "draft_id", "revision", "messages", "events", "checks", "usage", "model_calls", "tool_calls", "allow_execution", "allow_edits"]:
             self.assertEqual(after[key], before[key], key)
         self.assertEqual(self.client.post(f"{self.root}/{self.run_id}/reasoning-default", json=body).json(), result)
+        self.complete.assert_not_called()
+
+    def test_change_reasoning_recovers_length_failure_and_preserves_saved_work(self):
+        self.create(provider="compatible", base_url="https://api.cerebras.ai/v1", model="qwen-3.8-27b", reasoning_mode="default")
+        path = agent._path(self.project.id, self.run_id)
+        before = agent._read(path)
+        before.update(status="failed", error={"code": "output_token_limit", "message": "Output exhausted"})
+        before["usage"] = [{"total_tokens": 47408}]
+        agent._save(path, before)
+        body = {"expected_revision": before["revision"], "expected_reasoning_mode": "default", "reasoning_mode": "off"}
+        response = self.client.post(f"{self.root}/{self.run_id}/reasoning", json=body)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["provider"]["reasoning_mode"], "off")
+        self.assertEqual(response.json()["status"], "ready")
+        self.assertIsNone(response.json()["error"])
+        after = agent._read(path)
+        for key in ["id", "draft_id", "revision", "messages", "events", "checks", "usage", "model_calls", "tool_calls", "allow_execution", "allow_edits"]:
+            self.assertEqual(after[key], before[key], key)
+        self.complete.assert_not_called()
+        self.complete.return_value = ({"role": "assistant", "content": "Recovered"}, {"total_tokens": 10})
+        self.assertEqual(self.step()["status"], "completed")
+        self.assertEqual(self.complete.call_args.args[1].reasoning_mode, "off")
+
+    def test_change_reasoning_rejects_stale_busy_unsupported_and_exhausted_requests(self):
+        self.create(provider="compatible", base_url="https://api.cerebras.ai/v1", model="qwen-3.8-27b", reasoning_mode="default")
+        path = agent._path(self.project.id, self.run_id)
+        saved = agent._read(path)
+        url = f"{self.root}/{self.run_id}/reasoning"
+        body = {"expected_revision": saved["revision"], "expected_reasoning_mode": "default", "reasoning_mode": "low"}
+        for changed, status in [({"expected_revision": "f" * 64}, 409), ({"expected_reasoning_mode": "high"}, 409),
+                                ({"reasoning_mode": "max"}, 422), ({"allow_execution": True}, 422)]:
+            self.assertEqual(self.client.post(url, json={**body, **changed}).status_code, status)
+            self.assertEqual(agent._read(path), saved)
+        for changes in [{"pending": [tool_message("create_draft", {})]}, {"status": "running"},
+                        {"model_calls": agent.MAX_MODEL_CALLS}, {"usage": [{"total_tokens": 100000}]}]:
+            agent._save(path, {**saved, **changes})
+            self.assertEqual(self.client.post(url, json=body).status_code, 409, changes)
+        agent._save(path, saved)
+        (code_directory(self.project) / "endpoints/hello.py").write_text("def hello(): return {}\n")
+        self.assertEqual(self.client.post(url, json=body).status_code, 409)
         self.complete.assert_not_called()
 
     def test_reasoning_reset_rejects_stale_scope_pending_tools_other_failures_and_exhausted_budget(self):
@@ -398,7 +650,6 @@ class AgentTests(unittest.TestCase):
             ("create_draft", {}), ("activate_draft", {}), ("approve_draft", {}),
             ("test_draft", {"expected_revision": chosen["revision"]}),
             ("write_draft_file", {"expected_revision": chosen["revision"], "path": ".env", "content": "KEY=bad"}),
-            ("write_draft_file", {"expected_revision": "f" * 64, "path": "endpoints/x.py", "content": "x=1"}),
         ]:
             self.complete.return_value = (tool_message(name, {"project_id": self.project.id, **arguments}), None)
             self.step()
@@ -411,6 +662,75 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(len(drafts.list_drafts(self.project.id)["drafts"]), 2)
         self.assertEqual(drafts.inspect_draft(self.project.id, chosen["id"])["revision"], chosen["revision"])
         self.assertEqual(drafts.list_drafts(other.id)["drafts"], [])
+
+    def test_server_binds_revision_across_edits_even_when_model_sends_stale_hash(self):
+        self.create()
+        self.tool("create_draft")
+        old_revision = self.run["revision"]
+        self.tool("write_draft_file", path="endpoints/greetings.py", content=HANDLER,
+                  expected_revision=old_revision)
+        current_revision = self.run["revision"]
+        self.assertNotEqual(old_revision, current_revision)
+
+        self.complete.return_value = (tool_message("write_draft_file", {
+            "path": "endpoints/extra.py", "content": "x = 1\n",
+            "expected_revision": old_revision}), None)
+        self.assertEqual(self.step()["status"], "ready")
+        self.assertEqual(self.step()["status"], "ready")
+        checkpoint = agent._read(agent._path(self.project.id, self.run_id))
+        feedback = json.loads(checkpoint["messages"][-1]["content"])
+        self.assertEqual(feedback["revision"], self.run["revision"])
+        self.assertNotEqual(self.run["revision"], current_revision)
+
+        self.complete.return_value = (tool_message("upsert_endpoint", {
+            "endpoint": {"method": "GET", "path": "/greet", "handler": "endpoints/greetings.py:greet"},
+            "expected_revision": old_revision}), None)
+        self.assertEqual(self.step()["status"], "ready")
+        self.assertEqual(self.step()["status"], "ready")
+        self.assertNotIn("tool_argument_rejections", agent._read(agent._path(self.project.id, self.run_id)))
+        manifest = json.loads((drafts.draft_directory(self.project, self.run["draft_id"]) / "manifest.json").read_text())
+        self.assertTrue(any(endpoint["path"] == "/greet" for endpoint in manifest["endpoints"]))
+
+    def test_batched_file_writes_use_successive_server_revisions(self):
+        self.create()
+        self.tool("create_draft")
+        first = tool_message("write_draft_file", {"path": "endpoints/greetings.py", "content": HANDLER})
+        second = tool_message("write_draft_file", {"path": "tests/test_greetings.py", "content": TEST_SOURCE})
+        first["tool_calls"].extend(second["tool_calls"])
+        self.complete.return_value = (first, None)
+        self.assertEqual(self.step()["status"], "ready")
+        self.assertEqual(self.step()["status"], "ready")
+        self.assertEqual(self.step()["status"], "ready")
+        saved = drafts.inspect_draft(self.project.id, self.run["draft_id"])
+        self.assertIn("endpoints/greetings.py", saved["files"])
+        self.assertIn("tests/test_greetings.py", saved["files"])
+        self.assertEqual(self.run["events"][-1]["status"], "done")
+
+    def test_json_string_endpoint_error_then_correction_does_not_interrupt_run(self):
+        self.create()
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="endpoints/greetings.py", content=HANDLER)
+        bad = json.dumps({"method": "GET", "path": "/greet", "handler": "endpoints/greetings:greet"})
+        self.tool("upsert_endpoint", endpoint=bad)
+        self.assertEqual(self.run["events"][-1]["status"], "error")
+        self.assertIn(".py file and function", self.run["events"][-1]["detail"])
+        good = json.dumps({"method": "GET", "path": "/greet", "handler": "endpoints/greetings.py:greet"})
+        self.tool("upsert_endpoint", endpoint=good)
+        self.assertEqual(self.run["status"], "ready")
+        self.assertEqual(self.run["events"][-1]["status"], "done")
+        self.assertEqual(self.run["events"][-1]["route"], "GET /greet")
+        manifest = json.loads((drafts.draft_directory(self.project, self.run["draft_id"]) / "manifest.json").read_text())
+        self.assertTrue(any(endpoint["path"] == "/greet" for endpoint in manifest["endpoints"]))
+
+    def test_unavailable_tool_returns_specific_safe_guidance(self):
+        self.create(allow_execution=True)
+        self.tool("create_draft")
+        self.complete.return_value = (tool_message("list_drafts", {}), None)
+        self.step()
+        self.assertEqual(self.step()["status"], "ready")
+        feedback = json.loads(agent._read(agent._path(self.project.id, self.run_id))["messages"][-1]["content"])
+        self.assertEqual(feedback["code"], "tool_unavailable")
+        self.assertIn("get_draft_changes", feedback["error"])
 
     def test_conflicting_edit_stops_before_model_or_tool_execution(self):
         selected = drafts.create_draft(self.project.id)
@@ -449,6 +769,63 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(working["base_version"], published)
         self.assertEqual(working["revision"], selected["revision"])
         self.assertEqual(drafts.inspect_draft(self.project.id, selected["id"]), before)
+
+    def test_chat_continues_after_its_saved_draft_is_published(self):
+        self.create()
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="endpoints/greetings.py", content=HANDLER)
+        self.finish_with_question()
+        original_id = self.run["draft_id"]
+        original_revision = self.run["revision"]
+        calls = self.run["model_calls"], self.run["tool_calls"]
+        published = self.publish_snapshot(drafts.draft_directory(self.project, original_id))
+        original = drafts.inspect_draft(self.project.id, original_id)
+        body = self.reply_body()
+        response = self.post_reply(body)
+        self.assertEqual(response.status_code, 200, response.text)
+        continued = response.json()
+        self.assertEqual(continued["id"], self.run_id)
+        self.assertIsNone(continued["draft_id"])
+        self.assertEqual(continued["source_draft_id"], original_id)
+        self.assertEqual(continued["revision"], original_revision)
+        self.assertEqual((continued["model_calls"], continued["tool_calls"]), calls)
+        self.assertEqual(continued["turn"], 1)
+        self.assertEqual(self.post_reply(body).json(), continued)
+        self.tool("create_draft")
+        fresh = drafts.inspect_draft(self.project.id, self.run["draft_id"])
+        self.assertNotEqual(fresh["id"], original_id)
+        self.assertEqual(fresh["base_version"], published)
+        self.assertEqual(fresh["revision"], original_revision)
+        self.assertEqual(drafts.inspect_draft(self.project.id, original_id), original)
+
+    def test_publication_with_different_code_cannot_rebind_a_chat(self):
+        self.create()
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="endpoints/greetings.py", content=HANDLER)
+        self.finish_with_question()
+        self.publish_snapshot(code_directory(self.project))
+        path = agent._path(self.project.id, self.run_id)
+        before = agent._read(path)
+        self.assertEqual(self.post_reply(self.reply_body()).status_code, 409)
+        self.assertEqual(agent._read(path), before)
+
+    def test_chat_already_stopped_on_publication_can_accept_a_new_reply(self):
+        self.create()
+        self.tool("create_draft")
+        original_id = self.run["draft_id"]
+        self.publish_snapshot(drafts.draft_directory(self.project, original_id))
+        self.assertEqual(self.step()["status"], "conflict")
+        path = agent._path(self.project.id, self.run_id)
+        before = agent._read(path)
+        public = self.client.get(f"{self.root}/{self.run_id}").json()
+        self.assertTrue(public["can_reply"])
+        self.assertEqual(agent._read(path), before)
+        listed = self.client.get(self.root).json()["runs"][0]
+        self.assertTrue(listed["can_reply"])
+        response = self.post_reply(self.reply_body())
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["status"], "ready")
+        self.assertIsNone(response.json()["draft_id"])
 
     def test_fresh_draft_after_publication_uses_current_base(self):
         self.publish_snapshot(code_directory(self.project))
@@ -500,6 +877,134 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(self.step()["status"], "limit")
         self.complete.assert_not_called()
 
+    def test_reported_token_budget_stops_pending_tools_and_survives_reload(self):
+        self.create()
+        self.assertEqual(agent.MAX_REPORTED_TOKENS, 100000)
+        self.complete.return_value = (
+            tool_message("create_draft", {"name": "Over budget draft"}),
+            {"prompt_tokens": agent.MAX_REPORTED_TOKENS - 100, "completion_tokens": 100,
+             "total_tokens": agent.MAX_REPORTED_TOKENS},
+        )
+        result = self.step()
+        self.assertEqual(result["status"], "limit")
+        self.assertEqual(result["reported_tokens"], agent.MAX_REPORTED_TOKENS)
+        self.assertEqual(result["limits"]["total_tokens"], agent.MAX_REPORTED_TOKENS)
+        self.assertFalse(result["can_resume"])
+        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
+        self.assertEqual(self.step()["status"], "limit")
+        self.assertEqual(self.complete.call_count, 1)
+
+    def test_one_request_cannot_run_model_steps_indefinitely(self):
+        self.create()
+        path = agent._path(self.project.id, self.run_id)
+        checkpoint = agent._read(path)
+        checkpoint["model_calls"] = agent.MAX_MODEL_CALLS_PER_TURN
+        agent._save(path, checkpoint)
+        self.assertEqual(self.step()["status"], "limit")
+        self.assertIn("16 model calls", self.run["error"]["message"])
+        self.complete.assert_not_called()
+
+    def test_remaining_reported_budget_caps_the_next_output(self):
+        self.create()
+        path = agent._path(self.project.id, self.run_id)
+        checkpoint = agent._read(path)
+        checkpoint["usage"] = [{"total_tokens": agent.MAX_REPORTED_TOKENS - 1000}]
+        agent._save(path, checkpoint)
+        self.complete.return_value = ({"role": "assistant", "content": "Done"}, {"total_tokens": 100})
+        self.assertEqual(self.step()["status"], "completed")
+        self.assertEqual(self.complete.call_args.args[1].max_tokens, 1000)
+
+    def test_explicit_recovery_retries_only_an_interrupted_model_step(self):
+        self.create()
+        path = agent._path(self.project.id, self.run_id)
+        checkpoint = agent._read(path)
+        checkpoint["status"] = "running"
+        checkpoint["model_calls"] = 1
+        agent._save(path, checkpoint)
+        with agent._lease(path, "AI build"):
+            active = self.client.post(f"{self.root}/{self.run_id}/recover")
+        self.assertEqual(active.status_code, 409)
+        self.assertEqual(agent._read(path)["status"], "running")
+        response = self.client.post(f"{self.root}/{self.run_id}/recover")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["status"], "ready")
+        self.complete.assert_not_called()
+        self.complete.return_value = ({"role": "assistant", "content": "Recovered"}, {"total_tokens": 25})
+        self.assertEqual(self.step()["status"], "completed")
+        self.assertEqual(self.run["model_calls"], 2)
+
+        checkpoint = agent._read(path)
+        checkpoint["status"] = "running"
+        checkpoint["pending"] = tool_message("create_draft", {"name": "Uncertain tool"})["tool_calls"]
+        agent._save(path, checkpoint)
+        response = self.client.post(f"{self.root}/{self.run_id}/recover")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["status"], "interrupted")
+        self.assertFalse(response.json()["can_resume"])
+        self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
+
+    def test_interrupted_edit_reconciles_saved_effect_without_replaying_tool(self):
+        self.create()
+        self.tool("create_draft")
+        self.complete.return_value = (tool_message("write_draft_file", {
+            "path": "endpoints/recovered.py", "content": "def recovered():\n    return 1\n"}), None)
+        self.step()
+        path = agent._path(self.project.id, self.run_id)
+        checkpoint = agent._read(path)
+        checkpoint["status"] = "interrupted"
+        checkpoint["active_tool"] = {"id": checkpoint["pending"][0]["id"],
+            "name": "write_draft_file", "revision": checkpoint["revision"]}
+        agent._save(path, checkpoint)
+        drafts.write_draft_file(self.project.id, self.run["draft_id"],
+            "endpoints/recovered.py", "def recovered():\n    return 1\n", self.run["revision"])
+        with patch.object(agent, "_session", side_effect=AssertionError("tool must not replay")):
+            recovered = self.step()
+        self.assertEqual(recovered["status"], "ready")
+        self.assertEqual(recovered["events"][-1]["status"], "done")
+        self.assertEqual(recovered["revision"], drafts.inspect_draft(self.project.id, self.run["draft_id"])["revision"])
+        self.assertEqual(agent._read(path)["pending"], [])
+
+    def test_interrupted_edit_without_effect_returns_feedback_to_model(self):
+        self.create()
+        self.tool("create_draft")
+        self.complete.return_value = (tool_message("write_draft_file", {
+            "path": "endpoints/recovered.py", "content": "def recovered():\n    return 1\n"}), None)
+        self.step()
+        path = agent._path(self.project.id, self.run_id)
+        checkpoint = agent._read(path)
+        checkpoint["status"] = "interrupted"
+        checkpoint["active_tool"] = {"id": checkpoint["pending"][0]["id"],
+            "name": "write_draft_file", "revision": checkpoint["revision"]}
+        agent._save(path, checkpoint)
+        with patch.object(agent, "_session", side_effect=AssertionError("tool must not replay")):
+            recovered = self.step()
+        self.assertEqual(recovered["status"], "ready")
+        self.assertEqual(recovered["events"][-1]["status"], "error")
+        self.assertIn("tool_interrupted", agent._read(path)["messages"][-1]["content"])
+        self.assertFalse((drafts.draft_directory(get_project(self.project.id), self.run["draft_id"])
+                          / "endpoints/recovered.py").exists())
+
+    def test_legacy_interrupted_route_is_reconciled_from_saved_manifest(self):
+        self.create()
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="endpoints/recovered.py",
+                  content="def recovered():\n    return 1\n")
+        self.complete.return_value = (tool_message("upsert_endpoint", {"endpoint": json.dumps({
+            "method": "GET", "path": "/recovered", "handler": "endpoints/recovered.py:recovered"})}), None)
+        self.step()
+        path = agent._path(self.project.id, self.run_id)
+        checkpoint = agent._read(path)
+        checkpoint["status"] = "interrupted"
+        agent._save(path, checkpoint)
+        drafts.upsert_endpoint(self.project.id, self.run["draft_id"],
+            {"method": "GET", "path": "/recovered", "handler": "endpoints/recovered.py:recovered"},
+            self.run["revision"])
+        with patch.object(agent, "_session", side_effect=AssertionError("tool must not replay")):
+            recovered = self.step()
+        self.assertEqual(recovered["status"], "ready")
+        self.assertEqual(recovered["events"][-1]["status"], "done")
+        self.assertEqual(agent._read(path)["pending"], [])
+
     def test_pending_batch_runs_sequentially_and_survives_reloading(self):
         self.create()
         first = tool_message("get_project_context", {"project_id": self.project.id, "include_source": False})
@@ -518,14 +1023,92 @@ class AgentTests(unittest.TestCase):
     def test_failed_checks_return_feedback_and_edits_clear_results(self):
         self.create(allow_execution=True)
         self.tool("create_draft")
-        self.tool("write_draft_file", path="endpoints/broken.py", content="def broken(:\n", expected_revision=self.run["revision"])
+        self.tool("write_draft_file", path="endpoints/broken.py", content="def broken():\n    return unknown_name\n", expected_revision=self.run["revision"])
         self.tool("validate_draft", expected_revision=self.run["revision"])
         self.assertEqual(self.run["events"][-1]["status"], "failed")
+        self.assertIn("unknown_name", self.run["events"][-1]["detail"])
         self.assertNotEqual(self.run["checks"]["validate_draft"]["status"], "passed")
         self.tool("write_draft_file", path="endpoints/broken.py", content="def broken():\n    return 1\n", expected_revision=self.run["revision"])
         self.assertEqual(self.run["checks"], {})
         messages = self.complete.call_args.args[0]
         self.assertTrue(any(m["role"] == "tool" and 'failed' in m["content"] for m in messages))
+
+    def test_invalid_python_is_rejected_with_line_before_saving(self):
+        self.create()
+        self.tool("create_draft")
+        revision = self.run["revision"]
+        self.tool("write_draft_file", path="endpoints/broken.py", content="def broken(:\n")
+        self.assertEqual(self.run["events"][-1]["status"], "error")
+        self.assertIn("line 1", self.run["events"][-1]["detail"])
+        feedback = json.loads(agent._read(agent._path(self.project.id, self.run_id))["messages"][-1]["content"])
+        self.assertEqual(feedback["code"], "source_syntax")
+        self.assertEqual(feedback["line"], 1)
+        self.assertEqual(drafts.inspect_draft(self.project.id, self.run["draft_id"])["revision"], revision)
+
+    def test_static_failure_without_execution_is_fed_back_and_blocks_success_claim(self):
+        self.create(allow_execution=False)
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="endpoints/broken.py",
+                  content="def broken():\n    return missing_name\n")
+        self.assertIn("Static check", self.run["events"][-1]["detail"])
+        self.complete.return_value = ({"role": "assistant", "content": "Done"}, None)
+        self.assertEqual(self.step()["status"], "ready")
+        self.assertIn("latest draft check failed", self.complete.call_args.args[0][0]["content"])
+        self.assertEqual(self.step()["status"], "failed")
+        self.assertEqual(self.run["error"]["code"], "repair_exhausted")
+
+    def test_static_failure_without_execution_can_be_repaired_in_same_draft(self):
+        self.create(allow_execution=False)
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="endpoints/broken.py",
+                  content="def broken():\n    return missing_name\n")
+        self.complete.return_value = (tool_message("write_draft_file", {
+            "path": "endpoints/broken.py", "content": "def broken():\n    return 1\n"}), None)
+        self.step()
+        self.assertIn("latest draft check failed", self.complete.call_args.args[0][0]["content"])
+        self.step()
+        self.assertEqual(self.run["status"], "ready")
+        self.assertNotIn("Static check", self.run["events"][-1].get("detail", ""))
+        self.complete.return_value = ({"role": "assistant", "content": "Saved. Execution was disabled."}, None)
+        self.assertEqual(self.step()["status"], "completed")
+        self.assertFalse(self.run["allow_execution"])
+
+    def test_final_answer_automatically_validates_and_tests_edited_draft(self):
+        self.create(allow_execution=True)
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="endpoints/greetings.py", content=HANDLER)
+        self.tool("write_draft_file", path="tests/test_greetings.py", content=TEST_SOURCE)
+        self.tool("upsert_endpoint", endpoint={"method": "GET", "path": "/greet", "handler": "endpoints/greetings.py:greet"})
+        self.complete.return_value = ({"role": "assistant", "content": "Greeting is ready."}, None)
+        self.assertEqual(self.step()["status"], "ready")
+        self.assertEqual(self.run["next_action"], {"kind": "tool", "name": "validate_draft"})
+        self.assertEqual(self.step()["status"], "ready")
+        self.assertEqual(self.run["next_action"], {"kind": "tool", "name": "test_draft"})
+        self.assertEqual(self.step()["status"], "ready")
+        self.assertEqual(self.run["checks"]["validate_draft"]["status"], "passed")
+        self.assertEqual(self.run["checks"]["test_draft"]["status"], "passed")
+        self.assertEqual(self.step()["status"], "completed")
+
+    def test_failed_automatic_check_is_fed_back_for_code_repair(self):
+        self.create(allow_execution=True)
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="endpoints/broken.py", content="def broken():\n    return unknown_name\n")
+        self.complete.return_value = ({"role": "assistant", "content": "Done"}, None)
+        self.assertEqual(self.step()["next_action"], {"kind": "tool", "name": "validate_draft"})
+        self.assertEqual(self.step()["events"][-1]["status"], "failed")
+        self.complete.return_value = (tool_message("write_draft_file", {
+            "path": "endpoints/broken.py", "content": "def broken():\n    return 1\n"}), None)
+        self.assertEqual(self.step()["status"], "ready")
+        sent = self.complete.call_args.args[0]
+        self.assertIn("latest draft check failed", sent[0]["content"])
+        self.assertTrue(any(m["role"] == "tool" and "unknown_name" in m["content"] for m in sent))
+        self.assertEqual(self.step()["status"], "ready")
+        self.assertEqual(self.run["checks"], {})
+        self.complete.return_value = ({"role": "assistant", "content": "Fixed"}, None)
+        self.assertEqual(self.step()["next_action"], {"kind": "tool", "name": "validate_draft"})
+        self.assertEqual(self.step()["next_action"], {"kind": "tool", "name": "test_draft"})
+        self.assertEqual(self.step()["status"], "ready")
+        self.assertEqual(self.step()["status"], "completed")
 
     def test_selected_draft_revision_pair_and_run_ids_are_validated(self):
         self.assertEqual(self.client.put(f"{self.root}/{self.run_id}", json={"model": "test-tool-model", "message": "Change", "draft_id": "a" * 32}).status_code, 422)
@@ -655,12 +1238,50 @@ class AgentTests(unittest.TestCase):
         self.create()
         self.complete.return_value = ({"role": "assistant", "content": None,
                                        "tool_calls": [{"type": "custom", "id": "x"}]}, None)
-        self.assertEqual(self.step()["status"], "failed")
+        self.assertEqual(self.step()["status"], "ready")
         self.assertEqual(self.run["tool_calls"], 0)
         with patch.object(agent, "MAX_PROMPT_BYTES", 1):
             self.assertEqual(self.step()["status"], "limit")
         self.assertFalse(self.run["can_resume"])
         self.assertEqual(drafts.list_drafts(self.project.id)["drafts"], [])
+
+
+    def test_retry_context_explains_truncation_without_replaying_invalid_response(self):
+        self.create(allow_edits=False)
+        self.complete.side_effect = GenerationError("Model output was truncated", diagnostics={
+            "finish_reason": "length", "usage": {"total_tokens": 20}})
+        self.assertEqual(self.step()["status"], "failed")
+        self.complete.side_effect = None
+        self.complete.return_value = ({"role": "assistant", "content": "Here is the explanation"}, None)
+        self.assertEqual(self.step()["status"], "completed")
+        messages = self.complete.call_args.args[0]
+        self.assertIn("Output was truncated", messages[0]["content"])
+        self.assertIn("one file per call", messages[0]["content"])
+        self.assertEqual([m for m in messages if m["role"] == "user"],
+                         [{"role": "user", "content": "Add reader greetings"}])
+        self.assertEqual(len(messages), 2)
+
+    def test_failed_turn_accepts_correction_and_retains_unverified_edits(self):
+        self.create()
+        self.complete.return_value = (tool_message("create_draft", {"name": "Greeting fixes"}), None)
+        self.step()
+        self.step()
+        path = agent._path(self.project.id, self.run_id)
+        saved = agent._read(path)
+        saved.update(status="failed", edits_made=True, repair_required=True,
+                     error={"message": "Checks need repair"})
+        agent._save(path, saved)
+        public = self.client.get(f"{self.root}/{self.run_id}").json()
+        self.assertTrue(public["can_reply"])
+        response = self.client.post(f"{self.root}/{self.run_id}/replies", json={
+            "message": "Preserve auth and fix the missing import", "reply_id": uuid4().hex,
+            "expected_turn": public["turn"], "expected_revision": public["revision"]})
+        self.assertEqual(response.status_code, 200, response.text)
+        saved = agent._read(path)
+        self.assertTrue(saved["edits_made"])
+        self.assertTrue(saved["repair_required"])
+        self.assertEqual(saved["draft_id"], public["draft_id"])
+        self.assertEqual(saved["messages"][-1]["content"], "Preserve auth and fix the missing import")
 
 
 class ToolProviderTests(unittest.TestCase):

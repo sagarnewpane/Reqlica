@@ -47,3 +47,21 @@ def job(project_id: str, job_id: str, response: Response):
 @router.post('/jobs/{job_id}/install', status_code=202)
 def install(project_id: str, job_id: str, body: packages.PackageInstall):
     return draft_operation(packages.install_package, project_id, job_id, body)
+
+
+@router.get('/jobs')
+def job_history(project_id: str, response: Response, offset: int = 0, limit: int = 20):
+    response.headers['Cache-Control'] = 'no-store'
+    def listing():
+        if not 0 <= offset <= 100000 or not 1 <= limit <= 100:
+            raise ValueError('Invalid package history page')
+        packages.get_project(project_id)
+        rows = []
+        for path in sorted(packages.environment_directory().glob('*/job.json'), key=lambda p: p.stat().st_mtime, reverse=True):
+            try:
+                job = packages._read(project_id, path.parent.name)
+                rows.append({key: job[key] for key in ('id', 'status', 'requirement') if key in job})
+            except (OSError, ValueError, KeyError):
+                continue
+        return {'jobs': rows[offset:offset + limit], 'next_offset': offset + limit if offset + limit < len(rows) else None}
+    return draft_operation(listing)

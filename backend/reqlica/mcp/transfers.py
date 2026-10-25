@@ -67,7 +67,7 @@ def _archive_info(data):
 
 
 async def inspect_project_archive(archive_path: ArchivePath) -> dict:
-    """Inspect bounded ZIP metadata and digest without extracting or executing source.
+    """Read an existing server-local ZIP's metadata/sha256 before import. Extracts and executes nothing; fully_validated=false means import must still validate contents. Copy sha256 into import_project_archive.expected_sha256 after review.
 
     Returns no code, records or secrets. Metadata is untrusted; import performs
     full path, hash, SQLite and configuration validation. Files must be server-local.
@@ -122,7 +122,7 @@ async def export_project_archive(project_id: ProjectID, archive_path: ArchivePat
     confirm: Confirm,
     kind: Annotated[Literal["active", "workspace"], Field(description="active: portable code/data/policies for import or clone; workspace: full drafts/history, drains/stops worker.")] = "active",
     include_secrets: Annotated[bool, Field(strict=True, description="Explicit human opt-in to include private environment values in a workspace ZIP; default excludes them. Source/SQLite can still contain secrets.")] = False) -> dict:
-    """Export to a NEW private server-local ZIP after human destination approval.
+    """Export to a NEW server-local ZIP after human destination approval. Read get_worker_status.active_revision first; choose active or workspace. Never overwrites; parent must exist outside registered projects. Returns archive_path/sha256, not ZIP bytes.
 
     Returns path/hash/metadata, never ZIP data. No overwrite; destination must be
     outside project directories. Active export includes a consistent SQLite copy;
@@ -137,7 +137,7 @@ async def import_project_archive(archive_path: ArchivePath, expected_sha256: Arc
     confirm: Confirm,
     clone: Annotated[bool, Field(strict=True, description="Assign a new project ID for an active bundle; required if its original ID is registered. Workspace archives cannot be cloned.")] = False,
     name: Annotated[str | None, Field(max_length=200, description="Optional nonblank project name for active bundles only.")] = None) -> dict:
-    """Import/clone a reviewed ZIP with an exact file digest and human approval.
+    """Import a reviewed server-local ZIP into a NEW directory after human approval. First inspect_project_archive and copy sha256 to expected_sha256. Active bundles support clone/name; workspace archives preserve identity/name and reject those options. Registers the project without running source.
 
     Fully validates paths, hashes and SQLite; never executes imported source.
     Workspace preserves identity/drafts/history and may contain private environment

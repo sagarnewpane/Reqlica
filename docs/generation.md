@@ -22,6 +22,22 @@ next tool call; server permissions, one-project/one-draft scope, revisions, and
 budgets constrain it. Tool failures return feedback to the model. Check execution
 runs trusted Python with OS permissions on disposable data, not in a sandbox.
 
+The model is instructed to read tool descriptions, prerequisites and argument schemas
+before calling, reuse saved evidence, and wait for reads/checks before dependent calls.
+Tool argument, source and check failures return compact repair feedback with locations
+and a next step. Recoverable failures keep the conversation running without setting a
+conversation error. Remaining calls in a failed batch are skipped with matching tool
+receipts; earlier successful changes stay saved. Identical failed calls at the same
+draft revision are blocked before execution. Three consecutive tool failures stop
+automatic repair; successful calls reset that counter. Unresolved failures prevent a
+success answer. Permission, transport and revision conflicts still require attention
+when safe automatic recovery is unavailable.
+
+Context compaction preserves user requirements, current source evidence and structured
+repair diagnostics, including source locations, dependency issues and recovery status.
+Complete history remains in the checkpoint. Optional tool groups limit catalog size;
+argument descriptions and fallback tool documentation retain their full prerequisites.
+
 ## Console API
 
 All project paths start with `/api/projects/{project_id}`.
@@ -89,7 +105,11 @@ conversations retain their saved output budget when Settings is edited.
 
 Replies require `message`, a unique `reply_id`, `expected_turn`, and
 `expected_revision`. They cannot change provider, scope, permissions, or reset
-budgets. Changed source or publication stops continuation for review.
+budgets. Changed source stops continuation for review. Publishing the chat's exact
+saved revision allows the next reply in the same conversation; further edits use
+a fresh draft based on the published version. The original draft stays intact.
+New chat can explicitly leave an unconfirmed send once its request has ended;
+the previous server checkpoint stays in history and is not replayed in the new chat.
 
 Conversations retain their saved reasoning setting when a provider profile is edited.
 The setup summary shows the conversation’s actual choice. For an unsupported choice,

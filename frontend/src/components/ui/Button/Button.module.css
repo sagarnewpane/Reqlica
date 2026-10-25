@@ -1,0 +1,80 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+.primary {
+  background: var(--button-primary);
+  border-color: var(--button-primary);
+  color: var(--button-primary-text);
+}
+.secondary {
+  background: var(--background-secondary);
+  border-color: var(--border-primary);
+  color: var(--text-accent);
+  box-shadow: none;
+}
+.ghost {
+  background: transparent;
+  color: var(--text-accent);
+  box-shadow: none;
+}
+.danger {
+  background: var(--button-danger);
+  border-color: var(--button-danger);
+  color: var(--button-danger-text);
+}
+.icon {
+  width: 44px;
+  padding: 8px;
+}
+
+.button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+.primary:hover:not(:disabled) {
+  background: var(--button-primary);
+}
+.danger:hover:not(:disabled) {
+  background: var(--button-danger);
+}
+.secondary:hover:not(:disabled),
+.ghost:hover:not(:disabled) {
+  background: var(--background-primary);
+  opacity: 1;
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+@media (prefers-reduced-motion: reduce) {
+  .button:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--reqlica-lime);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

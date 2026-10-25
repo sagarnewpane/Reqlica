@@ -132,6 +132,115 @@ class MCPTests(unittest.TestCase):
         self.assertEqual(result["events"][0]["status_code"], 429)
         self.assertEqual(self.tool("list_drafts", {"project_id": self.project.id})["drafts"], [])
 
+    def test_migration_documentation_survives_chat_compaction_and_examples_compile(self):
+        from mcp.types import Tool
+        from reqlica.generation import agent
+        from reqlica.projects.migrations import Operation, compile_operations
+        from reqlica.projects.schema_plan import SchemaPlan
+        metadata = next(t for t in self.rpc("tools/list")["tools"] if t["name"] == "preview_database_migration")
+        run = {"draft_id": None, "allow_execution": False, "tool_groups": ["database"], "messages": []}
+        with patch.object(agent, "_has_current_context", return_value=True):
+            exposed = agent._model_tools([Tool.model_validate(metadata)], run)[0]["function"]
+        self.assertIn("No add_table", exposed["description"])
+        self.assertIn("database/schema.json", exposed["description"])
+        self.assertIn("EXISTING LIVE", exposed["description"])
+        self.assertIn("INTEGER primary keys", exposed["description"])
+        self.assertIn("existing source columns", exposed["description"])
+        description = metadata["inputSchema"]["properties"]["operations_json"]["description"]
+        self.assertEqual(exposed["parameters"]["properties"]["operations_json"]["description"], description)
+        # Validate the literal examples users/models receive, including all six
+        # operations and the separate additive new-table plan.
+        decoder, examples, offset = json.JSONDecoder(), [], 0
+        while (start := description.find("{", offset)) != -1:
+            example, consumed = decoder.raw_decode(description[start:])
+            examples.append(example)
+            offset = start + consumed
+        self.assertEqual(len(examples), 7)
+        for example in examples[:-1]:
+            self.assertTrue(compile_operations([Operation.model_validate(example)]))
+        SchemaPlan.model_validate(examples[-1])
+
+    def test_migration_preview_accepts_documented_existing_table_shape_without_live_changes(self):
+        from reqlica.projects.database_setup import database_path
+        path = database_path(get_project(self.project.id))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(path) as db:
+            db.execute("CREATE TABLE users (id INTEGER PRIMARY KEY)")
+        result = self.tool("preview_database_migration", {"project_id": self.project.id,
+            "operations_json": json.dumps([{"op": "add_column", "table": "users", "column": {"name": "nickname", "type": "TEXT", "nullable": True}}])})
+        self.assertEqual(result["plan"]["operations"][0]["op"], "add_column")
+        with sqlite3.connect(path) as db:
+            self.assertEqual([row[1] for row in db.execute("PRAGMA table_info(users)")], ["id"])
+
+    def test_chat_catalog_preserves_argument_guidance_for_every_enabled_tool_group(self):
+        from copy import deepcopy
+        from mcp.types import Tool
+        from reqlica.generation import agent
+        catalog = self.rpc("tools/list")["tools"]
+        original = deepcopy(catalog)
+        discovered = [Tool.model_validate(item) for item in catalog]
+        by_name = {tool.name: tool for tool in discovered}
+        seen = set()
+        run = {"draft_id": "a" * 32, "allow_execution": True, "allow_edits": True,
+               "repair_required": True, "messages": []}
+        overrides = {("get_project_context", "include_source"), ("get_project_context", "include_database"),
+                     ("write_draft_file", "path"), ("write_draft_file", "content")}
+        with patch.object(agent, "_has_current_context", return_value=True):
+            for group in agent.TOOL_GROUPS:
+                tools = agent._model_tools(discovered, {**run, "tool_groups": [group]})
+                for tool in tools:
+                    function = tool["function"]
+                    name = function["name"]
+                    seen.add(name)
+                    if name not in by_name:
+                        continue  # Local discover_tools/finish_task have inline schemas.
+                    properties = function["parameters"]["properties"]
+                    for parameter, field in properties.items():
+                        self.assertTrue(field.get("description"), (name, parameter))
+                        if (name, parameter) not in overrides:
+                            self.assertEqual(field["description"], by_name[name].inputSchema["properties"][parameter]["description"], (name, parameter))
+        self.assertEqual(seen, agent._allowed(run))
+        self.assertEqual(catalog, original)
+        # All external tools also retain clear prerequisite/result guidance in
+        # their first paragraph, which chat uses for tools without a local summary.
+        for tool in discovered:
+            self.assertTrue(tool.description.split("\n\n", 1)[0].strip(), tool.name)
+        endpoint = agent._tool_schema(by_name["upsert_endpoint"])["$defs"]["Endpoint"]["properties"]
+        self.assertIn("No query", endpoint["path"]["description"])
+        self.assertIn("Together with path", endpoint["method"]["description"])
+        self.assertIn("concrete request path", agent._tool_schema(by_name["call_draft_endpoint"])["properties"]["path"]["description"].lower())
+
+    def test_serialized_data_and_policy_documentation_examples_validate(self):
+        from reqlica.generation.data_schemas import DataValidationRequest, RelatedDataValidationRequest
+        from reqlica.projects.related_data import validate_related_records
+        from reqlica.projects.scenarios import ScenarioSettings
+        from reqlica.projects.cors import CorsSettings
+        tools = {tool["name"]: tool for tool in self.rpc("tools/list")["tools"]}
+
+        def examples(tool, parameter):
+            description = tools[tool]["inputSchema"]["properties"][parameter]["description"]
+            decoder, result, offset = json.JSONDecoder(), [], 0
+            while offset < len(description):
+                candidates = [i for char in ("{", "[") if (i := description.find(char, offset)) != -1]
+                if not candidates:
+                    break
+                start = min(candidates)
+                example, consumed = decoder.raw_decode(description[start:])
+                result.append(example)
+                offset = start + consumed
+            return result
+
+        records, related = examples("preview_mock_data", "records_json")
+        DataValidationRequest(records=records)
+        RelatedDataValidationRequest(records_by_table=related, expected_schema="a" * 64)
+        validate_related_records(related)
+        scenarios, clear, cors = examples("set_traffic_policy", "settings_json")
+        ScenarioSettings.model_validate(scenarios)
+        ScenarioSettings.model_validate(clear)
+        CorsSettings.model_validate(cors)
+        from reqlica.projects.schema_plan import SchemaPlan
+        SchemaPlan.model_validate(examples("write_draft_file", "content")[0])
+
     def test_discovery_schemas_and_no_ai_approval_or_activation(self):
         tools = {tool["name"]: tool for tool in self.rpc("tools/list")["tools"]}
         self.assertEqual(

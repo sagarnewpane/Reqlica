@@ -91,6 +91,11 @@ def _filter_proxy_headers(
     return forwarded_headers
 
 
+@app.get("/api/health", tags=["Runtime"])
+def health() -> dict[str, str]:
+    return {"status": "ok", "service": "reqlica-runtime"}
+
+
 @app.get("/mock/demo/hello", tags=["Demo"])
 def hello() -> dict[str, str]:
     """Return a sample response for checking the mock server connection."""

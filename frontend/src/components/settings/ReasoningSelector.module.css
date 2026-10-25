@@ -1,0 +1,9 @@
+.root {
+  min-width: 0;
+}
+.hint {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}

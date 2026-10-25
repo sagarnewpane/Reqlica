@@ -47,10 +47,16 @@ class ModelSettings(ProviderEndpoint):
     temperature: float = Field(default=0, ge=0, le=2, allow_inf_nan=False)
     max_tokens: int = Field(default=8192, ge=256, le=65536)
     timeout_seconds: int = Field(default=300, ge=30, le=600, strict=True)
-    reasoning_mode: Literal["default", "off", "minimal", "low", "medium", "high", "xhigh", "max"] = "default"
+    reasoning_mode: Literal["default", "off", "minimal", "low", "medium", "high", "xhigh", "max"] = "off"
+
+
+from reqlica.generation.specifications import Specification
 
 
 class AgentRequest(ModelSettings):
+    specification: Specification | None = None
+    total_token_limit: int = Field(default=100000, ge=1000, le=1000000, strict=True)
+    tool_call_limit: int = Field(default=64, ge=1, le=1000, strict=True)
     message: str = Field(min_length=1, max_length=32_768, pattern=r"\S")
     draft_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
     expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -61,6 +67,8 @@ class AgentRequest(ModelSettings):
     def selected_revision(self):
         if bool(self.draft_id) != bool(self.expected_revision):
             raise ValueError("Select both the draft and its current revision, or neither for a new draft")
+        if self.specification and not self.allow_edits:
+            raise ValueError("Specification import requires draft editing permission")
         return self
 
 
@@ -73,8 +81,22 @@ class AgentReplyRequest(BaseModel):
     expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+class AgentLimitsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+    expected_total_token_limit: int = Field(ge=1000, le=1000000, strict=True)
+    expected_tool_call_limit: int = Field(ge=1, le=1000, strict=True)
+    total_token_limit: int = Field(ge=1000, le=1000000, strict=True)
+    tool_call_limit: int = Field(ge=1, le=1000, strict=True)
+
+
 class AgentReasoningResetRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
     expected_reasoning_mode: Literal["default", "off", "minimal", "low", "medium", "high", "xhigh", "max"]
+
+
+class AgentReasoningChangeRequest(AgentReasoningResetRequest):
+    reasoning_mode: Literal["default", "off", "minimal", "low", "medium", "high", "xhigh", "max"]

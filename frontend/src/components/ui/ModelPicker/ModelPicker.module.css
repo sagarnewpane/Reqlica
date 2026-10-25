@@ -1,0 +1,167 @@
+.row {
+  display: flex;
+  gap: 8px;
+}
+.trigger,
+.refresh {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  border: 1px solid var(--border-primary);
+  background: var(--background-secondary);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+}
+.trigger {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trigger svg,
+.refresh svg {
+  flex-shrink: 0;
+}
+.trigger:focus-visible,
+.refresh:focus-visible {
+  outline: 2px solid var(--reqlica-lime);
+  outline-offset: 2px;
+}
+.trigger:disabled,
+.refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.content {
+  width: var(--radix-popover-trigger-width);
+  min-width: 260px;
+  max-width: calc(100vw - 40px);
+  z-index: 100;
+  background: var(--background-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgb(23 35 29 / 12%);
+  overflow: hidden;
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border-primary);
+}
+.search input {
+  width: 100%;
+  outline: none;
+  font-size: 13px;
+}
+.list {
+  max-height: 280px;
+  overflow: auto;
+  padding: 6px;
+  font-size: 13px;
+}
+.manualAction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-primary);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.popoverError {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--status-danger);
+}
+.manualAction button {
+  color: var(--text-accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.manualAction button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.manualAction button:focus-visible {
+  outline: 2px solid var(--reqlica-lime);
+  outline-offset: 2px;
+}
+.list [cmdk-item] {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  min-height: 44px;
+  border-radius: 6px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.list [cmdk-item][data-selected='true'] {
+  background: var(--background-primary);
+  color: var(--text-accent);
+}
+.list strong {
+  font-weight: 500;
+}
+.list small {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.list [cmdk-empty] {
+  padding: 16px;
+  color: var(--text-secondary);
+}
+.meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.meta button {
+  color: var(--text-accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.note,
+.error {
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 8px;
+  color: var(--text-secondary);
+}
+.error {
+  color: var(--status-danger);
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

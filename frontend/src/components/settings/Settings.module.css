@@ -1,0 +1,318 @@
+.form {
+  composes: page from '../ui/PageHeader/PageHeader.module.css';
+}
+.connectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+.heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 20px;
+}
+.heading h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+.heading p,
+.context {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.heading p {
+  margin: 0;
+}
+.context {
+  margin: 20px 0 28px;
+}
+.scope {
+  padding: 6px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.section {
+  background: var(--background-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.sectionHeading {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.catalogKey {
+  margin-top: 20px;
+  padding: 16px;
+  background: var(--background-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+}
+.catalogKey > .savedKeyHeading > strong {
+  font-size: 14px;
+}
+.catalogKey > p {
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+.catalogKey .error {
+  color: var(--status-danger);
+  background: var(--status-danger-background);
+}
+.catalogKey .notice {
+  color: var(--text-accent);
+  background: var(--status-success-background);
+}
+.profiles {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-primary);
+}
+.savedKeyPanel {
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--background-primary);
+}
+.savedKeyHeading,
+.savedKeyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.savedKeyHeading {
+  margin-bottom: 10px;
+}
+.savedKeyHeading strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.keyAvailable {
+  color: var(--text-accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+.savedKeyText {
+  min-width: 0;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: nowrap;
+  user-select: text;
+}
+.savedKeyRow button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.catalogKey label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.catalogKey p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.keyActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+.sectionHeading > span {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.sectionHeading h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+.sectionHeading p,
+.grid p,
+.toggle p,
+.note p,
+.caption {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 4px 0 0;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.grid label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.modelSetup {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+.modelSetup label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.full {
+  grid-column: 1 / -1;
+}
+.note {
+  background: var(--background-primary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 24px;
+  font-size: 13px;
+}
+.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 72px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border-primary);
+  cursor: pointer;
+}
+.toggle strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.toggle input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--reqlica-green);
+  cursor: pointer;
+}
+.toggle input:focus-visible,
+.advanced summary:focus-visible,
+.secondary:focus-visible {
+  outline: 2px solid var(--reqlica-lime);
+  outline-offset: 4px;
+}
+.caption {
+  padding-top: 12px;
+}
+.advanced {
+  margin-top: 16px;
+  font-size: 13px;
+}
+.advanced summary {
+  cursor: pointer;
+  padding: 12px 0;
+  color: var(--text-accent);
+  font-weight: 600;
+}
+.advanced .grid {
+  margin-top: 16px;
+}
+.footer {
+  z-index: 10;
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  background: var(--background-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+.footer span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.secondary {
+  composes: button secondary from '../ui/Button/Button.module.css';
+}
+.secondary:hover {
+  background: var(--background-primary);
+}
+.secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.error,
+.notice {
+  padding: 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+.error {
+  background: var(--status-danger-background);
+  color: var(--status-danger);
+}
+.notice {
+  background: var(--status-success-background);
+  color: var(--text-accent);
+}
+@media (max-width: 640px) {
+  .savedKeyHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .heading {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .modelSetup {
+    grid-template-columns: 1fr;
+  }
+  .section {
+    padding: 20px;
+  }
+  .footer {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+  .actions {
+    margin-left: auto;
+  }
+}
+.section {
+  gap: 0;
+}

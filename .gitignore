@@ -4,3 +4,5 @@ __pycache__/
 .env
 frontend-qa-commerce/
 .ruff_cache/
+.qa-seat-hold-20261024/
+frontend/.reqlica-connections.json*
