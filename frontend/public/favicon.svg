@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="108" fill="#edf3df"/>
+  <g transform="translate(40 66) scale(.9)">
+  <defs><linearGradient id="lime" x1="145" y1="20" x2="350" y2="375" gradientUnits="userSpaceOnUse"><stop stop-color="#c5da26"/><stop offset="1" stop-color="#b3ce24"/></linearGradient><linearGradient id="green" x1="60" y1="175" x2="420" y2="400" gradientUnits="userSpaceOnUse"><stop stop-color="#246346"/><stop offset="1" stop-color="#174832"/></linearGradient></defs>
+  <path d="M0 222 49 166 115 186 139 163 240 378 145 325 120 405Z" fill="url(#green)"/>
+  <path d="M480 222 431 166 365 186 341 163 240 378 335 325 360 405Z" fill="url(#green)"/>
+  <path d="m0 373 69-49 51 81Z" fill="url(#lime)"/><path d="m480 373-69-49-51 81Z" fill="url(#lime)"/>
+  <path d="M0 222 49 166 240 378 82 291Z" fill="url(#lime)"/><path d="m480 222-49-56-191 212 158-87Z" fill="url(#lime)"/>
+  <path d="M240 0 161 41 119 130 240 378Z" fill="url(#lime)"/><path d="m240 0 79 41 42 89-121 248Z" fill="#b3ca27"/>
+  <ellipse cx="173" cy="65" rx="12" ry="21" transform="rotate(20 173 65)" fill="#194e36"/><ellipse cx="307" cy="65" rx="12" ry="21" transform="rotate(-20 307 65)" fill="#194e36"/>
+</g>
+</svg>

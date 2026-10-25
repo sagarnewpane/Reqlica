@@ -69,6 +69,11 @@ def approve(
     )
 
 
+@router.post("/{draft_id}/recover")
+def recover(project_id: str, draft_id: str, body: Revision) -> dict:
+    return draft_operation(drafts.recover_draft, project_id, draft_id, body.expected_revision)
+
+
 @router.post("")
 def create(project_id: str, body: DraftCreate | None = None) -> dict:
     return draft_operation(drafts.create_draft, project_id, body.name if body else None)

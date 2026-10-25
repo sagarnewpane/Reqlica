@@ -1,0 +1,14 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const ts = require('../frontend/node_modules/typescript');
+const exportsForTest = {};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('frontend/src/lib/project-route.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports:exportsForTest,URLSearchParams});
+const { projectFromRoute } = exportsForTest;
+const id='a'.repeat(32);
+test('settings retains project context while router query is unavailable',()=>{ assert.equal(projectFromRoute(undefined,`/settings?projectId=${id}`),id); });
+test('project routes resolve concrete IDs and ignore hashes',()=>{ assert.equal(projectFromRoute(undefined,`/projects/${id}#main-content`),id); });
+test('query fallback supports Pages Router dynamic route hydration',()=>{ assert.equal(projectFromRoute(id,'/projects/[projectId]'),id); });
+test('returning to project list clears context even if the query lags',()=>{ assert.equal(projectFromRoute(id,'/'),null); });
+test('workspace settings and invalid IDs have no project navigation',()=>{ assert.equal(projectFromRoute(undefined,'/settings'),null); assert.equal(projectFromRoute('invalid','/settings?projectId=invalid'),null); });

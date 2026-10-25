@@ -1,0 +1,54 @@
+.content {
+  composes: page from '../components/ui/PageHeader/PageHeader.module.css';
+}
+.content h1 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin: 0 0 8px;
+}
+.subtitle {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 28px;
+}
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  background: var(--background-secondary);
+  margin-bottom: 20px;
+  width: fit-content;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.worker {
+  margin-bottom: 24px;
+}
+.tabs button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  min-height: 44px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.tabs button[data-state='active'] {
+  background: var(--button-primary);
+  color: var(--button-primary-text);
+}
+.tabs button:focus-visible {
+  outline: 2px solid var(--reqlica-lime);
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .tabs button {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+}

@@ -244,6 +244,9 @@ def get_project(project_id: str) -> Project:
         raise FileNotFoundError(f"Unknown project: {project_id}")
     registry_entry = registry_directory() / f"{project_id}.json"
     if not registry_entry.is_file():
+        if (registry_directory() / f".relocate-{project_id}.json").exists():
+            recover_relocation(project_id)
+            return get_project(project_id)
         raise FileNotFoundError(f"Unknown project: {project_id}")
     try:
         location = json.loads(registry_entry.read_text(encoding="utf-8"))
@@ -258,4 +261,31 @@ def get_project(project_id: str) -> Project:
             raise ValueError("Registered ID does not match project.json")
         return Project(**metadata.model_dump(), directory=directory.resolve())
     except (OSError, ValueError, KeyError, TypeError) as exc:
+        if (registry_directory() / f".relocate-{project_id}.json").exists():
+            recover_relocation(project_id)
+            return get_project(project_id)
         raise ValueError(f"Cannot open project {project_id}: {exc}") from exc
+
+
+def recover_relocation(project_id: str) -> None:
+    """A crashed directory rename resolves to the intact source or destination."""
+    journal = registry_directory() / f".relocate-{project_id}.json"
+    if not journal.exists():
+        return
+    from reqlica.projects.versions import atomic_write_json, _read_code_file, _fsync_directory
+    record = json.loads(journal.read_text())
+    for key in ("source", "target"):
+        path = Path(record[key])
+        if not path.is_absolute() or path.is_symlink():
+            raise ValueError("Invalid relocation recovery path")
+        try:
+            metadata = ProjectMetadata.model_validate_json(_read_code_file(path, Path("project.json")))
+        except (OSError, ValueError):
+            continue
+        if metadata.id != project_id:
+            raise ValueError("Relocation recovery ID mismatch")
+        atomic_write_json(registry_directory() / f"{project_id}.json", {"directory":str(path)})
+        journal.unlink(missing_ok=True)
+        _fsync_directory(journal.parent)
+        return
+    raise ValueError("Relocation recovery requires an intact project directory")

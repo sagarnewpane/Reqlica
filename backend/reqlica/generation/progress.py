@@ -13,8 +13,7 @@ TTL_SECONDS = 900
 MAX_ACTIVITIES = 128
 MAX_EVENTS = 64
 STAGES = {"received", "provider_request", "provider_accepted", "provider_rejected",
-          "provider_response", "checking", "completed", "failed",
-          "format_json_schema", "format_json_object", "format_text"}
+          "provider_response", "checking", "completed", "failed"}
 
 
 def _prune():

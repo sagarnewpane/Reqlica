@@ -12,7 +12,7 @@ import threading
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from reqlica.projects.drafts import _contained, _save_state, _state, draft_directory
+from reqlica.projects.drafts import _contained, _save_state, _state, draft_directory, changed_handlers
 from reqlica.projects.environment import read_environment, redact_output
 from reqlica.projects.store import Manifest, get_project
 from reqlica.projects.versions import (
@@ -22,6 +22,7 @@ from reqlica.projects.versions import (
     snapshot_code,
 )
 from reqlica.runtime.dependencies import import_issue_summary, import_issues
+from reqlica.runtime.package_state import dependency_revision
 from reqlica.runtime.sdk import backup_database
 from reqlica.validation.openapi import OPENAPI_LIMIT
 from reqlica.validation.source import name_issues, name_issue_summary
@@ -213,7 +214,12 @@ def _check(
                 if repair.get("revision") == expected_revision
                 else 1
             )
+            try:
+                required_handlers = changed_handlers(project, checked_state) if kind == "test" else []
+            except (OSError, ValueError):
+                required_handlers = []  # Static checks below report malformed source/manifest.
             environment_revision, _ = read_environment(project.directory)
+            package_revision = dependency_revision()
             revision = snapshot_code(draft_directory(project, draft_id), snapshot)
             if revision != expected_revision:
                 raise ValueError("Draft changed while creating the check snapshot")
@@ -241,6 +247,7 @@ def _check(
                 "environment_directory": str(project.directory),
                 "openapi_result": str(workspace / "openapi.json"),
                 "minimum_tests_passed": minimum_tests_passed,
+                "required_handlers": required_handlers,
                 "requirements": requirements,
                 **request,
             }
@@ -331,8 +338,13 @@ def _check(
             }
         result["revision"] = revision
         result["environment_revision"] = environment_revision
+        result['dependency_revision'] = package_revision
         with project_lock(project.directory):
             state = _state(project, draft_id)
+            if (state.get("generation") or {}).get("requirements", "") != requirements:
+                raise ValueError("Imported requirements changed during the check; rerun validation and tests")
+            if dependency_revision() != package_revision:
+                raise ValueError('Runtime packages changed during the check; rerun validation and tests')
             if read_environment(project.directory)[0] != environment_revision:
                 raise ValueError(
                     "Project environment changed during the check; rerun validation and tests"

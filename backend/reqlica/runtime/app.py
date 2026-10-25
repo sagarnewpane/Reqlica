@@ -2,6 +2,9 @@
 
 import asyncio
 import os
+import sys
+import time
+from uuid import uuid4
 from contextlib import asynccontextmanager
 from pathlib import Path
 from threading import Lock
@@ -10,9 +13,15 @@ import httpx
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
+from reqlica.projects.authentication import authentication_error
+from reqlica.projects.scenarios import consume_scenario
+from reqlica.projects.inspection import record_project_request
+from reqlica.projects.reset import DataReset
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from reqlica.projects.store import create_project as create_project_files
 from reqlica.runtime.schema_routes import router as schema_router
+from reqlica.runtime.cors import ProjectCorsMiddleware
 from reqlica.runtime.worker import (
     ProjectActivatingError,
     ProjectStoppedError,
@@ -48,7 +57,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Reqlica Mock Server", lifespan=lifespan)
+app.add_middleware(ProjectCorsMiddleware)
 app.include_router(schema_router)
+from reqlica.runtime.operations import router as maintenance_router
+app.include_router(maintenance_router)
 _creation_lock = Lock()
 
 
@@ -79,6 +91,11 @@ def _filter_proxy_headers(
     return forwarded_headers
 
 
+@app.get("/api/health", tags=["Runtime"])
+def health() -> dict[str, str]:
+    return {"status": "ok", "service": "reqlica-runtime"}
+
+
 @app.get("/mock/demo/hello", tags=["Demo"])
 def hello() -> dict[str, str]:
     """Return a sample response for checking the mock server connection."""
@@ -95,6 +112,13 @@ def _with_urls(request: Request, project: dict) -> dict:
             for endpoint in project["endpoints"]
         ],
     }
+
+
+@app.get('/api/runtime-environment', tags=['Runtime'])
+def runtime_environment():
+    """Identify the Python environment inherited by project workers."""
+    return {'prefix': str(Path(sys.prefix).resolve()), 'python': sys.executable,
+            'python_version': list(sys.version_info[:2])}
 
 
 @app.get("/api/projects", tags=["Projects"])
@@ -278,9 +302,52 @@ def activate_project(request: Request, project_id: str, activation: Activation) 
     return _publish(request, project_id, activation)
 
 
+@app.post("/api/projects/{project_id}/data-reset", tags=["Projects"])
+def reset_project_data(request: Request, project_id: str, body: DataReset) -> dict:
+    from reqlica.runtime.reset import reset_data
+    try:
+        return reset_data(request.app.state.worker_manager, project_id, body)
+    except FileNotFoundError as error:
+        raise HTTPException(404, str(error)) from error
+    except ProjectActivatingError as error:
+        raise HTTPException(503, str(error)) from error
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    except (OSError, RuntimeError) as error:
+        raise HTTPException(503, str(error)) from error
+
+
 @app.api_route("/mock/{project_id}", methods=SUPPORTED_METHODS)
 @app.api_route("/mock/{project_id}/{path:path}", methods=SUPPORTED_METHODS)
 async def proxy(request: Request, project_id: str, path: str = "") -> Response:
+    request_id = uuid4().hex
+    request.state.reqlica_request_id = request_id
+    started = time.monotonic()
+    status, outcome, response = 500, "gateway_error", None
+    try:
+        response = await _dispatch_proxy(request, project_id, path)
+        status, outcome = response.status_code, "response"
+        response.headers["X-Reqlica-Request-ID"] = request_id
+        return response
+    except HTTPException as error:
+        status, outcome = error.status_code, "gateway_error"
+        error.headers = {**(error.headers or {}), "X-Reqlica-Request-ID": request_id}
+        raise
+    except asyncio.CancelledError:
+        status, outcome = 499, "cancelled"
+        raise
+    finally:
+        if isinstance(request.method, str):
+            await asyncio.to_thread(record_project_request, project_id, {
+                "kind": "request", "request_id": request_id,
+                "method": request.method, "path": ("/" + path)[:1024],
+                "status_code": status, "outcome": outcome,
+                "duration_ms": round((time.monotonic() - started) * 1000, 3),
+                "response_bytes": len(response.body) if response is not None else None,
+            }, getattr(request, "_body", None), response.body if response is not None else None)
+
+
+async def _dispatch_proxy(request: Request, project_id: str, path: str = "") -> Response:
     worker_manager = request.app.state.worker_manager
     acquisition = asyncio.create_task(
         asyncio.to_thread(worker_manager.acquire_request, project_id)
@@ -310,6 +377,44 @@ async def proxy(request: Request, project_id: str, path: str = "") -> Response:
 
 
 async def _proxy_to_worker(request: Request, worker) -> Response:
+    try:
+        failure = await asyncio.to_thread(authentication_error, worker.project.directory, request.headers)
+    except FileNotFoundError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except (OSError, ValueError) as exc:
+        raise HTTPException(503, "Mock authentication settings unavailable") from exc
+    if failure:
+        code, headers = failure
+        return JSONResponse({"detail": code}, status_code=401,
+                            headers={**headers, "Cache-Control": "no-store"})
+    try:
+        # ASGI path has the same decoding as the worker router; query is separate.
+        path = request.scope["path"].split("/", 3)
+        route_path = "/" + path[3] if len(path) == 4 else "/"
+        scenario = await asyncio.to_thread(consume_scenario, worker.project.directory,
+                                          request.method, route_path, worker.manifest, request.headers)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(503, "Scenario settings unavailable") from exc
+    if scenario:
+        if "rate_limit_error" in scenario:
+            headers = {"Cache-Control": "no-store"}
+            if "retry_after" in scenario:
+                headers["Retry-After"] = str(scenario["retry_after"])
+            response = JSONResponse({"detail": scenario["rate_limit_error"]},
+                                    status_code=scenario["rate_limit_status"], headers=headers)
+            if request.method == "HEAD":
+                response.body = b""
+            return response
+        await asyncio.sleep(scenario["delay_ms"] / 1000)
+        if scenario["response"] != "passthrough":
+            response = JSONResponse(
+                [] if scenario["response"] == "empty" else scenario["body"],
+                status_code=200 if scenario["response"] == "empty" else scenario["status_code"],
+                headers={"Cache-Control": "no-store", "X-Reqlica-Scenario": scenario["response"]},
+            )
+            if request.method == "HEAD":
+                response.body = b""
+            return response
     # Strip the gateway prefix without decoding escaped slashes or other path bytes.
     path_parts = request.scope["raw_path"].split(b"/", maxsplit=3)
     endpoint_path = b"/"
@@ -325,10 +430,11 @@ async def _proxy_to_worker(request: Request, worker) -> Response:
     try:
         headers = []
         for name, value in _filter_proxy_headers(request.scope["headers"]):
-            if name.lower() in {b"x-forwarded-proto", b"x-forwarded-for"}:
+            if name.lower() in {b"x-forwarded-proto", b"x-forwarded-for", b"x-reqlica-request-id"}:
                 continue
             headers.append((name, value))
         headers.append((b"x-forwarded-proto", request.scope["scheme"].encode("ascii")))
+        headers.append((b"x-reqlica-request-id", request.state.reqlica_request_id.encode("ascii")))
 
         # Do not merge the shared client's cookie jar into a caller's request.
         worker_request = httpx.Request(

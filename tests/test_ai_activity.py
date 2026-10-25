@@ -1,6 +1,7 @@
 """Activity is observable during a request without exposing request/model data."""
 
 import unittest
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 from unittest.mock import patch
@@ -12,7 +13,7 @@ from pydantic import SecretStr
 from reqlica.console.app import create_app
 from reqlica.generation import progress, provider
 from reqlica.generation.errors import GenerationError
-from reqlica.generation.schemas import GenerationRequest
+from reqlica.generation.schemas import AgentRequest
 
 
 class ActivityTests(unittest.TestCase):
@@ -28,21 +29,21 @@ class ActivityTests(unittest.TestCase):
     def test_live_stages_and_completion_are_scoped_and_content_free(self):
         reached, release = Event(), Event()
 
-        def review(*args):
+        async def review(*args):
             progress.report("provider_request")
             reached.set()
-            if not release.wait(5):
+            if not await asyncio.to_thread(release.wait, 5):
                 raise RuntimeError("Test did not release request")
             progress.report("provider_response")
             progress.report("checking")
             return {"status": "ready"}
 
-        with patch("reqlica.console.routes.generation.review_requirements", review):
+        with patch("reqlica.console.routes.generation.agent.step_run", review):
             with ThreadPoolExecutor() as pool:
                 pending = pool.submit(
-                    self.client.post, self.root + "/clarify",
+                    self.client.post, self.root + "/agent-runs/run/step",
                     headers={"X-Reqlica-Activity-ID": self.activity_id, "X-Reqlica-Groq-Key": "private-key"},
-                    json={"requirements": "private-prompt"},
+                    json={},
                 )
                 try:
                     self.assertTrue(reached.wait(5))
@@ -61,16 +62,16 @@ class ActivityTests(unittest.TestCase):
         self.assertIsNone(progress._current.get())
 
     def test_failure_before_provider_contact_is_distinct(self):
-        with patch("reqlica.console.routes.generation.review_requirements", side_effect=GenerationError("Missing key", 503)):
-            response = self.client.post(self.root + "/clarify", json={"requirements": "x"}, headers={"X-Reqlica-Activity-ID": self.activity_id})
+        with patch("reqlica.console.routes.generation.agent.step_run", side_effect=GenerationError("Missing key", 503)):
+            response = self.client.post(self.root + "/agent-runs/run/step", json={}, headers={"X-Reqlica-Activity-ID": self.activity_id})
         self.assertEqual(response.status_code, 503)
         events = self.client.get(self.root + "/activity/" + self.activity_id).json()["events"]
         self.assertEqual([e["stage"] for e in events], ["received", "failed"])
 
     def test_activity_is_optional_and_invalid_ids_are_rejected(self):
-        with patch("reqlica.console.routes.generation.review_requirements", return_value={"status": "ready"}):
-            self.assertEqual(self.client.post(self.root + "/clarify", json={"requirements": "x"}).status_code, 200)
-            self.assertEqual(self.client.post(self.root + "/clarify", json={"requirements": "x"}, headers={"X-Reqlica-Activity-ID": "bad"}).status_code, 422)
+        with patch("reqlica.console.routes.generation.agent.step_run", return_value={"status": "ready"}):
+            self.assertEqual(self.client.post(self.root + "/agent-runs/run/step", json={}).status_code, 200)
+            self.assertEqual(self.client.post(self.root + "/agent-runs/run/step", json={}, headers={"X-Reqlica-Activity-ID": "bad"}).status_code, 422)
         self.assertEqual(len(progress._activities), 0)
 
     def test_expiration_capacity_and_event_bounds(self):
@@ -101,12 +102,12 @@ class ActivityTests(unittest.TestCase):
             with patch("reqlica.generation.provider.OpenAI", side_effect=factory):
                 try:
                     with progress.track("project", str(status)):
-                        provider.complete([{"role": "user", "content": "private-prompt"}], GenerationRequest(requirements="x"), SecretStr("private-key"))
+                        provider.complete([{"role": "user", "content": "private-prompt"}], AgentRequest(message="x", model="test-tool-model"), SecretStr("private-key"), tools=[])
                 except GenerationError:
                     self.assertEqual(status, 429)
             events = progress.inspect("project", str(status))["events"]
             stages = [e["stage"] for e in events]
-            self.assertEqual(stages[:3], ["received", "format_json_schema", "provider_request"])
+            self.assertEqual(stages[:2], ["received", "provider_request"])
             self.assertIn("provider_accepted" if status == 200 else "provider_rejected", stages)
             self.assertEqual(stages[-1], "completed" if status == 200 else "failed")
             self.assertNotIn("private", str(events))

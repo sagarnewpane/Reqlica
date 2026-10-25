@@ -14,7 +14,7 @@ from reqlica.projects.related_data import validate_related_data
 
 
 async def get_mock_data_context(project_id: ProjectID) -> dict:
-    """Read writable live table definitions, relationships and application field contracts.
+    """Read live table definitions and application field contracts before sqlite/related previews. Returns schema.fingerprint and application.unsupported_tables; no records. Do not use proposed draft tables as live tables.
 
     No records, secret values or handler execution. Use the returned schema
     fingerprint with preview_mock_data. Respect unsupported_tables: do not invent
@@ -30,12 +30,12 @@ async def get_mock_data_context(project_id: ProjectID) -> dict:
 
 async def preview_mock_data(
     project_id: ProjectID,
-    records_json: Annotated[str, Field(min_length=1, max_length=131072, description="JSON-encoded record array for json/sqlite, or a table-to-record-arrays object for related. At most 100 records and 128 KiB; related foreign keys may use $ref objects.")],
+    records_json: Annotated[str, Field(min_length=1, max_length=131072, description='JSON encoded as a STRING, not a native array/object. json/sqlite: [{"name":"Example"}] with 1–100 nonempty row objects. related: {"users":[{"name":"Example"}],"posts":[{"user_id":{"$ref":"users.0.id"},"title":"Hello"}]}; 1–10 existing tables, at most 100 total rows / 128 KiB. References use table.zero_based_row.column, not guessed generated IDs.')],
     target: Annotated[Literal["json", "sqlite", "related"], Field(description="Preview destination: json is a downloadable fixture; sqlite validates one existing table; related validates linked rows across existing tables. No live insertion.")] = "json",
     table: Annotated[str | None, Field(min_length=1, max_length=128, description="Exact existing table name for sqlite only. Omit for json and related.")] = None,
     expected_schema: Annotated[str | None, Field(pattern=r"^[0-9a-f]{64}$", description="Current database fingerprint returned by get_mock_data_context.schema.fingerprint. Required for sqlite/related; omit for json.")] = None,
 ) -> dict:
-    """Prepare and validate synthetic records for human review. NEVER inserts live rows.
+    """Preview requested synthetic records; NEVER inserts live rows or tests endpoint behavior. records_json must be a JSON string. For sqlite/related first read get_mock_data_context and supply its fingerprint; inspect validation.status before offering insertion.
 
     records_json is a JSON-encoded array for json/sqlite, or an object mapping
     existing table names to arrays for related. At most 100 records / 128 KiB.

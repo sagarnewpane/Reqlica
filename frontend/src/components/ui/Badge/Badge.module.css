@@ -1,0 +1,23 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.success {
+  color: var(--status-success);
+  background-color: var(--status-success-background);
+}
+
+.warning {
+  color: var(--status-warning);
+  background-color: var(--status-warning-background);
+}
+
+.danger {
+  color: var(--status-danger);
+  background-color: var(--status-danger-background);
+}

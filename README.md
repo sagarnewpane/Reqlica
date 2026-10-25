@@ -16,8 +16,10 @@ through the console's built-in HTTP MCP server.
 The standalone HTML dashboard provides one **Project AI** conversation for questions,
 specifications, endpoint changes, repairs, checks, and mock-data previews through MCP.
 See the [conversation guide](docs/mcp.md#project-ai-inside-the-dashboard).
-The packaged Next.js dashboard, database migrations, reset, and import/export
-remain planned. See the [roadmap](docs/roadmap.md).
+The backend includes declarative schema migrations/rollback, project relocation,
+full workspace archives, baseline reset and active-project ZIP import/export.
+The packaged Next.js dashboard remains separate.
+See the [roadmap](docs/roadmap.md).
 
 ## Quick Start
 
@@ -80,7 +82,8 @@ read-only permission also blocks editing tools on the server.
 
 Tool actions are expandable; checks remain tied to the exact source revision.
 Conversations persist in private local checkpoints and support pause/resume.
-Earlier read-only chats and generation jobs remain accessible in archives.
+Earlier read-only chats remain viewable as archives. Saved drafts remain in
+**Drafts & checks**; the retired generation engine cannot resume old jobs.
 See [Project AI and MCP](docs/mcp.md#project-ai-inside-the-dashboard).
 
 **Endpoints → Edit source** still opens a handler in a fresh manual draft.
@@ -95,8 +98,7 @@ Generated APIs can now include a declarative `database/schema.json` plan. In
 **Drafts & checks → Database setup**, review the SQL, validate/test on disposable
 copies, then confirm creating new live tables with a pre-change backup. Existing
 tables/records are preserved; code approval and activation remain separate.
-See [`docs/database-setup.md`](docs/database-setup.md). Destructive/alter-table
-migrations are not supported.
+See [`docs/database-setup.md`](docs/database-setup.md). Existing table changes use separate [reviewed migration plans](docs/maintenance.md).
 
 For code expecting `JWT_SECRET` or another application variable, open
 **Settings → Project environment**. Save a value or generate a secure JWT key,
@@ -104,21 +106,16 @@ rerun draft checks, and explicitly restart the published API. Values are stored
 privately per project, never shown by settings APIs or sent to AI. See
 [`docs/environment.md`](docs/environment.md) for security boundaries and limits.
 
-API generation and AI endpoint edits now begin with a clarification review.
-Answer questions about fields, configuration names, and behavior, then explicitly
-generate from those decisions. Optional follow-up reviews preserve earlier answers.
-Actual secret values belong in Project environment—not clarification answers.
-
-Generation also checks handler/test imports before saving drafts. Clarification
-uses the same declared-runtime dependency policy; missing libraries produce
-actionable errors rather than automatic installs. See
-[dependency handling](docs/generation.md#dependencies-and-missing-package-errors).
-
-Failed draft checks now offer **Repair with AI…**: Reqlica uses the original spec,
-current implementation/tests and failure logs to repair implementation and rerun
-checks for at most two confirmed attempts. Tests, routes and schema plans remain
-protected; code backups are kept. It never installs packages or publishes code.
-See [draft recovery](docs/generation.md#repair-a-failed-draft).
+Project AI handles questions, clarification, implementation and repair in one saved
+conversation. Tool-capable Groq, OpenAI, compatible providers and local Ollama can
+be configured; Anthropic remains preview-only. Edits and execution permissions
+are server-enforced. Failed checks return feedback for repairs in the same draft;
+there is no separate fixed two-attempt repair engine. Dependencies are checked
+without automatic installation. To install a missing library manually through
+the dashboard, use **Settings → Python packages** to resolve, review, and confirm
+an installation into the shared virtual environment. See the
+[package installation guide](docs/installation.md#install-missing-libraries-from-the-html-dashboard)
+and [Project AI](docs/generation.md).
 
 Remove a project through the running gateway (confirmation required):
 
@@ -132,6 +129,25 @@ confirm non-interactively. Deletion stops the worker and clears registry/runtime
 state without restarting Reqlica; `project stop` alone does not remove a project.
 
 ## Change an API
+
+Published mock routes can require per-project bearer credentials or API keys,
+including expired credentials for client testing. Configure them through the
+console API; see [mock authentication](docs/mock-authentication.md).
+Per-route delays, synthetic failures (including the next N requests), and empty
+responses are configurable through [gateway scenarios](docs/scenarios.md).
+Rules also support [per-route and per-test-user rate limits](docs/rate-limits.md)
+with HTTP 429 and `Retry-After` responses.
+Inspect published request statuses, timings and correlated Python errors through
+the [request history API and MCP](docs/inspection.md).
+Save a SQLite baseline and restore it with a pre-reset backup, or rearm scenario
+counters through the [reset APIs](docs/reset.md).
+Copy active projects between installations using [validated ZIP export/import](docs/project-transfer.md).
+Configure per-project browser origins, preflights and credentials through
+[CORS settings](docs/cors.md).
+External MCP clients can manage traffic policies, worker lifecycle, baselines/reset,
+migration history and project archives/moves through the
+[project operations tools](docs/mcp.md#project-operations). Live changes require
+explicit human confirmation and current revisions; Project AI gets inspection only.
 
 Create a draft rather than editing published versions:
 
@@ -169,7 +185,7 @@ Run backend tests:
 ```bash
 uv run python -m unittest discover -s tests
 ```
-y
+
 - [Development guide](docs/development.md): configuration, troubleshooting, project APIs, and code layout.
 - [Drafts and versions](docs/persistence-drafts-versions.md): editing, checks, approval, persistence, and activation.
 - [MCP tools](docs/mcp.md): connect an AI client and generate endpoint drafts.
@@ -178,3 +194,6 @@ y
 
 **Local trusted use only:** management APIs are unauthenticated. Keep servers on
 loopback and only load trusted Python; separate workers are not a security sandbox.
+
+Backend installation and the stateful bookstore demo: [installation](docs/installation.md).
+Relocation, full workspace backup, migrations and rollback: [maintenance](docs/maintenance.md).

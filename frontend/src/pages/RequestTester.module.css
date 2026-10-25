@@ -1,0 +1,4 @@
+.content {
+  composes: page from '../components/ui/PageHeader/PageHeader.module.css';
+  max-width: none;
+}

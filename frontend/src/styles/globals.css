@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
 
 * {
   box-sizing: border-box;
@@ -12,4 +14,96 @@ body {
 
 body {
   min-height: 100vh;
+  background: var(--background-primary);
+  color: var(--text-primary);
+}
+
+.component-test {
+  padding: 20px;
+}
+
+.component-test__input {
+  width: 300px;
+  margin-top: 20px;
+}
+
+.component-test__button {
+  margin-top: 20px;
+}
+
+.component-test__card {
+  max-width: 400px;
+  margin-top: 30px;
+}
+
+.component-test__select {
+  width: 300px;
+  margin-top: 20px;
+}
+
+@theme inline {
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* Component colors resolve from the light/dark pairs in colors.css. */
+@theme inline {
+  --color-background: var(--background-secondary);
+  --color-foreground: var(--text-primary);
+  --color-accent: var(--background-primary);
+  --color-accent-foreground: var(--text-accent);
+  --color-border: var(--border-primary);
+  --color-ring: var(--reqlica-lime);
+  --color-popover: var(--background-elevated);
+  --color-popover-foreground: var(--text-primary);
+}
+[data-slot='sidebar-content'] {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+@theme inline {
+  --color-card: var(--background-secondary);
+  --color-card-foreground: var(--text-primary);
+  --color-input: var(--border-primary);
+  --color-muted: var(--background-primary);
+  --color-muted-foreground: var(--text-secondary);
+  --color-primary: var(--button-primary);
+  --color-primary-foreground: var(--button-primary-text);
+  --color-secondary: var(--background-primary);
+  --color-secondary-foreground: var(--text-primary);
+  --color-destructive: var(--button-danger);
+  --color-destructive-foreground: var(--button-danger-text);
+}
+[data-slot='select-content'] {
+  min-width: var(--radix-select-trigger-width);
+}
+[data-slot='select-item'],
+[data-slot='dropdown-menu-item'] {
+  min-height: 40px;
+  cursor: pointer;
+}
+[data-slot='select-item'][data-highlighted],
+[data-slot='dropdown-menu-item'][data-highlighted] {
+  background: var(--background-primary);
+  color: var(--text-accent);
+}
+[data-slot='select-content'],
+[data-slot='dropdown-menu-content'],
+[data-slot='alert-dialog-content'] {
+  border-color: var(--border-primary);
+}
+[data-slot='alert-dialog-content'],
+[data-slot='dialog-content'] {
+  background: var(--background-elevated);
+  color: var(--text-primary);
+}
+[data-slot='dropdown-menu-separator'] {
+  background: var(--border-primary);
 }

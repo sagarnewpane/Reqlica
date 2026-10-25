@@ -5,13 +5,12 @@ import unittest
 from pathlib import Path
 
 from pydantic import ValidationError
-from reqlica.generation.schemas import GenerationRequest, ClarificationRequest, ProjectQuestionRequest
-from reqlica.generation.data_schemas import MockDataRequest
+from reqlica.generation.schemas import AgentRequest
 
 
 class TimeoutTests(unittest.TestCase):
     def test_api_defaults_and_bounds(self):
-        for cls, body in [(GenerationRequest, {"requirements": "x"}), (ClarificationRequest, {"requirements": "x"}), (ProjectQuestionRequest, {"question": "x"}), (MockDataRequest, {"requirements": "x"})]:
+        for cls, body in [(AgentRequest, {"message": "x", "model": "test-tool-model"})]:
             self.assertEqual(cls(**body).timeout_seconds, 300)
             for seconds in [30, 100, 600]:
                 self.assertEqual(cls(**body, timeout_seconds=seconds).timeout_seconds, seconds)
@@ -25,7 +24,7 @@ class TimeoutTests(unittest.TestCase):
         namespace = {"re": re}
         exec("def upstream_timeout(" + source, namespace)
         timeout = namespace["upstream_timeout"]
-        for route in ["clarify", "ask", "generate", "edit-endpoint", "data/generate", "drafts/d/repair", "generation-jobs/j/step"]:
+        for route in ["agent-runs/j/step"]:
             path = "/api/projects/p/" + route
             self.assertEqual(timeout("console", path, "POST"), 330)
             self.assertEqual(timeout("console", path, "POST", "100"), 130)

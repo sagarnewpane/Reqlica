@@ -2,6 +2,7 @@
 
 import json
 import os
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -76,6 +77,170 @@ class MCPTests(unittest.TestCase):
     def create_draft(self):
         return self.tool("create_draft", {"project_id": self.project.id})
 
+    def test_package_discovery_compact_inventory_and_annotations(self):
+        from reqlica.console import packages
+        tools = {tool['name']: tool for tool in self.rpc('tools/list')['tools']}
+        self.assertTrue(tools['install_package']['annotations']['destructiveHint'])
+        self.assertTrue(tools['install_package']['annotations']['openWorldHint'])
+        self.assertFalse(tools['preview_package_install']['annotations']['readOnlyHint'])
+        self.assertIn('human', tools['install_package']['inputSchema']['properties']['confirm']['description'])
+        info = {'installed':{'demo':'1'}, 'jobs':[{'id':'a'*32,'status':'review','requirement':'demo', 'log':'large output'}]}
+        with patch.object(packages, 'package_info', return_value=info):
+            result = self.tool('inspect_runtime_packages', {'project_id':self.project.id})
+        self.assertEqual(result['installed_count'], 1)
+        self.assertNotIn('installed', result)
+        self.assertNotIn('log', result['jobs'][0])
+
+    def test_package_tools_preserve_plan_pins_and_require_confirmation(self):
+        from reqlica.console import packages
+        ids = {'project_id':self.project.id}
+        with patch.object(packages, 'preview_package', return_value={'id':'a'*32,'status':'resolving'}) as preview:
+            self.tool('preview_package_install', {**ids,'package':'PyJWT','version':'2.10.1','expected_environment_revision':'b'*64})
+            body = preview.call_args.args[1]
+            self.assertEqual(body.package, 'PyJWT')
+            self.assertEqual(body.expected_revision, 'b'*64)
+        self.tool_error('install_package', {**ids,'job_id':'a'*32,'expected_plan_digest':'c'*64,'confirm':False}, 'confirmation')
+        with patch.object(packages, 'install_package', return_value={'id':'a'*32,'status':'installing'}) as install:
+            self.tool('install_package', {**ids,'job_id':'a'*32,'expected_plan_digest':'c'*64,'confirm':True})
+            self.assertEqual(install.call_args.args[2].expected_plan_digest, 'c'*64)
+            self.assertTrue(install.call_args.args[2].confirm)
+        with patch.object(packages, 'install_package', side_effect=ValueError('Runtime packages changed')):
+            self.tool_error('install_package', {**ids,'job_id':'a'*32,'expected_plan_digest':'c'*64,'confirm':True}, 'Runtime packages changed')
+        with patch.object(packages, 'preview_package') as preview:
+            response = self.rpc('tools/call', {'name':'preview_package_install','arguments':{**ids,'package':'-r evil','expected_environment_revision':'b'*64}})
+            self.assertTrue(response['isError'])
+            preview.assert_not_called()
+
+    def test_package_job_polling_is_read_only_and_output_is_opt_in(self):
+        from reqlica.console import packages
+        args = {'project_id':self.project.id,'job_id':'a'*32}
+        def result(*_args):
+            return {'id':'a'*32,'status':'failed','message':'x'*3000,'log':'details'}
+        with patch.object(packages, 'inspect_job', side_effect=result) as read, patch.object(packages, 'install_package') as install:
+            compact = self.tool('get_package_install_job', args)
+            expanded = self.tool('get_package_install_job', {**args,'include_output':True})
+            self.assertNotIn('log', compact)
+            self.assertEqual(len(compact['message']), 1024)
+            self.assertEqual(expanded['log'], 'details')
+            self.assertEqual(read.call_count, 2)
+            install.assert_not_called()
+
+    def test_saved_request_history_is_readable_without_draft_or_execution(self):
+        from reqlica.projects.inspection import record_event
+        record_event(self.project.directory, {"kind": "request", "request_id": "a" * 32, "status_code": 429})
+        result = self.tool("read_project_logs", {"project_id": self.project.id, "request_id": "a" * 32})
+        self.assertEqual(result["events"][0]["status_code"], 429)
+        self.assertEqual(self.tool("list_drafts", {"project_id": self.project.id})["drafts"], [])
+
+    def test_migration_documentation_survives_chat_compaction_and_examples_compile(self):
+        from mcp.types import Tool
+        from reqlica.generation import agent
+        from reqlica.projects.migrations import Operation, compile_operations
+        from reqlica.projects.schema_plan import SchemaPlan
+        metadata = next(t for t in self.rpc("tools/list")["tools"] if t["name"] == "preview_database_migration")
+        run = {"draft_id": None, "allow_execution": False, "tool_groups": ["database"], "messages": []}
+        with patch.object(agent, "_has_current_context", return_value=True):
+            exposed = agent._model_tools([Tool.model_validate(metadata)], run)[0]["function"]
+        self.assertIn("No add_table", exposed["description"])
+        self.assertIn("database/schema.json", exposed["description"])
+        self.assertIn("EXISTING LIVE", exposed["description"])
+        self.assertIn("INTEGER primary keys", exposed["description"])
+        self.assertIn("existing source columns", exposed["description"])
+        description = metadata["inputSchema"]["properties"]["operations_json"]["description"]
+        self.assertEqual(exposed["parameters"]["properties"]["operations_json"]["description"], description)
+        # Validate the literal examples users/models receive, including all six
+        # operations and the separate additive new-table plan.
+        decoder, examples, offset = json.JSONDecoder(), [], 0
+        while (start := description.find("{", offset)) != -1:
+            example, consumed = decoder.raw_decode(description[start:])
+            examples.append(example)
+            offset = start + consumed
+        self.assertEqual(len(examples), 7)
+        for example in examples[:-1]:
+            self.assertTrue(compile_operations([Operation.model_validate(example)]))
+        SchemaPlan.model_validate(examples[-1])
+
+    def test_migration_preview_accepts_documented_existing_table_shape_without_live_changes(self):
+        from reqlica.projects.database_setup import database_path
+        path = database_path(get_project(self.project.id))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(path) as db:
+            db.execute("CREATE TABLE users (id INTEGER PRIMARY KEY)")
+        result = self.tool("preview_database_migration", {"project_id": self.project.id,
+            "operations_json": json.dumps([{"op": "add_column", "table": "users", "column": {"name": "nickname", "type": "TEXT", "nullable": True}}])})
+        self.assertEqual(result["plan"]["operations"][0]["op"], "add_column")
+        with sqlite3.connect(path) as db:
+            self.assertEqual([row[1] for row in db.execute("PRAGMA table_info(users)")], ["id"])
+
+    def test_chat_catalog_preserves_argument_guidance_for_every_enabled_tool_group(self):
+        from copy import deepcopy
+        from mcp.types import Tool
+        from reqlica.generation import agent
+        catalog = self.rpc("tools/list")["tools"]
+        original = deepcopy(catalog)
+        discovered = [Tool.model_validate(item) for item in catalog]
+        by_name = {tool.name: tool for tool in discovered}
+        seen = set()
+        run = {"draft_id": "a" * 32, "allow_execution": True, "allow_edits": True,
+               "repair_required": True, "messages": []}
+        overrides = {("get_project_context", "include_source"), ("get_project_context", "include_database"),
+                     ("write_draft_file", "path"), ("write_draft_file", "content")}
+        with patch.object(agent, "_has_current_context", return_value=True):
+            for group in agent.TOOL_GROUPS:
+                tools = agent._model_tools(discovered, {**run, "tool_groups": [group]})
+                for tool in tools:
+                    function = tool["function"]
+                    name = function["name"]
+                    seen.add(name)
+                    if name not in by_name:
+                        continue  # Local discover_tools/finish_task have inline schemas.
+                    properties = function["parameters"]["properties"]
+                    for parameter, field in properties.items():
+                        self.assertTrue(field.get("description"), (name, parameter))
+                        if (name, parameter) not in overrides:
+                            self.assertEqual(field["description"], by_name[name].inputSchema["properties"][parameter]["description"], (name, parameter))
+        self.assertEqual(seen, agent._allowed(run))
+        self.assertEqual(catalog, original)
+        # All external tools also retain clear prerequisite/result guidance in
+        # their first paragraph, which chat uses for tools without a local summary.
+        for tool in discovered:
+            self.assertTrue(tool.description.split("\n\n", 1)[0].strip(), tool.name)
+        endpoint = agent._tool_schema(by_name["upsert_endpoint"])["$defs"]["Endpoint"]["properties"]
+        self.assertIn("No query", endpoint["path"]["description"])
+        self.assertIn("Together with path", endpoint["method"]["description"])
+        self.assertIn("concrete request path", agent._tool_schema(by_name["call_draft_endpoint"])["properties"]["path"]["description"].lower())
+
+    def test_serialized_data_and_policy_documentation_examples_validate(self):
+        from reqlica.generation.data_schemas import DataValidationRequest, RelatedDataValidationRequest
+        from reqlica.projects.related_data import validate_related_records
+        from reqlica.projects.scenarios import ScenarioSettings
+        from reqlica.projects.cors import CorsSettings
+        tools = {tool["name"]: tool for tool in self.rpc("tools/list")["tools"]}
+
+        def examples(tool, parameter):
+            description = tools[tool]["inputSchema"]["properties"][parameter]["description"]
+            decoder, result, offset = json.JSONDecoder(), [], 0
+            while offset < len(description):
+                candidates = [i for char in ("{", "[") if (i := description.find(char, offset)) != -1]
+                if not candidates:
+                    break
+                start = min(candidates)
+                example, consumed = decoder.raw_decode(description[start:])
+                result.append(example)
+                offset = start + consumed
+            return result
+
+        records, related = examples("preview_mock_data", "records_json")
+        DataValidationRequest(records=records)
+        RelatedDataValidationRequest(records_by_table=related, expected_schema="a" * 64)
+        validate_related_records(related)
+        scenarios, clear, cors = examples("set_traffic_policy", "settings_json")
+        ScenarioSettings.model_validate(scenarios)
+        ScenarioSettings.model_validate(clear)
+        CorsSettings.model_validate(cors)
+        from reqlica.projects.schema_plan import SchemaPlan
+        SchemaPlan.model_validate(examples("write_draft_file", "content")[0])
+
     def test_discovery_schemas_and_no_ai_approval_or_activation(self):
         tools = {tool["name"]: tool for tool in self.rpc("tools/list")["tools"]}
         self.assertEqual(
@@ -97,6 +262,25 @@ class MCPTests(unittest.TestCase):
                 "get_api_schema",
                 "get_mock_data_context",
                 "preview_mock_data",
+                "read_project_logs",
+                "preview_database_migration",
+                "inspect_runtime_packages",
+                "preview_package_install",
+                "get_package_install_job",
+                "install_package",
+                "get_traffic_policies",
+                "set_traffic_policy",
+                "reset_scenario_counters",
+                "get_worker_status",
+                "control_project_worker",
+                "get_data_baseline",
+                "capture_data_baseline",
+                "reset_project_data",
+                "list_database_migrations",
+                "inspect_project_archive",
+                "export_project_archive",
+                "import_project_archive",
+                "relocate_project",
             },
         )
         self.assertTrue(tools["get_project_context"]["annotations"]["readOnlyHint"])
@@ -121,6 +305,18 @@ class MCPTests(unittest.TestCase):
             self.tool_error(name, {}, "Unknown tool")
         self.assertEqual(self.client.get("/api/health").status_code, 200)
         self.assertEqual(self.client.get("/docs").status_code, 200)
+
+    def test_mock_data_refuses_hash_columns_without_writing_live_data(self):
+        path = self.project.directory / "data.sqlite"
+        with sqlite3.connect(path) as db:
+            db.execute("CREATE TABLE users(id INTEGER PRIMARY KEY, password_hash TEXT NOT NULL)")
+        original = path.read_bytes()
+        context = self.tool("get_mock_data_context", {"project_id": self.project.id})
+        self.assertIn("users", context["application"]["unsupported_tables"])
+        self.tool_error("preview_mock_data", {"project_id": self.project.id,
+            "target": "sqlite", "table": "users", "expected_schema": context["schema"]["fingerprint"],
+            "records_json": '[{"password_hash":"invented-hash"}]'}, "application-specific hashing")
+        self.assertEqual(path.read_bytes(), original)
 
     def test_mock_data_tools_validate_json_and_reject_unsafe_or_stale_input(self):
         arguments = {"project_id": self.project.id}
