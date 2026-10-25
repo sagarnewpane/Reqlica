@@ -259,7 +259,7 @@ def check_migration(project, body):
     state = drafts._state(project, body.draft_id, body.expected_revision)
     if state["base_version"] != project.active_version:
         raise ValueError("Migration draft must use the current active base")
-    drafts._require_checks(state)
+    drafts._require_checks(state, project)
     directory = drafts.draft_directory(project, body.draft_id)
     plan = load_migration(directory)
     if plan is None or plan_digest(plan) != body.expected_plan_digest or body.expected_schema != plan.from_schema:

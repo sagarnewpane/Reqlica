@@ -132,7 +132,7 @@ def apply_setup(project_id: str, draft_id: str, request: SetupApply) -> dict:
     with project_lock(project.directory):
         project = get_project(project_id)
         state = _state(project, draft_id, request.expected_revision)
-        drafts._require_checks(state)
+        drafts._require_checks(state, project)
         directory = drafts.draft_directory(project, draft_id)
         plan = load_plan(directory)
         if plan is None:

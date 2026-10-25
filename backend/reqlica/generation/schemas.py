@@ -50,7 +50,12 @@ class ModelSettings(ProviderEndpoint):
     reasoning_mode: Literal["default", "off", "minimal", "low", "medium", "high", "xhigh", "max"] = "default"
 
 
+from reqlica.generation.specifications import Specification
+
+
 class AgentRequest(ModelSettings):
+    specification: Specification | None = None
+    total_token_limit: int = Field(default=100000, ge=1000, le=1000000, strict=True)
     message: str = Field(min_length=1, max_length=32_768, pattern=r"\S")
     draft_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
     expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -61,6 +66,8 @@ class AgentRequest(ModelSettings):
     def selected_revision(self):
         if bool(self.draft_id) != bool(self.expected_revision):
             raise ValueError("Select both the draft and its current revision, or neither for a new draft")
+        if self.specification and not self.allow_edits:
+            raise ValueError("Specification import requires draft editing permission")
         return self
 
 

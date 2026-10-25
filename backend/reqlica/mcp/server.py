@@ -326,11 +326,25 @@ async def get_project_context(
     )
 
 
-async def create_draft(project_id: ProjectID) -> dict:
+async def create_draft(
+    project_id: ProjectID,
+    name: Annotated[
+        str | None,
+        Field(
+            min_length=1,
+            max_length=80,
+            description=(
+                "Short descriptive draft title, ideally 2–6 words, e.g. 'Bookstore API demo'. "
+                "Summarize the change; do not copy the full request, generated content, or code."
+            ),
+        ),
+    ] = None,
+) -> dict:
     """Begin API changes by creating ONE editable draft of an existing versioned project.
 
     Read context and discover existing work first; create only if no task-matching
     draft exists. Takes project_id, not draft_id/revision. Copies active code;
+    Supply name with a short descriptive title for the demo or change being built.
     creates no project, endpoint, worker or publication. Legacy projects require
     CLI conversion; retrying cannot convert them. Obtain IDs from tools, not guesses.
 
@@ -338,7 +352,7 @@ async def create_draft(project_id: ProjectID) -> dict:
     Store 'id', NOT 'draft_id', as draft_id and revision as expected_revision.
     Reuse for related endpoints/fixes; next write_draft_file and upsert_endpoint.
     """
-    return await run_in_threadpool(drafts.create_draft, project_id)
+    return await run_in_threadpool(drafts.create_draft, project_id, name)
 
 
 async def write_draft_file(
@@ -367,7 +381,11 @@ async def write_draft_file(
     ],
     expected_revision: Revision,
 ) -> dict:
-    """Create or replace a complete source/test file inside an existing draft.
+    """Save a complete source/test file once. A successful response confirms it is saved; do not repeat the write to confirm success or run tests.
+
+    This tool only saves source. Saving a test file does NOT execute its tests.
+    Correct arguments after a rejection instead of repeating the rejected call.
+    Use returned revision as expected_revision on the next different edit/check.
 
     Write handlers, models, support code, tests or project notes. Read existing
     draft source before replacement; content replaces the whole file, not a patch,
@@ -400,7 +418,7 @@ async def upsert_endpoint(
     ],
     expected_revision: Revision,
 ) -> dict:
-    """Register a Python handler as an HTTP route in an existing draft.
+    """Register a Python handler as an HTTP route in an existing draft. A successful registration changes the revision; use the returned revision next.
 
     After saving the handler with write_draft_file, pass a nested endpoint object
     (method, path, handler), not separate top-level fields. Adds or replaces the
@@ -434,7 +452,7 @@ async def remove_endpoint(
     ],
     expected_revision: Revision,
 ) -> dict:
-    """Unregister one HTTP route from a draft without deleting its source or records.
+    """Unregister one HTTP route from a draft without deleting its source or records. A successful removal changes the revision; use the returned revision next.
 
     Read draft context and match method and registered pattern exactly, including
     placeholder names. Use for deletion or removing the old key after a route rename.
@@ -510,7 +528,7 @@ async def get_api_schema(
 async def validate_draft(
     project_id: ProjectID, draft_id: DraftID, expected_revision: Revision
 ) -> dict:
-    """Check that the final draft's Python and route definitions can load.
+    """Check that the final draft's Python and route definitions can load. Supply the revision returned by the most recent successful edit.
 
     After final file/route edits, before test_draft: checks syntax, manifest/handler
     definitions, imports and application loading in a disposable code/database copy.
@@ -532,7 +550,7 @@ async def validate_draft(
 async def test_draft(
     project_id: ProjectID, draft_id: DraftID, expected_revision: Revision
 ) -> dict:
-    """Run the draft's unittest behavior tests against a disposable data copy.
+    """Run the draft's unittest behavior tests against a disposable data copy. Supply the revision returned by the most recent successful edit.
 
     After validation passes at the final revision, run meaningful tests/test*.py
     unittest tests. The starter hello test alone does not cover new endpoints.

@@ -4,6 +4,7 @@ import inspect
 import json
 import os
 import sys
+import threading
 import traceback
 import unittest
 import warnings
@@ -103,6 +104,10 @@ def run(job: dict) -> dict:
                 super().__init__(*args, **kwargs)
                 self.dependency_errors = []
 
+            def startTest(self, test):
+                current_execution.clear()
+                super().startTest(test)
+
             def addError(self, test, err):
                 if (
                     isinstance(err[1], ModuleNotFoundError)
@@ -116,6 +121,19 @@ def run(job: dict) -> dict:
             def addSuccess(self, test):
                 super().addSuccess(test)
                 self.tests_passed += 1
+                executed.update(current_execution)
+
+        required = set(job.get("required_handlers", []))
+        executed = set()
+        current_execution = set()
+        targets = {(str((directory / handler.split(":")[0]).resolve()), handler.split(":")[1]): handler
+                   for handler in required}
+
+        def observe(frame, event, arg):
+            if event == "call":
+                handler = targets.get((frame.f_code.co_filename, frame.f_code.co_name))
+                if handler:
+                    current_execution.add(handler)
 
         with contract.monitor() if contract else nullcontext():
             suite = unittest.defaultTestLoader.discover(str(tests), pattern="test*.py")
@@ -126,9 +144,17 @@ def run(job: dict) -> dict:
                     message="It is deprecated to return a value.*",
                     category=DeprecationWarning,
                 )
-                result = unittest.TextTestRunner(
-                    stream=sys.stdout, verbosity=2, resultclass=TestResult
-                ).run(suite)
+                previous, previous_threads = sys.getprofile(), threading.getprofile()
+                try:
+                    if required:
+                        threading.setprofile_all_threads(observe)
+                    result = unittest.TextTestRunner(
+                        stream=sys.stdout, verbosity=2, resultclass=TestResult
+                    ).run(suite)
+                finally:
+                    if required:
+                        threading.setprofile_all_threads(previous_threads)
+                        sys.setprofile(previous)
         result_body = {
             "status": "passed"
             if result.wasSuccessful()
@@ -155,6 +181,15 @@ def run(job: dict) -> dict:
                 for test in result.unexpectedSuccesses
             ])[:20],
         }
+        missing = sorted(required - executed)
+        result_body["handler_coverage"] = {
+            "status": "failed" if missing else "passed", "required": sorted(required),
+            "executed": sorted(executed), "missing": missing,
+            "scope": "Handler execution during tests; does not prove assertion quality.",
+        }
+        if missing:
+            result_body["status"] = "failed"
+            result_body["output"] += "\nChanged handlers were not exercised by tests: " + ", ".join(missing)
         if result.wasSuccessful() and result.tests_passed < job.get(
             "minimum_tests_passed", 1
         ):

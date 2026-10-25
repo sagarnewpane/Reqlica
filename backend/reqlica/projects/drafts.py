@@ -119,9 +119,31 @@ def _inspect(project: Project, draft_id: str, state: dict) -> dict:
     files = _files(draft_directory(project, draft_id))
     base_project = project.model_copy(update={"active_version": state["base_version"]})
     base = _files(code_directory(base_project))
+    manifest_error = None
+    try:
+        required = changed_handlers(project, state)
+        endpoints = Manifest.model_validate_json(
+            _contained(draft_directory(project, draft_id), "manifest.json").read_text()
+        ).model_dump()["endpoints"]
+    except (OSError, ValueError) as error:
+        required, endpoints, manifest_error = [], [], str(error)
+    test = state.get("test")
+    if test and required:
+        coverage = test.get("handler_coverage") or {}
+        missing = sorted(set(required) - set(coverage.get("executed", [])))
+        if missing:
+            test = {**test, "status": "unverified", "handler_coverage": {
+                **coverage, "status": "unverified", "missing": missing,
+                "message": "Saved tests did not verify execution of the changed handlers. Rerun tests with behavior checks for these handlers."}}
     return {
         **state,
+        "test": test,
         "files": sorted(files),
+        "base_is_current": state["base_version"] == project.active_version,
+        "published_matches": content_digest(code_directory(project)) == state["revision"],
+        "endpoints": endpoints,
+        "manifest_error": manifest_error,
+        "required_handlers": required,
         "changes": {
             "added": sorted(files.keys() - base.keys()),
             "modified": sorted(
@@ -130,6 +152,62 @@ def _inspect(project: Project, draft_id: str, state: dict) -> dict:
             "deleted": sorted(base.keys() - files.keys()),
         },
     }
+
+
+def changed_handlers(project: Project, state: dict) -> list[str]:
+    """Require execution of added/repointed handlers and changed runtime files."""
+    directory = draft_directory(project, state["id"])
+    base = code_directory(project.model_copy(update={"active_version": state["base_version"]}))
+    before, after = _files(base), _files(directory)
+    changed = {name for name in before.keys() | after.keys() if before.get(name) != after.get(name)}
+    shared = any(name.endswith(".py") and not name.startswith(("tests/", "endpoints/")) for name in changed)
+    old = Manifest.model_validate_json(_contained(base, "manifest.json").read_text())
+    new = Manifest.model_validate_json(_contained(directory, "manifest.json").read_text())
+    old_routes = {(route.method, route.path): route.handler for route in old.endpoints}
+    return sorted({route.handler for route in new.endpoints
+                   if shared or route.handler.split(":")[0] in changed
+                   or old_routes.get((route.method, route.path)) != route.handler})
+
+
+def recover_draft(project_id: str, draft_id: str, expected_revision: str) -> dict:
+    """Copy nonconflicting draft changes onto the current API; preserve original."""
+    project = get_project(project_id)
+    with project_lock(project.directory):
+        project = get_project(project_id)
+        state = _state(project, draft_id, expected_revision)
+        if state["base_version"] == project.active_version:
+            return _inspect(project, draft_id, state)
+        source = draft_directory(project, draft_id)
+        base = code_directory(project.model_copy(update={"active_version": state["base_version"]}))
+        active = code_directory(project)
+        before, ours, theirs = _files(base), _files(source), _files(active)
+        changes, conflicts = {}, []
+        for name in before.keys() | ours.keys():
+            if before.get(name) == ours.get(name):
+                continue
+            if theirs.get(name) not in {before.get(name), ours.get(name)}:
+                conflicts.append(name)
+            else:
+                changes[name] = _contained(source, name).read_bytes() if name in ours else None
+        if conflicts:
+            raise ValueError("Recovery conflicts in: " + ", ".join(sorted(conflicts)) +
+                             ". Original draft retained; resolve these changes manually.")
+        recovered = create_draft(project_id, state["name"][:85] + " (recovered)")
+        target = draft_directory(project, recovered["id"])
+        try:
+            for name, content in changes.items():
+                path = _contained(target, name)
+                if content is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(content)
+            saved = _state(project, recovered["id"])
+            return _inspect(project, recovered["id"], saved)
+        except Exception:
+            shutil.rmtree(target)
+            _state_path(project, recovered["id"]).unlink(missing_ok=True)
+            raise
 
 
 def create_draft(project_id: str, name: str | None = None) -> dict:
@@ -452,7 +530,7 @@ def remove_endpoint(
         )
 
 
-def _require_checks(state: dict) -> None:
+def _require_checks(state: dict, project: Project | None = None) -> None:
     for name in ("validation", "test"):
         result = state.get(name)
         if (
@@ -466,6 +544,11 @@ def _require_checks(state: dict) -> None:
         or state["test"].get("tests_passed", 0) < 1
     ):
         raise ValueError("At least one passing test is required")
+    if project is not None:
+        required = set(changed_handlers(project, state))
+        coverage = state["test"].get("handler_coverage") or {}
+        if required - set(coverage.get("executed", [])):
+            raise ValueError("Changed handlers were not exercised by saved tests. Add behavior tests and rerun tests before approval or publication.")
 
 
 def approve_draft(project_id: str, draft_id: str, expected_revision: str) -> dict:
@@ -473,7 +556,9 @@ def approve_draft(project_id: str, draft_id: str, expected_revision: str) -> dic
     project = get_project(project_id)
     with project_lock(project.directory):
         state = _state(project, draft_id, expected_revision)
-        _require_checks(state)
+        _require_checks(state, project)
+        if state["base_version"] != get_project(project_id).active_version:
+            raise ValueError("Draft base version is no longer active. Recover changes onto the current API first.")
         state["approval"] = {"revision": state["revision"]}
         _save_state(project, draft_id, state)
         return _inspect(project, draft_id, state)
@@ -484,7 +569,7 @@ def require_approved(project_id: str, draft_id: str, expected_revision: str) -> 
     with project_lock(project.directory):
         project = get_project(project_id)
         state = _state(project, draft_id, expected_revision)
-        _require_checks(state)
+        _require_checks(state, project)
         if (
             not state.get("approval")
             or state["approval"].get("revision") != state["revision"]

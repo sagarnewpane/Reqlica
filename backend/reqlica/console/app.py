@@ -22,11 +22,13 @@ from reqlica.console.routes import (
     packages,
     preview,
     projects,
+    provider_keys,
     reset,
     runtime,
     scenarios,
     schemas,
     validation,
+    workspace,
 )
 from reqlica.mcp.server import create_server
 
@@ -54,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(runtime.router)
     app.include_router(generation.router)
     app.include_router(generation.provider_router)
+    app.include_router(provider_keys.router)
     app.include_router(data.router)
     app.include_router(environment.router)
     app.include_router(scenarios.router)
@@ -63,6 +66,7 @@ def create_app() -> FastAPI:
     app.include_router(projects.router)
     app.include_router(cors.router)
     app.include_router(maintenance.router)
+    app.include_router(workspace.router)
     app.include_router(packages.router)
     app.add_api_route("/api/health", health, methods=["GET"], tags=["Console"])
     # Keep this last: the transport handles /mcp and returns 404 for other paths.
