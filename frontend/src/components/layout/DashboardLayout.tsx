@@ -107,21 +107,21 @@ function ProjectSidebar({ projectId }: { projectId: string }) {
                         isActive={
                           router.pathname === item.href ||
                           (item.href === '/generate' &&
-                            router.pathname.startsWith('/projects/'))
+                            router.pathname === '/project')
                         }
                         className={styles.menuButton}
                       >
                         <Link
                           href={
                             item.href === '/generate'
-                              ? `/projects/${projectId}`
+                              ? `/project?projectId=${projectId}`
                               : { pathname: item.href, query: { projectId } }
                           }
                           onClick={() => setOpenMobile(false)}
                           aria-current={
                             router.pathname === item.href ||
                             (item.href === '/generate' &&
-                              router.pathname.startsWith('/projects/'))
+                              router.pathname === '/project')
                               ? 'page'
                               : undefined
                           }

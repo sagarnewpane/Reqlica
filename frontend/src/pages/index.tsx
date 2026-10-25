@@ -243,7 +243,7 @@ export default function Home() {
                   <h2>
                     <Link
                       className={styles.projectLink}
-                      href={`/projects/${project.id}`}
+                      href={`/project?projectId=${project.id}`}
                     >
                       {project.name || 'Unavailable project'}
                     </Link>
@@ -280,7 +280,7 @@ export default function Home() {
                 )}
                 <Link
                   className={styles.openProject}
-                  href={`/projects/${project.id}`}
+                  href={`/project?projectId=${project.id}`}
                   aria-label={`Open ${project.name || 'project'}`}
                 >
                   Open project →

@@ -591,7 +591,23 @@ def _start_servers() -> int:
             )
             servers.append((name, process))
 
-        print("Starting console and mock servers. Press Ctrl+C to stop.", flush=True)
+        console = _console_base_url()
+        print(
+            "Reqlica is starting.\n"
+            f"\n  Dashboard:    {console}\n"
+            f"  Mock gateway: {_mock_base_url()}\n"
+            f"  API docs:     {console}/docs\n"
+            f"  MCP endpoint: {console}/mcp\n"
+            "\nPress Ctrl+C to stop.",
+            flush=True,
+        )
+        if not (Path(__file__).resolve().parent / "static" / "index.html").is_file():
+            print(
+                "Dashboard assets are not built; run 'python3 scripts/build_frontend.py' "
+                "to build and stage the UI.",
+                file=sys.stderr,
+                flush=True,
+            )
         while True:
             for name, process in servers:
                 exit_code = process.poll()

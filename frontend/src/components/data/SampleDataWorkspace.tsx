@@ -61,7 +61,7 @@ export default function SampleDataWorkspace({
         title="Sample data"
         actions={
           <Button asChild variant="secondary">
-            <Link href={`/projects/${projectId}`}>Generate in chat</Link>
+            <Link href={`/project?projectId=${projectId}`}>Generate in chat</Link>
           </Button>
         }
       />

@@ -17,7 +17,7 @@ export type Project = {
 };
 
 export async function projectRequest(init?: RequestInit) {
-  const response = await fetch('/api/projects', init);
+  const response = await fetch('/api/ui/projects', init);
   const data = await response.json();
   if (!response.ok)
     throw new Error(

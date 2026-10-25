@@ -229,7 +229,7 @@ export default function RequestTester({
   const current: RequestConfig = { method, path, body, headerText, draftId };
   async function copyRequest() {
     try {
-      const reply = await fetch('/api/connection');
+      const reply = await fetch('/api/ui/connection');
       const connection = await reply.json();
       if (!reply.ok) throw new Error(connection.error);
       if (draftId)

@@ -1,62 +1,31 @@
-# Backend status and product direction
+# Future improvements
 
-Reqlica turns descriptions/specifications into reviewed Python mock APIs with
-persistent SQLite data. OpenAPI specifies contracts, not every business rule;
-ambiguous behavior still requires clarification. Once published, requests execute
-Python without model calls.
+The current release focuses on a complete local workflow: author an API, check
+it, review and publish it, then test clients against persistent data. See
+[feature status](guides/feature-status.md) for shipped behavior and
+[limitations](limitations.md) for current constraints.
 
-## Implemented backend
+The following are possible improvements, not implemented features or delivery
+commitments.
 
-- Project CLI/management APIs, independent supervised workers, persistent data,
-  startup/shutdown, explicit deletion, and revision-pinned draft approval/activation.
-- Saved Project AI conversations and follow-ups through the real MCP transport;
-  server-enforced scope, editing/execution permissions, model/tool budgets,
-  provider discovery and supported reasoning settings. Groq, OpenAI, compatible
-  endpoints and local tool-capable Ollama are supported; Anthropic is preview-only.
-- Typed API schemas, draft/published Swagger/OpenAPI, import diagnostics and
-  meaningful unittest checks on disposable code/data copies.
-- JSON/SQLite/related mock-data previews and separately confirmed live insertion.
-- Private application variables and additive database setup.
-- [Mock authentication](mock-authentication.md), [scenarios](scenarios.md),
-  [rate limits](rate-limits.md), [browser CORS](cors.md).
-- [Request/error inspection](inspection.md), including optional bounded redacted
-  body and stdout/stderr capture. Capture is disabled by default.
-- [SQLite baselines, data restore and counter reset](reset.md).
-- [Active project export/import](project-transfer.md), plus stable-ID relocation
-  and full version/draft workspace archives through [maintenance](maintenance.md).
-- Declarative add/drop/rename column/table and table rebuild migrations, preview,
-  disposable draft checks, exact-revision confirmed live apply, durable backups
-  and confirmed snapshot rollback. Schema and data limits are documented.
-- Installable backend wheel, [installation guide and stateful demo](installation.md).
+| Area                 | Improvement                                                                                                                             | Reason                                                                                                                                       |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| AI reliability       | Broader provider/model regression coverage and more actionable recovery diagnostics.                                                    | Reduce failures caused by varying tool support, malformed output, and quota behavior.                                                        |
+| Contract coverage    | Support more imported OpenAPI constructs and strengthen behavior checks derived from requirements.                                      | Reduce gaps between a specification and the verified implementation.                                                                         |
+| Dataset preparation  | Broader supported application formats and explicit user-supplied reference selection.                                                   | Make linked datasets easier to prepare without guessing existing IDs or credentials.                                                         |
+| Dependency isolation | Per-project environments and portable dependency manifests.                                                                             | Avoid one project's package requirements affecting another.                                                                                  |
+| Storage maintenance  | Retention controls and clearer backup/disk-usage management.                                                                            | Make long-lived local workspaces easier to maintain.                                                                                         |
+| Observability        | Optional live log subscriptions and richer bounded diagnostics.                                                                         | Shorten the feedback loop while keeping capture deliberate.                                                                                  |
+| Automation           | A dedicated CI runner and reproducible scenario execution against real backends.                                                        | Extend local manual testing into automated integration workflows.                                                                            |
+| Platform support     | Validate and document a Windows setup.                                                                                                  | Expand beyond the current macOS/Linux support boundary.                                                                                      |
+| Team use             | Management authentication, authorization, and remote workspace design.                                                                  | Establish identity and access control before supporting shared deployments.                                                                  |
+| Sandboxed execution  | Integrate an execution sandbox for generated APIs and draft checks, with filesystem, network, and resource controls.                    | Current local workers do not restrict generated Python's OS/network access.                                                                  |
+| Hosted SaaS          | Explore a hosted API-building experience similar to Lovable, with accounts, isolated workspaces, managed execution, and deployment.     | Let users create and run APIs without installing Reqlica locally; requires tenant isolation, authentication, quotas, and hosted persistence. |
+| Framework support    | Experiment with backend frameworks beyond FastAPI through framework-specific generation, worker, validation, and API-contract adapters. | Support different stacks while preserving the draft, check, review, and publication workflow.                                                |
 
-## MCP authoring boundary
+New capabilities should preserve revision-pinned checks, explicit publication,
+reviewed live-data changes, and recovery after uncertain responses. External MCP
+clients and built-in Project AI have different permissions; extending one should
+not silently expand the other.
 
-Read tools include project/draft context, API contracts, mock-data metadata,
-request history and disposable migration preview. Write tools create/edit one
-unpublished draft and prepare synthetic data previews. Validation, tests and
-isolated HTTP calls require execution permission inside Project AI.
-
-There are deliberately no AI approval, activation, live migration/rollback,
-secret-setting, maintenance or live data-insertion tools. Manual management
-operations remain explicit. An exact-revision approval is a local workflow
-boundary, not authentication against another process owned by the same user.
-
-## Frontend scope
-
-The packaged Next.js dashboard and frontend integration of newer management APIs
-are separate work. This backend status does not imply that all dashboard controls
-exist. The standalone HTML dashboard retains the controls described in its guide.
-
-## Operational limits and future extensions
-
-This is a trusted local application. Management APIs are unauthenticated and
-Python has OS/network access; workers are not a hostile-code sandbox. License,
-remote multi-user authorization, hostile-code isolation, real-backend scenario
-execution and a CI runner need separate product/security decisions.
-
-Migrations are declarative, not arbitrary SQL; rebuilds can remove indexes/triggers
-and rollback restores snapshot data. See maintenance docs before applying them.
-Inspection capture and archive sizes are bounded; log subscriptions/unbounded
-payload recording are not implemented. Agent execution advances in explicit steps,
-not as an unattended background repair service. Those extensions are not required
-for the documented local backend workflow.
+[Documentation index](README.md) · [Project overview](../README.md)

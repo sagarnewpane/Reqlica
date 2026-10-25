@@ -123,7 +123,7 @@ export default function EndpointBrowser({ projectId }: { projectId: string }) {
               </div>
               <div className={styles.filters}>
                 <Button asChild variant="secondary">
-                  <Link href={`/projects/${projectId}`}>
+                  <Link href={`/project?projectId=${projectId}`}>
                     <MessageSquare size={16} />
                     Edit in chat
                   </Link>
@@ -165,7 +165,7 @@ export default function EndpointBrowser({ projectId }: { projectId: string }) {
                   Ask the project assistant to prepare routes in a draft, then
                   validate, test, approve, and activate the changes.
                 </p>
-                <Link className={styles.link} href={`/projects/${projectId}`}>
+                <Link className={styles.link} href={`/project?projectId=${projectId}`}>
                   Open project chat →
                 </Link>
               </Card>
@@ -295,7 +295,7 @@ export default function EndpointBrowser({ projectId }: { projectId: string }) {
                       )}
                       <Link
                         className={styles.link}
-                        href={`/projects/${projectId}?prompt=${encodeURIComponent(`Inspect and edit ${selected.method} ${selected.path}, handler ${selected.handler || 'not reported'}. Read existing source first and make changes in an unpublished draft.`)}`}
+                        href={`/project?projectId=${projectId}&prompt=${encodeURIComponent(`Inspect and edit ${selected.method} ${selected.path}, handler ${selected.handler || 'not reported'}. Read existing source first and make changes in an unpublished draft.`)}`}
                       >
                         Open endpoint in chat
                       </Link>

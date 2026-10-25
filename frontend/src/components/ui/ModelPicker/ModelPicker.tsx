@@ -43,7 +43,7 @@ export default function ModelPicker({
       }
       setLoading(true);
       try {
-        const response = await fetch('/api/ai/models', {
+        const response = await fetch('/api/ui/ai/models', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

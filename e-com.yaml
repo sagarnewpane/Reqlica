@@ -1,0 +1,132 @@
+openapi: 3.0.3
+info:
+  title: Shop Demo API
+  version: 1.0.0
+  description: |
+    Small stateful shop demo with login. No signup endpoint.
+    Persist users, sessions, products, and orders in SQLite.
+    Seed one demo user once: demo@example.com with password DemoPass123!.
+    Store a salted password hash, never the plaintext password.
+    Successful login creates a random opaque bearer token stored in sessions.
+    Tokens do not expire in this demo. No JWT, refresh, or logout flow.
+    Both order endpoints require a valid token and use its associated user.
+    Seed these products once, without duplicating them on restart:
+    product 1 is "Notebook" at 500 USD cents;
+    product 2 is "Pen" at 150 USD cents.
+    Each order contains one product and a quantity.
+    Calculate total_cents from the stored product price times quantity.
+
+paths:
+  /auth/login:
+    post:
+      operationId: login
+      summary: Log in with the seeded demo account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: {type: string, example: demo@example.com}
+                password: {type: string, example: DemoPass123!}
+      responses:
+        '200':
+          description: Use access_token as Authorization Bearer on order requests
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [access_token, token_type]
+                properties:
+                  access_token: {type: string}
+                  token_type: {type: string, enum: [bearer]}
+        '401':
+          description: Incorrect email or password
+        '422':
+          description: Missing fields or invalid field types
+
+  /products:
+    get:
+      operationId: listProducts
+      summary: List products by ID ascending
+      responses:
+        '200':
+          description: All products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+
+  /orders:
+    post:
+      operationId: createOrder
+      summary: Save an order for the logged-in user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id, quantity]
+              properties:
+                product_id: {type: integer, minimum: 1, example: 1}
+                quantity: {type: integer, minimum: 1, example: 2}
+      responses:
+        '201':
+          description: Saved order; product 1 with quantity 2 totals 1000 cents
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          description: Product not found; no order saved
+        '401':
+          description: Missing or invalid bearer token
+        '422':
+          description: Missing fields or invalid integers; no order saved
+
+    get:
+      operationId: listMyOrders
+      summary: List only the logged-in user's orders by ID ascending
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The user's saved orders, or an empty array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401':
+          description: Missing or invalid bearer token
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Product:
+      type: object
+      required: [id, name, price_cents]
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        price_cents: {type: integer, minimum: 0}
+
+    Order:
+      type: object
+      required: [id, product_id, quantity, total_cents]
+      properties:
+        id: {type: integer}
+        product_id: {type: integer}
+        quantity: {type: integer, minimum: 1}
+        total_cents: {type: integer, minimum: 0}

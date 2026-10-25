@@ -2,7 +2,11 @@
 
 from typing import Literal
 from urllib.parse import urlsplit, urlunsplit
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+DEFAULT_MODEL_CALL_LIMIT = 24
+DEFAULT_PER_TURN_MODEL_CALL_LIMIT = 16
 
 
 class ProviderEndpoint(BaseModel):
@@ -57,11 +61,19 @@ class AgentRequest(ModelSettings):
     specification: Specification | None = None
     total_token_limit: int = Field(default=100000, ge=1000, le=1000000, strict=True)
     tool_call_limit: int = Field(default=64, ge=1, le=1000, strict=True)
+    model_call_limit: int = Field(default=DEFAULT_MODEL_CALL_LIMIT, ge=1, le=1000, strict=True)
+    per_turn_model_call_limit: int = Field(default=DEFAULT_PER_TURN_MODEL_CALL_LIMIT, ge=1, le=1000, strict=True)
     message: str = Field(min_length=1, max_length=32_768, pattern=r"\S")
     draft_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
     expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     allow_execution: bool = False
     allow_edits: bool = True
+
+    @model_validator(mode="after")
+    def model_call_budgets(self):
+        if self.per_turn_model_call_limit > self.model_call_limit:
+            raise ValueError("Per-turn model calls cannot exceed the conversation model-call limit")
+        return self
 
     @model_validator(mode="after")
     def selected_revision(self):
@@ -87,8 +99,18 @@ class AgentLimitsRequest(BaseModel):
     expected_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
     expected_total_token_limit: int = Field(ge=1000, le=1000000, strict=True)
     expected_tool_call_limit: int = Field(ge=1, le=1000, strict=True)
+    expected_model_call_limit: int = Field(ge=1, le=1000, strict=True)
+    expected_per_turn_model_call_limit: int = Field(ge=1, le=1000, strict=True)
     total_token_limit: int = Field(ge=1000, le=1000000, strict=True)
     tool_call_limit: int = Field(ge=1, le=1000, strict=True)
+    model_call_limit: int = Field(ge=1, le=1000, strict=True)
+    per_turn_model_call_limit: int = Field(ge=1, le=1000, strict=True)
+
+    @model_validator(mode="after")
+    def model_call_budgets(self):
+        if self.per_turn_model_call_limit > self.model_call_limit:
+            raise ValueError("Per-turn model calls cannot exceed the conversation model-call limit")
+        return self
 
 
 class AgentReasoningResetRequest(BaseModel):

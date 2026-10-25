@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/router';
 import Button from '@/components/ui/Button/Button';
 import type { DataPreview } from '@/lib/sample-data';
 import s from '@/components/workspace/Workspace.module.css';
@@ -11,15 +11,19 @@ export default function ChatDataPreview({
   preview: DataPreview;
 }) {
   const [error, setError] = useState('');
-  const [ready, setReady] = useState(false);
+  const router = useRouter();
+  const passed = preview.validation?.status === 'passed';
   return (
     <section className={s.panel}>
       <h2>Generated sample data</h2>
+      {passed && (
+        <p>Ready for your review. No live records have been inserted.</p>
+      )}
       <p>
         {preview.validation?.message || preview.note} Validation:{' '}
         {preview.validation?.status || 'not verified'}.
       </p>
-      <details>
+      <details open>
         <summary>Preview records</summary>
         <pre>
           {JSON.stringify(
@@ -33,28 +37,26 @@ export default function ChatDataPreview({
         <Button
           type="button"
           variant="secondary"
-          onClick={() => {
+          disabled={!passed}
+          onClick={async () => {
             try {
               sessionStorage.setItem(
                 `reqlica:data-handoff:${projectId}`,
                 JSON.stringify(preview),
               );
-              setReady(true);
               setError('');
+              await router.push(
+                `/sample-data?projectId=${projectId}&fromChat=1`,
+              );
             } catch {
               setError(
-                'Browser storage unavailable. Copy or download the preview records.',
+                'Could not open Sample data. Copy the preview records or try again.',
               );
             }
           }}
         >
-          Prepare for Sample data
+          Review mock data
         </Button>
-        {ready && (
-          <Link href={`/sample-data?projectId=${projectId}&fromChat=1`}>
-            Review in Sample data
-          </Link>
-        )}
       </div>
       {error && <p role="alert">{error}</p>}
     </section>

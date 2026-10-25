@@ -49,7 +49,7 @@ export default function ReasoningSelector({
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const response = await fetch('/api/ai/reasoning-options', {
+        const response = await fetch('/api/ui/ai/reasoning-options', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

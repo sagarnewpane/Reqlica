@@ -24,3 +24,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["backend/reqlica"]
+
+[tool.hatch.build.hooks.custom]
+path = "scripts/hatch_build.py"

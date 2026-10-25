@@ -181,6 +181,18 @@ def _execute(job: dict, workspace: Path) -> dict:
         if process.returncode != 0:
             raise ValueError(f"Runner exited with code {process.returncode}")
         summary = str(result.get("output", ""))
+        # unittest prints the test list before tracebacks, and generated code may
+        # fill the captured stream. Keep actionable causes ahead of bounded logs.
+        details = []
+        for failure in (result.get("failures") or [])[:3]:
+            if isinstance(failure, dict):
+                details.append(
+                    str(failure.get("test", "check"))[:512]
+                    + ":\n"
+                    + str(failure.get("output", ""))[-2048:]
+                )
+        if details:
+            summary = "Test failure details:\n" + "\n\n".join(details) + "\n" + summary
         result["output"] = redact_output(
             summary + "\n" + output if summary else output,
             project_values,

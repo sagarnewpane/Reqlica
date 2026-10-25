@@ -59,6 +59,29 @@ class CliTests(unittest.TestCase):
             process.terminate.assert_called_once_with()
             process.wait.assert_called_once_with(timeout=5)
 
+    def test_start_prints_dashboard_and_gateway_urls(self):
+        output = StringIO()
+        with (
+            patch("reqlica.cli.time.sleep", side_effect=KeyboardInterrupt),
+            patch("sys.stdout", output),
+            patch.dict(
+                os.environ,
+                {
+                    "CONSOLE_HOST": "127.0.0.1",
+                    "CONSOLE_PORT": "3100",
+                    "MOCK_HOST": "127.0.0.1",
+                    "MOCK_PORT": "4100",
+                },
+            ),
+        ):
+            self.assertEqual(main(), 0)
+
+        printed = output.getvalue()
+        self.assertIn("Dashboard:    http://127.0.0.1:3100", printed)
+        self.assertIn("Mock gateway: http://127.0.0.1:4100", printed)
+        self.assertIn("http://127.0.0.1:3100/docs", printed)
+        self.assertIn("http://127.0.0.1:3100/mcp", printed)
+
     def test_child_exit_stops_other_server(self):
         self.console.poll.return_value = 1
 

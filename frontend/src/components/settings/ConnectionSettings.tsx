@@ -23,7 +23,7 @@ export default function ConnectionSettings({
         if (active) setTheme(localStorage.getItem('reqlica:theme') || 'system');
       } catch {}
     });
-    fetch('/api/connection')
+    fetch('/api/ui/connection')
       .then((reply) => reply.json())
       .then((data) => {
         if (active) {
@@ -38,27 +38,16 @@ export default function ConnectionSettings({
       active = false;
     };
   }, []);
-  async function request(save = false) {
+  async function request() {
     setBusy(true);
     setError('');
     try {
-      const reply = await fetch(
-        `/api/connection${save ? '' : '?health=1'}`,
-        save
-          ? {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ console: consoleUrl, runtime }),
-            }
-          : undefined,
-      );
+      const reply = await fetch('/api/ui/connection?health=1');
       const data = await reply.json();
       if (!reply.ok) throw new Error(data.error);
       setConsoleUrl(data.console);
       setRuntime(data.runtime);
       setHealth(data.health || {});
-      if (save)
-        setNotice('Connection settings saved for this dashboard server.');
     } catch (reason) {
       setError((reason as Error).message);
     } finally {
@@ -72,32 +61,20 @@ export default function ConnectionSettings({
           <div>
             <h2>Connections and appearance</h2>
             <p>
-              Configure the local console and mock runtime used by this
-              dashboard.
+              Service addresses come from the running Reqlica configuration.
+              Restart Reqlica after changing its host or port settings.
             </p>
           </div>
         </div>
         <div className={s.grid}>
           <div>
             <label htmlFor="console-url">Console URL</label>
-            <Input
-              id="console-url"
-              type="url"
-              value={consoleUrl}
-              disabled={busy}
-              onChange={(e) => setConsoleUrl(e.target.value)}
-            />
+            <Input id="console-url" type="url" value={consoleUrl} readOnly />
             <p>{health.console || 'Not checked'}</p>
           </div>
           <div>
             <label htmlFor="runtime-url">Runtime URL</label>
-            <Input
-              id="runtime-url"
-              type="url"
-              value={runtime}
-              disabled={busy}
-              onChange={(e) => setRuntime(e.target.value)}
-            />
+            <Input id="runtime-url" type="url" value={runtime} readOnly />
             <p>{health.runtime || 'Not checked'}</p>
           </div>
           <div>
@@ -131,12 +108,6 @@ export default function ConnectionSettings({
           </div>
         </div>
         <div className={s.connectionActions}>
-          <Button
-            disabled={busy || !consoleUrl || !runtime}
-            onClick={() => void request(true)}
-          >
-            Save connections
-          </Button>
           <Button
             variant="secondary"
             disabled={busy}

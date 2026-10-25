@@ -319,6 +319,48 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
               </p>
             </div>
             <div>
+              <label htmlFor="model-call-limit">Model calls per chat</label>
+              <Input
+                id="model-call-limit"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={1000}
+                step={1}
+                required
+                value={value.modelCallLimit}
+                onChange={(event) =>
+                  update('modelCallLimit', Number(event.target.value))
+                }
+              />
+              <p>
+                Every model request, including retries. Applies to new chats;
+                use Model & permissions to update an existing chat.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="per-turn-model-call-limit">
+                Model calls per request
+              </label>
+              <Input
+                id="per-turn-model-call-limit"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={1000}
+                step={1}
+                required
+                value={value.perTurnModelCallLimit}
+                onChange={(event) =>
+                  update('perTurnModelCallLimit', Number(event.target.value))
+                }
+              />
+              <p>
+                Stops a single long request from looping. Cannot exceed model
+                calls per chat.
+              </p>
+            </div>
+            <div>
               <label htmlFor="max-tokens">Maximum output tokens</label>
               <Input
                 id="max-tokens"

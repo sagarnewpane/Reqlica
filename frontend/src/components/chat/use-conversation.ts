@@ -364,6 +364,8 @@ export function useConversation({
                 max_tokens: preferences.maxTokens,
                 total_token_limit: preferences.totalTokenLimit,
                 tool_call_limit: preferences.toolCallLimit,
+                model_call_limit: preferences.modelCallLimit,
+                per_turn_model_call_limit: preferences.perTurnModelCallLimit,
                 timeout_seconds: preferences.timeoutSeconds,
                 reasoning_mode: reasoningMode,
                 ...(selectedDraft
@@ -526,7 +528,12 @@ export function useConversation({
     setActivity(null);
   }
 
-  async function changeLimits(totalTokenLimit: number, toolCallLimit: number) {
+  async function changeLimits(
+    totalTokenLimit: number,
+    toolCallLimit: number,
+    modelCallLimit: number,
+    perTurnModelCallLimit: number,
+  ) {
     const generation = epoch.current;
     const currentLifecycle = () =>
       alive.current && generation === epoch.current;
@@ -543,8 +550,13 @@ export function useConversation({
           expected_revision: run.revision,
           expected_total_token_limit: run.limits?.total_tokens ?? 100000,
           expected_tool_call_limit: run.limits?.tool_calls ?? 64,
+          expected_model_call_limit: run.limits?.model_calls ?? 24,
+          expected_per_turn_model_call_limit:
+            run.limits?.model_calls_per_turn ?? 16,
           total_token_limit: totalTokenLimit,
           tool_call_limit: toolCallLimit,
+          model_call_limit: modelCallLimit,
+          per_turn_model_call_limit: perTurnModelCallLimit,
         },
       );
       if (currentLifecycle()) accept(result);

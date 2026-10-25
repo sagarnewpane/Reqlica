@@ -38,7 +38,7 @@ function mount(file, props, dependencies) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
   vm.runInNewContext(source, {
-    exports, Promise, AbortController, setTimeout, clearTimeout,
+    exports, Promise, AbortController, setTimeout, clearTimeout, window: { addEventListener() {}, removeEventListener() {} },
     require(name) {
       if (name === 'react') return react;
       if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'Fragment' };
@@ -83,6 +83,7 @@ test('profiles have an explicit create/cancel flow using the current connection,
     '@/lib/ids': { newUuid: () => 'profile-id' },
     '@/lib/model-profiles': {
       readModelProfiles: () => [],
+      subscribeModelProfiles: () => () => {},
       modelConnection: value => ({ ...value }),
       saveModelProfile: profile => { saved = profile; return [profile]; },
     },
@@ -115,7 +116,7 @@ test('saved keys hide replacement fields until requested, and cancel preserves t
     projectId: 'a'.repeat(32), provider: 'groq', baseUrl: '',
     onPendingChange: value => { pending = value; }, onBusyChange() {}, onChanged() {},
   }, {
-    '@/lib/chat': { workspaceRequest: async (...args) => { requests.push(args); return { configured: true }; } },
+    '@/lib/ai-settings': { aiSettingsRequest: async (...args) => { requests.push(args); return { configured: true }; } },
   });
   app.render();
   await new Promise(resolve => setTimeout(resolve, 400));
@@ -131,7 +132,7 @@ test('saved keys hide replacement fields until requested, and cancel preserves t
   assert.equal(pending, false);
   assert.ok(button(tree, 'Replace key'));
   assert.equal(requests.length, 1);
-  assert.equal(requests[0][1], 'ai/key/status');
+  assert.equal(requests[0][0], 'key/status');
   app.unmount();
 });
 

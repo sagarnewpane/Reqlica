@@ -488,7 +488,7 @@ export default function ProjectChat({
         <ConversationBudgets
           key={
             run
-              ? `${run.id}:${run.limits?.total_tokens}:${run.limits?.tool_calls}`
+              ? `${run.id}:${run.limits?.total_tokens}:${run.limits?.tool_calls}:${run.limits?.model_calls}:${run.limits?.model_calls_per_turn}`
               : 'new'
           }
           run={run}

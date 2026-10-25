@@ -1,199 +1,144 @@
 # Reqlica
 
-![Alt text](logo.png)
+![Reqlica logo](logo.png)
 
-A self-hosted mock backend tool for frontend developers and QA engineers.
-The goal is to generate stateful Python APIs from descriptions or API specs,
-then review, test, and publish them without waiting for a production backend.
+Reqlica is a self-hosted mock backend for frontend developers and QA engineers.
+Turn a description or API specification into a stateful Python API, check it on
+copies of your data, then review and publish it. Published endpoints run Python
+against persistent SQLite data without a model call for each request.
 
-## Current Status
+## Project documentation
 
-The backend supports manually written FastAPI handlers, independent project
-workers, persistent SQLite data, and a draft/test/approval/version workflow through
-the CLI and management APIs. AI clients can now create and check endpoint drafts
-through the console's built-in HTTP MCP server.
+- [Architecture overview](docs/architecture.md)
+- [Technology details](docs/technology.md)
+- [Limitations](docs/limitations.md) and [future improvements](docs/roadmap.md)
+- [AI usage disclosure and Build with AI](docs/ai-usage.md)
 
-The standalone HTML dashboard provides one **Project AI** conversation for questions,
-specifications, endpoint changes, repairs, checks, and mock-data previews through MCP.
-See the [conversation guide](docs/mcp.md#project-ai-inside-the-dashboard).
-The backend includes declarative schema migrations/rollback, project relocation,
-full workspace archives, baseline reset and active-project ZIP import/export.
-The packaged Next.js dashboard remains separate.
-See the [roadmap](docs/roadmap.md).
+Supporting setup, workflow, and API guides are in [docs/guides/](docs/guides/README.md).
 
-## Quick Start
+## What it does
+
+- **AI-assisted API authoring:** one saved conversation for specifications,
+  endpoint creation, changes, tests, and repairs through MCP tools.
+- **Review before publication:** editable drafts, revision-linked validation and
+  behavior tests, then separate human approval and activation.
+- **Stateful mock APIs:** independent project workers and persistent SQLite data,
+  including generated signup/login flows when requested and properly configured.
+- **Reliable sample-data preparation:** JSON, single-table, and related-record
+  previews; a passed preview pauses for your review. Live insertion requires
+  separate confirmation.
+- **Client testing:** request tester and chains, OpenAPI/Swagger, mock access
+  rules, delays, failures, rate limits, CORS, and request/error inspection.
+- **Local project management:** environment variables, reviewed package installs,
+  database setup/migrations, baselines, backups, and project transfer.
+
+See [feature status](docs/guides/feature-status.md) for coverage and
+[limitations](docs/limitations.md) before running generated code.
+
+## Quick start
 
 Requires Python 3.12+, [uv](https://docs.astral.sh/uv/getting-started/installation/),
-and macOS or Linux. From the repository root:
+macOS or Linux, and Node.js 20.9+ with npm to build the dashboard. From the repository root:
 
 ```bash
 uv sync --locked
+npm --prefix frontend ci
+python3 scripts/build_frontend.py
 uv run reqlica start
 ```
 
-Default addresses:
+| Service                              | Default address           |
+| ------------------------------------ | ------------------------- |
+| Dashboard and console management API | http://127.0.0.1:3000     |
+| Mock gateway                         | http://127.0.0.1:4000     |
+| MCP, using Streamable HTTP           | http://127.0.0.1:3000/mcp |
 
-- Console management API: `http://127.0.0.1:3000`
-- Mock gateway: `http://127.0.0.1:4000`
-- MCP for AI clients (Streamable HTTP): `http://127.0.0.1:3000/mcp`
-- Interactive API reference: `/docs` on either server
+Both servers expose interactive management API documentation at `/docs`.
+Configure hosts, ports, and `REQLICA_HOME` through environment variables or the
+checkout's root `.env`. Installed wheels include the dashboard and need no Node.js
+server. See [installation](docs/guides/installation.md) for building a local wheel.
 
-Override hosts, ports, or `REQLICA_HOME` in the root `.env` or environment.
-Press `Ctrl+C` to stop the servers and workers; project files and data remain.
+## Try a stateful API without an AI account
 
-## Create a Project
-
-In another terminal, choose a new or empty directory:
+In another terminal:
 
 ```bash
-uv run reqlica project create /path/to/books --name "Book API"
+uv run reqlica demo /absolute/new/bookstore
+```
+
+Use the printed project ID in place of `PROJECT_ID`:
+
+```bash
+curl http://127.0.0.1:4000/mock/PROJECT_ID/books
+curl -X POST http://127.0.0.1:4000/mock/PROJECT_ID/orders \
+  -H 'Content-Type: application/json' -d '{"book_id":1,"quantity":1}'
+curl http://127.0.0.1:4000/mock/PROJECT_ID/books
+```
+
+Creating an order updates stock in the same SQLite transaction. Records survive
+worker restarts. To create a starter project instead:
+
+```bash
+uv run reqlica project create /absolute/new/books --name "Book API"
 uv run reqlica project list
-curl http://127.0.0.1:4000/mock/<project-id>/hello
 ```
 
-Creation prints the project ID and sample endpoint URL. The first request starts
-its worker automatically. Manage it with:
+The dashboard can also create projects. Paths refer to the machine running
+Reqlica. Press `Ctrl+C` in the server terminal to stop servers and workers while
+keeping saved projects and data.
 
-```bash
-uv run reqlica project endpoints <project-id>
-uv run reqlica project stop <project-id>
-uv run reqlica project start <project-id>
-```
+## Build with Project AI
 
-The gateway also accepts `POST /api/projects` with
-`{"directory": "/absolute/path/to/books", "name": "Book API"}` and returns the
-created idle project with HTTP `201`. The standalone
-`backend/reqlica/reqlicav1.html` dashboard can create and delete projects; its
-**Connection & help** section includes the local server launcher.
+1. Open a project and configure a tool-capable model in Settings. Supported
+   connections are Groq, OpenAI, OpenAI-compatible APIs, and local Ollama.
+2. Describe the API or attach an OpenAPI specification in Project chat. Review
+   the selected context and draft-edit/execution permissions before sending.
+3. Inspect generated files, registered routes, and actual check results in Drafts.
+   Configure required environment variables and review database plans separately.
+4. Run validation and behavior tests for the final revision, review the source,
+   then explicitly approve and activate it.
+5. Use the request tester or a client against `/mock/PROJECT_ID/...`.
 
-In **Request tester**, choose a route shortcut and click **Insert example** to
-fill its path/query and JSON body from saved OpenAPI examples, defaults, or types.
-This never sends the request and keeps custom headers. Review sample values and
-record IDs before sending. Drafts need current validation; live contracts become
-available after validated activation. Missing contracts leave inputs unchanged.
+The same conversation handles clarifications and repairs. Data preparation uses
+Sample data: validated previews stop for review and never insert live records
+through Project AI. Test signup/login sequences in one behavior test run; separate
+draft requests each discard their data changes.
 
-**Project AI** is one conversation for understanding the project, building from an
-attached/pasted specification, changing endpoints, repairing drafts, running checks,
-and preparing synthetic data previews. The same composer handles clarifications
-and follow-ups, keeping the assigned draft, provider, permissions, and remaining
-budget. Expand **Conversation setup** to select context, disable draft edits, or
-allow validation/tests/disposable requests. Questions should not create drafts;
-read-only permission also blocks editing tools on the server.
+External tool-capable agents can connect directly to the
+[MCP server](docs/guides/mcp.md). Built-in Project AI cannot approve or publish code,
+install packages, set secrets, or mutate live data. Some external MCP maintenance
+tools support explicit, human-confirmed operations; their scope is documented.
 
-Tool actions are expandable; checks remain tied to the exact source revision.
-Conversations persist in private local checkpoints and support pause/resume.
-Earlier read-only chats remain viewable as archives. Saved drafts remain in
-**Drafts & checks**; the retired generation engine cannot resume old jobs.
-See [Project AI and MCP](docs/mcp.md#project-ai-inside-the-dashboard).
+## How AI is part of the core logic
 
-**Endpoints → Edit source** still opens a handler in a fresh manual draft.
-**Modify in Project AI**, failed-check repair, and mock-data preparation prefill
-the conversation without making an AI request. Data previews open in **Mock data**
-for manual editing, validation, copying/downloading, and separately confirmed
-append-only insertion into existing tables. The AI cannot insert live rows.
-Manual source/routes, checks, request testing, database setup, environment values,
-approval, and activation remain available. See [mock data](docs/mock-data.md).
+Reqlica uses AI to transform requirements and specifications into structured tool
+calls, Python handlers, tests, route definitions, and synthetic record batches.
+The backend parses and validates those outputs, saves drafts, executes permitted
+checks, and feeds diagnostics back into the repair loop. These outputs change
+executable API behavior and validate datasets.
 
-Generated APIs can now include a declarative `database/schema.json` plan. In
-**Drafts & checks → Database setup**, review the SQL, validate/test on disposable
-copies, then confirm creating new live tables with a pre-change backup. Existing
-tables/records are preserved; code approval and activation remain separate.
-See [`docs/database-setup.md`](docs/database-setup.md). Existing table changes use separate [reviewed migration plans](docs/maintenance.md).
+The exact programmatic consumption point is `step_run()` in
+[`backend/reqlica/generation/agent.py`](backend/reqlica/generation/agent.py), which
+consumes the model's `tool_calls`; `_execute_tool()` validates arguments and
+executes allowed MCP actions. See [AI usage disclosure](docs/ai-usage.md) for the
+full code path and development assistance statement.
 
-For code expecting `JWT_SECRET` or another application variable, open
-**Settings → Project environment**. Save a value or generate a secure JWT key,
-rerun draft checks, and explicitly restart the published API. Values are stored
-privately per project, never shown by settings APIs or sent to AI. See
-[`docs/environment.md`](docs/environment.md) for security boundaries and limits.
-
-Project AI handles questions, clarification, implementation and repair in one saved
-conversation. Tool-capable Groq, OpenAI, compatible providers and local Ollama can
-be configured; Anthropic remains preview-only. Edits and execution permissions
-are server-enforced. Failed checks return feedback for repairs in the same draft;
-there is no separate fixed two-attempt repair engine. Dependencies are checked
-without automatic installation. To install a missing library manually through
-the dashboard, use **Settings → Python packages** to resolve, review, and confirm
-an installation into the shared virtual environment. See the
-[package installation guide](docs/installation.md#install-missing-libraries-from-the-html-dashboard)
-and [Project AI](docs/generation.md).
-
-Remove a project through the running gateway (confirmation required):
-
-```bash
-uv run reqlica project delete "Book API"                # Unregister; keep files/data
-uv run reqlica project delete <project-id> --delete-files # Also erase the project folder
-```
-
-Names and unique ID prefixes of six or more characters work. Add `--yes` to
-confirm non-interactively. Deletion stops the worker and clears registry/runtime
-state without restarting Reqlica; `project stop` alone does not remove a project.
-
-## Change an API
-
-Published mock routes can require per-project bearer credentials or API keys,
-including expired credentials for client testing. Configure them through the
-console API; see [mock authentication](docs/mock-authentication.md).
-Per-route delays, synthetic failures (including the next N requests), and empty
-responses are configurable through [gateway scenarios](docs/scenarios.md).
-Rules also support [per-route and per-test-user rate limits](docs/rate-limits.md)
-with HTTP 429 and `Retry-After` responses.
-Inspect published request statuses, timings and correlated Python errors through
-the [request history API and MCP](docs/inspection.md).
-Save a SQLite baseline and restore it with a pre-reset backup, or rearm scenario
-counters through the [reset APIs](docs/reset.md).
-Copy active projects between installations using [validated ZIP export/import](docs/project-transfer.md).
-Configure per-project browser origins, preflights and credentials through
-[CORS settings](docs/cors.md).
-External MCP clients can manage traffic policies, worker lifecycle, baselines/reset,
-migration history and project archives/moves through the
-[project operations tools](docs/mcp.md#project-operations). Live changes require
-explicit human confirmation and current revisions; Project AI gets inspection only.
-
-Create a draft rather than editing published versions:
-
-```bash
-uv run reqlica draft create <project-id> --json
-uv run reqlica draft inspect <project-id> <draft-id>
-```
-
-For human checks, use a project name or unique ID prefix and a draft ID prefix
-(six or more characters), without copying a revision hash:
-
-```bash
-uv run reqlica draft validate "Book API" <draft-prefix>
-uv run reqlica draft test "Book API" <draft-prefix>
-uv run reqlica draft url "Book API" <draft-prefix> /hello
-```
-
-The URL previews current draft code using disposable data. `draft call` also
-resolves the revision automatically; explicit `--revision` is still supported.
-
-Validation also saves revision-linked OpenAPI. Ask MCP's `get_api_schema` for
-request/response formats, or `get_draft_urls` for Swagger and JSON links. See the
-[API schema guide](docs/api-schemas.md); unknown/free-form contracts produce warnings
-rather than guessed payloads.
-
-Edit draft files/routes, validate and test the exact revision, then explicitly
-approve and activate it. Draft checks use disposable database copies and do not
-change live records through the SDK. See the [draft and version guide](docs/persistence-drafts-versions.md)
-for commands, examples, legacy conversion, and recovery.
-
-## Development
-
-Run backend tests:
+## Development and documentation
 
 ```bash
 uv run python -m unittest discover -s tests
+npm --prefix frontend run typecheck
+npm --prefix frontend run lint
+npm --prefix frontend run format:check
+npm --prefix frontend test
 ```
 
-- [Development guide](docs/development.md): configuration, troubleshooting, project APIs, and code layout.
-- [Drafts and versions](docs/persistence-drafts-versions.md): editing, checks, approval, persistence, and activation.
-- [MCP tools](docs/mcp.md): connect an AI client and generate endpoint drafts.
-- [API schemas](docs/api-schemas.md): generated contracts and draft/published Swagger docs.
-- [Roadmap and design](docs/roadmap.md): planned features, MCP tools, and development order.
+See the [development guide](docs/guides/development.md) for configuration and
+troubleshooting.
 
-**Local trusted use only:** management APIs are unauthenticated. Keep servers on
-loopback and only load trusted Python; separate workers are not a security sandbox.
+See the [documentation index](docs/README.md), [supporting guides](docs/guides/README.md),
+and [frontend development guide](frontend/README.md).
 
-Backend installation and the stateful bookstore demo: [installation](docs/installation.md).
-Relocation, full workspace backup, migrations and rollback: [maintenance](docs/maintenance.md).
+**Trusted local use:** management APIs and MCP are unauthenticated. Keep them on
+loopback. Generated Python runs with your OS and network permissions; separate
+workers and disposable databases are not a security sandbox.

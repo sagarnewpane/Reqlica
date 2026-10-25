@@ -282,7 +282,7 @@ export default function DraftWorkspace({
               Create a draft here or ask the project assistant to prepare a
               change.
             </p>
-            <Link href={`/projects/${projectId}`}>Open project chat →</Link>
+            <Link href={`/project?projectId=${projectId}`}>Open project chat →</Link>
           </div>
         )}
         {selected && !detail && !error && (
@@ -555,7 +555,7 @@ export default function DraftWorkspace({
           <h2>Check result</h2>
           {detail && (
             <Link
-              href={`/projects/${projectId}?draftId=${detail.id}&prompt=${encodeURIComponent('Repair the current draft using its saved validation and test failures. Inspect the draft and failures first; fix the cause, then rerun checks when execution is enabled.')}`}
+              href={`/project?projectId=${projectId}&draftId=${detail.id}&prompt=${encodeURIComponent('Repair the current draft using its saved validation and test failures. Inspect the draft and failures first; fix the cause, then rerun checks when execution is enabled.')}`}
             >
               Open this draft and failures in chat
             </Link>

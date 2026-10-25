@@ -12,6 +12,8 @@ export type ChatSettings = {
   maxTokens: number;
   totalTokenLimit: number;
   toolCallLimit: number;
+  modelCallLimit: number;
+  perTurnModelCallLimit: number;
   timeoutSeconds: number;
 };
 export const defaultSettings: ChatSettings = {
@@ -25,6 +27,8 @@ export const defaultSettings: ChatSettings = {
   maxTokens: 8192,
   totalTokenLimit: 100000,
   toolCallLimit: 64,
+  modelCallLimit: 24,
+  perTurnModelCallLimit: 16,
   timeoutSeconds: 300,
 };
 const key = (projectId?: string) =>
@@ -91,6 +95,20 @@ export function validateSettings(value: ChatSettings): string | null {
     value.toolCallLimit > 1000
   )
     return 'Tool-call limit must be between 1 and 1,000.';
+  if (
+    !Number.isInteger(value.modelCallLimit) ||
+    value.modelCallLimit < 1 ||
+    value.modelCallLimit > 1000
+  )
+    return 'Model-call limit must be between 1 and 1,000.';
+  if (
+    !Number.isInteger(value.perTurnModelCallLimit) ||
+    value.perTurnModelCallLimit < 1 ||
+    value.perTurnModelCallLimit > 1000
+  )
+    return 'Per-request model-call limit must be between 1 and 1,000.';
+  if (value.perTurnModelCallLimit > value.modelCallLimit)
+    return 'Per-request model calls cannot exceed the per-chat model-call limit.';
   if (
     !Number.isInteger(value.timeoutSeconds) ||
     value.timeoutSeconds < 30 ||

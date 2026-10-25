@@ -6,7 +6,7 @@ export async function aiSettingsRequest<T>(
   body: unknown,
   signal?: AbortSignal,
 ): Promise<T> {
-  const response = await fetch(`/api/ai/${path}`, {
+  const response = await fetch(`/api/ui/ai/${path}`, {
     method,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

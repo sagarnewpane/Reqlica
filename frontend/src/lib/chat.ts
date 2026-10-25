@@ -106,7 +106,7 @@ export async function workspaceRequest<T>(
   key?: string,
   options?: { activityId?: string; signal?: AbortSignal },
 ): Promise<T> {
-  const response = await fetch(`/api/projects/${projectId}/${path}`, {
+  const response = await fetch(`/api/ui/projects/${projectId}/${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',

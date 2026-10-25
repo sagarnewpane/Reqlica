@@ -6,3 +6,6 @@ frontend-qa-commerce/
 .ruff_cache/
 .qa-seat-hold-20261024/
 frontend/.reqlica-connections.json*
+backend/reqlica/static/
+frontend/out/
+dist/

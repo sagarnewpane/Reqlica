@@ -79,7 +79,7 @@ export default function ContractViewer({
   const [attempt, setAttempt] = useState(0);
   const root = draftId ? `drafts/${draftId}/` : '';
   const schemaPath = `${root}openapi.json${revision ? `?revision=${revision}` : ''}`;
-  const docsUrl = `/api/projects/${projectId}/${root}docs`;
+  const docsUrl = `/api/ui/projects/${projectId}/${root}docs`;
   useEffect(() => {
     let active = true;
     Promise.resolve().then(async () => {
@@ -143,7 +143,7 @@ export default function ContractViewer({
                 Open Swagger ↗
               </a>
               <a
-                href={`/api/projects/${projectId}/${schemaPath}`}
+                href={`/api/ui/projects/${projectId}/${schemaPath}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -152,7 +152,7 @@ export default function ContractViewer({
               {(['json', 'yaml'] as const).map((format) => (
                 <a
                   key={format}
-                  href={`/api/projects/${projectId}/schema-export?${new URLSearchParams(
+                  href={`/api/ui/projects/${projectId}/schema-export?${new URLSearchParams(
                     {
                       revision:
                         document['x-reqlica-revision'] || revision || '',

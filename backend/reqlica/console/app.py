@@ -11,6 +11,11 @@ from pathlib import Path
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.exception_handlers import http_exception_handler
+from starlette.exceptions import HTTPException
+from starlette.responses import JSONResponse
+from reqlica.console import dashboard_api
+from reqlica.console.dashboard import Dashboard
 from reqlica.console.routes import (
     cors,
     data,
@@ -38,8 +43,8 @@ def health() -> dict[str, str]:
     return {"status": "ok", "service": "reqlica-console"}
 
 
-def create_app() -> FastAPI:
-    """Expose MCP automatically with the console, sharing its host and port."""
+def create_app(*, frontend_directory: Path | None = None) -> FastAPI:
+    """Serve the dashboard, management API, and MCP on one host and port."""
     mcp = create_server()
     mcp_app = mcp.streamable_http_app()
 
@@ -49,6 +54,18 @@ def create_app() -> FastAPI:
             yield
 
     app = FastAPI(title="Console", lifespan=lifespan)
+
+    @app.exception_handler(HTTPException)
+    async def dashboard_error(request, error):
+        if request.url.path.startswith("/api/ui/"):
+            return JSONResponse(
+                {"error": error.detail},
+                status_code=error.status_code,
+                headers={**(error.headers or {}), "Cache-Control": "no-store"},
+            )
+        return await http_exception_handler(request, error)
+
+    app.include_router(dashboard_api.router)
     app.include_router(drafts.router)
     app.include_router(validation.router)
     app.include_router(preview.router)
@@ -70,8 +87,8 @@ def create_app() -> FastAPI:
     app.include_router(workspace.router)
     app.include_router(packages.router)
     app.add_api_route("/api/health", health, methods=["GET"], tags=["Console"])
-    # Keep this last: the transport handles /mcp and returns 404 for other paths.
-    app.mount("/", mcp_app)
+    # API routes take precedence over dashboard files and the MCP transport.
+    app.mount("/", Dashboard(mcp_app, frontend_directory))
     return app
 
 

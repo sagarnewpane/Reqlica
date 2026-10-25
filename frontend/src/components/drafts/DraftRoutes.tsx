@@ -87,7 +87,7 @@ export default function DraftRoutes({
                 Remove route
               </Button>
               <Link
-                href={`/projects/${projectId}?draftId=${draft.id}&source=${encodeURIComponent(route.handler)}&prompt=${encodeURIComponent(`Review and repair ${route.method} ${route.path} in ${route.handler}. Inspect the saved draft and current failures first.`)}`}
+                href={`/project?projectId=${projectId}&draftId=${draft.id}&source=${encodeURIComponent(route.handler)}&prompt=${encodeURIComponent(`Review and repair ${route.method} ${route.path} in ${route.handler}. Inspect the saved draft and current failures first.`)}`}
               >
                 Review in chat
               </Link>

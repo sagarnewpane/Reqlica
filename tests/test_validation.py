@@ -112,6 +112,22 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(result["tests_run"], 0)
         self.assertEqual(result["tests_passed"], 0)
 
+    def test_failure_cause_survives_noisy_output_and_handler_coverage_warning(self):
+        self.write("endpoints/hello.py", "def hello(body):\n    return body\n")
+        self.write(
+            "tests/test_hello.py",
+            "import unittest\nfrom endpoints.hello import hello\n"
+            "class AuthTests(unittest.TestCase):\n"
+            "    def test_stale_signature(self):\n"
+            "        print('noise' * 10000, flush=True)\n"
+            "        hello({}, {})\n",
+        )
+        result = test_draft(*self.arguments())
+        self.assertEqual(result["status"], "failed", result)
+        self.assertIn("TypeError: hello() takes 1 positional argument but 2 were given", result["output"][:3000])
+        self.assertIn("Changed handlers were not exercised", result["output"])
+        self.assertLessEqual(len(result["output"]), OUTPUT_LIMIT)
+
     def test_undefined_names_in_unexecuted_handler_branches_fail_before_import(self):
         marker = self.root / "imported"
         self.write(

@@ -91,6 +91,70 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(self.run["status"], "failed" if index == 2 else "ready")
         self.assertEqual(self.run["error"]["code"], "repeated_tool_rejection")
 
+    def test_failed_test_cannot_loop_on_successful_context_reads(self):
+        self.create(allow_execution=True)
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="tests/test_hello.py", content=(
+            "import unittest\nclass ShopTests(unittest.TestCase):\n"
+            "    def test_order(self):\n        self.fail('401: User not found')\n"))
+        self.tool("test_draft")
+        self.assertEqual(self.run["events"][-1]["status"], "failed")
+        self.tool("get_project_context", source_paths=["tests/test_hello.py"])
+        self.assertEqual(self.run["events"][-1]["status"], "done")
+        self.tool("get_project_context", source_paths=["tests/test_hello.py"])
+        self.assertEqual(self.run["events"][-1]["status"], "error")
+        # Reading a different file must not reset the unresolved repair count.
+        self.tool("get_project_context", source_paths=["endpoints/hello.py"])
+        self.assertEqual(self.run["events"][-1]["status"], "done")
+        self.tool("get_project_context", source_paths=["tests/test_hello.py"])
+        self.assertEqual(self.run["status"], "failed")
+        self.assertEqual(self.run["error"]["code"], "repeated_tool_rejection")
+        saved = agent._read(agent._path(self.project.id, self.run_id))
+        self.assertFalse(saved["pending"])
+        self.assertEqual(saved["unresolved_tool_failure"], "test_draft")
+        self.assertEqual(json.loads(saved["messages"][-1]["content"])["code"], "repair_read_loop")
+
+    def test_repair_inspection_is_bounded_and_new_revision_can_be_read(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+        self.create()
+        run = agent._read(agent._path(self.project.id, self.run_id))
+        run.update(repair_required=True, unresolved_tool_failure="test_draft")
+        session = SimpleNamespace(call_tool=AsyncMock(return_value=SimpleNamespace(
+            isError=False, structuredContent={"source": {}})))
+        for index in range(agent.MAX_REPAIR_READS + 1):
+            call = tool_message("get_project_context", {"source_paths": [f"support_{index}.py"]})["tool_calls"][0]
+            asyncio.run(agent._tool(session, self.project.id, run, call))
+        self.assertEqual(session.call_tool.await_count, agent.MAX_REPAIR_READS)
+        self.assertEqual(json.loads(run["messages"][-1]["content"])["code"], "repair_read_loop")
+        run["revision"] = "new-repaired-revision"
+        asyncio.run(agent._tool(session, self.project.id, run, call))
+        self.assertEqual(session.call_tool.await_count, agent.MAX_REPAIR_READS + 1)
+        self.assertEqual(run["events"][-1]["status"], "done")
+
+    def test_context_loop_feedback_allows_a_saved_repair_and_retest(self):
+        self.create(allow_execution=True)
+        self.tool("create_draft")
+        source = (
+            "import unittest\nfrom endpoints.hello import hello\n"
+            "class HelloTests(unittest.TestCase):\n"
+            "    def test_hello(self):\n"
+            "        self.assertEqual(hello()['message'], 'wrong')\n"
+        )
+        self.tool("write_draft_file", path="tests/test_hello.py", content=source)
+        self.tool("test_draft")
+        self.tool("get_project_context", source_paths=["tests/test_hello.py"])
+        self.tool("get_project_context", source_paths=["tests/test_hello.py"])
+        self.assertEqual(self.run["events"][-1]["status"], "error")
+        self.tool("write_draft_file", path="tests/test_hello.py", content=source.replace("'wrong'", "'Hello from Reqlica'"))
+        saved = agent._read(agent._path(self.project.id, self.run_id))
+        self.assertNotIn("unresolved_tool_failure", saved)
+        self.assertNotIn("tool_repair_attempts", saved)
+        self.tool("get_project_context", source_paths=["tests/test_hello.py"])
+        self.assertEqual(self.run["events"][-1]["status"], "done")
+        self.tool("test_draft")
+        self.assertEqual(self.run["checks"]["test_draft"]["status"], "passed")
+
     def test_unresolved_tool_error_cannot_be_hidden_by_final_success_claim(self):
         self.create()
         self.tool("create_draft")
@@ -597,6 +661,12 @@ class AgentTests(unittest.TestCase):
                 self.assertEqual(preview["validation"]["status"], "passed", self.run)
                 self.assertEqual(preview["target"], settings["target"])
                 self.assertEqual(path.read_bytes(), database)
+                self.assertEqual(self.run["status"], "completed")
+                self.assertTrue(self.run["can_reply"])
+                response = self.post_reply(self.reply_body(message="Prepare another batch"))
+                self.assertEqual(response.status_code, 200, response.text)
+                self.run = response.json()
+                self.assertIsNone(self.run["data_preview"])
         self.tool("preview_mock_data", target="sqlite", table="users", expected_schema=schema,
                   records_json='[{"name":"private-existing-name"}]')
         self.assertEqual(self.run["events"][-1]["status"], "failed")
@@ -607,6 +677,86 @@ class AgentTests(unittest.TestCase):
         self.tool("insert_data", records=[{"name": "unauthorized"}])
         self.assertEqual(self.run["events"][-1]["status"], "error")
         self.assertEqual(path.read_bytes(), database)
+
+    def test_passed_preview_stops_batch_for_human_review_without_more_model_calls(self):
+        self.create(allow_edits=True, allow_execution=True)
+        self.tool("discover_tools", groups=["data"])
+        batch = tool_message("preview_mock_data", {"target": "json", "records_json": '[{"name":"Ava"}]'})
+        batch["tool_calls"] += tool_message("finish_task", {})["tool_calls"]
+        batch["tool_calls"] += tool_message("create_draft", {})["tool_calls"]
+        self.complete.return_value = (batch, {"total_tokens": 10})
+        self.step()
+        exposed = {item["function"]["name"] for item in self.complete.call_args.kwargs["tools"]}
+        self.assertIn("preview_mock_data", exposed)
+        self.assertIn("get_mock_data_context", exposed)
+        self.assertNotIn("create_draft", exposed)
+        result = self.step()
+        self.assertEqual(result["status"], "completed", result)
+        self.assertTrue(result["can_reply"])
+        self.assertIn("review", result["answer"])
+        self.assertIsNone(result["draft_id"])
+        self.assertEqual(result["tool_calls"], 2)
+        self.assertEqual([e["status"] for e in result["events"][-2:]], ["skipped", "skipped"])
+        self.assertEqual(self.step(), result)
+        self.assertEqual(self.complete.call_count, 2)
+        saved = agent._read(agent._path(self.project.id, self.run_id))
+        self.assertFalse(saved["pending"])
+        for call in batch["tool_calls"]:
+            self.assertTrue(any(m.get("tool_call_id") == call["id"] for m in saved["messages"]))
+
+    def test_finish_task_without_code_draft_ends_turn(self):
+        self.create(allow_edits=False)
+        self.complete.return_value = (tool_message("finish_task", {}), None)
+        self.step()
+        result = self.step()
+        self.assertEqual(result["status"], "completed", result)
+        self.assertIsNone(result["draft_id"])
+        self.assertTrue(result["can_reply"])
+        self.assertEqual(self.step(), result)
+        self.assertEqual(self.complete.call_count, 1)
+
+    def test_invalid_preview_requires_correction_before_review_handoff(self):
+        path = self.project.directory / "data.sqlite"
+        with sqlite3.connect(path) as db:
+            db.executescript("CREATE TABLE users(name TEXT UNIQUE); INSERT INTO users VALUES('Taken');")
+        database = path.read_bytes()
+        self.create(allow_edits=False)
+        self.tool("get_mock_data_context")
+        saved = agent._read(agent._path(self.project.id, self.run_id))
+        schema = json.loads(saved["messages"][-1]["content"])["schema"]["fingerprint"]
+        self.tool("preview_mock_data", target="sqlite", table="users", expected_schema=schema,
+                  records_json='[{"name":"Taken"}]')
+        self.assertEqual(self.run["status"], "ready")
+        self.assertFalse(self.run["can_reply"])
+        self.assertEqual(self.run["data_preview"]["validation"]["status"], "failed")
+        self.tool("preview_mock_data", target="sqlite", table="users", expected_schema=schema,
+                  records_json='[{"name":"Available"}]')
+        self.assertEqual(self.run["status"], "completed")
+        self.assertTrue(self.run["can_reply"])
+        self.assertEqual(self.run["data_preview"]["validation"]["status"], "passed")
+        self.assertEqual(path.read_bytes(), database)
+
+    def test_preview_at_budget_boundary_stops_without_another_finish_call(self):
+        self.create(allow_edits=False, model_call_limit=1, per_turn_model_call_limit=1, tool_call_limit=1)
+        self.complete.return_value = (tool_message("preview_mock_data", {
+            "records_json": '[{"name":"Ava"}]'}), None)
+        self.step()
+        result = self.step()
+        self.assertEqual(result["status"], "completed", result)
+        self.assertIsNone(result["error"])
+        self.assertEqual(self.step(), result)
+        self.assertEqual(self.complete.call_count, 1)
+
+    def test_repeated_finish_without_fixing_unregistered_handler_is_bounded(self):
+        self.create()
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="endpoints/greetings.py", content=HANDLER)
+        for expected in ["ready", "failed"]:
+            self.complete.return_value = (tool_message("finish_task", {}), None)
+            self.step()
+            self.assertEqual(self.step()["status"], expected)
+        self.assertEqual(self.run["error"]["code"], "repair_exhausted")
+        self.assertLess(self.run["tool_calls"], agent.MAX_TOOL_CALLS)
 
     def test_full_build_reads_edits_checks_and_never_publishes(self):
         before = content_digest(code_directory(self.project))
@@ -902,7 +1052,78 @@ class AgentTests(unittest.TestCase):
         agent._save(path, checkpoint)
         self.assertEqual(self.step()["status"], "limit")
         self.assertIn("16 model calls", self.run["error"]["message"])
+        self.assertIn("per-turn limit", self.run["error"]["message"])
         self.complete.assert_not_called()
+
+    def test_raising_per_turn_model_call_budget_revives_a_limited_chat(self):
+        self.create()
+        path = agent._path(self.project.id, self.run_id)
+        checkpoint = agent._read(path)
+        checkpoint["model_calls"] = agent.MAX_MODEL_CALLS_PER_TURN
+        agent._save(path, checkpoint)
+        self.assertEqual(self.step()["status"], "limit")
+        limits = self.run["limits"]
+        body = {
+            "expected_revision": self.run["revision"],
+            "expected_total_token_limit": limits["total_tokens"],
+            "expected_tool_call_limit": limits["tool_calls"],
+            "expected_model_call_limit": limits["model_calls"],
+            "expected_per_turn_model_call_limit": limits["model_calls_per_turn"],
+            "total_token_limit": limits["total_tokens"],
+            "tool_call_limit": limits["tool_calls"],
+            "model_call_limit": limits["model_calls"],
+            "per_turn_model_call_limit": agent.MAX_MODEL_CALLS_PER_TURN + 4,
+        }
+        response = self.client.post(f"{self.root}/{self.run_id}/limits", json=body)
+        self.assertEqual(response.status_code, 200, response.text)
+        revived = agent._read(path)
+        self.assertEqual(revived["status"], "ready")
+        self.assertIsNone(revived["error"])
+        self.assertEqual(revived["request"]["per_turn_model_call_limit"],
+                         agent.MAX_MODEL_CALLS_PER_TURN + 4)
+        public = self.client.get(f"{self.root}/{self.run_id}").json()
+        self.assertEqual(public["limits"]["model_calls_per_turn"],
+                         agent.MAX_MODEL_CALLS_PER_TURN + 4)
+        self.assertTrue(public["can_resume"])
+        self.complete.return_value = ({"role": "assistant", "content": "Done"}, {"total_tokens": 10})
+        self.assertEqual(self.step()["status"], "completed")
+
+    def test_budget_updates_reject_stale_partial_and_exhausted_values(self):
+        self.create()
+        path = agent._path(self.project.id, self.run_id)
+        checkpoint = agent._read(path)
+        checkpoint["model_calls"] = agent.MAX_MODEL_CALLS_PER_TURN
+        checkpoint["usage"] = [{"total_tokens": 5000}]
+        agent._save(path, checkpoint)
+        self.assertEqual(self.step()["status"], "limit")
+        saved = agent._read(path)
+        limits = self.run["limits"]
+        body = {
+            "expected_revision": self.run["revision"],
+            "expected_total_token_limit": limits["total_tokens"],
+            "expected_tool_call_limit": limits["tool_calls"],
+            "expected_model_call_limit": limits["model_calls"],
+            "expected_per_turn_model_call_limit": limits["model_calls_per_turn"],
+            "total_token_limit": limits["total_tokens"],
+            "tool_call_limit": limits["tool_calls"],
+            "model_call_limit": limits["model_calls"],
+            "per_turn_model_call_limit": limits["model_calls_per_turn"] + 4,
+        }
+        url = f"{self.root}/{self.run_id}/limits"
+        for changed, status in [
+            ({"expected_revision": "f" * 64}, 409),
+            ({"expected_per_turn_model_call_limit": 99}, 409),
+            ({"per_turn_model_call_limit": 8}, 409),
+            ({"total_token_limit": 4000}, 409),
+            ({"model_call_limit": 8}, 422),
+            ({"per_turn_model_call_limit": 30}, 422),
+            ({"tool_call_limit": 0}, 422),
+            ({"model_call_limit": 0}, 422),
+            ({"per_turn_model_call_limit": 0}, 422),
+        ]:
+            self.assertEqual(self.client.post(url, json={**body, **changed}).status_code,
+                             status, changed)
+            self.assertEqual(agent._read(path), saved, changed)
 
     def test_remaining_reported_budget_caps_the_next_output(self):
         self.create()

@@ -43,13 +43,13 @@ export default function ProjectActions({
         <DropdownMenuContent align="end" className="min-w-52">
           <DropdownMenuLabel>Project actions</DropdownMenuLabel>
           <DropdownMenuItem asChild>
-            <Link href={`/projects/${id}`}>
+            <Link href={`/project?projectId=${id}`}>
               <ArrowUpRight size={16} />
               Open project
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href={`/projects/${id}`}>
+            <Link href={`/project?projectId=${id}`}>
               <MessageSquare size={16} />
               Project chat
             </Link>

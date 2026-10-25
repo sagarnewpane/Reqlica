@@ -309,7 +309,7 @@ export default function DraftPublication({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <Link className={styles.projectLink} href={`/projects/${projectId}`}>
+      <Link className={styles.projectLink} href={`/project?projectId=${projectId}`}>
         View project and published endpoints →
       </Link>
     </section>

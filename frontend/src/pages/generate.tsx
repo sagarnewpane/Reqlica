@@ -56,7 +56,7 @@ export default function GenerateAPI() {
                 <h2>
                   <Link
                     className={styles.projectLink}
-                    href={`/projects/${project.id}`}
+                    href={`/project?projectId=${project.id}`}
                   >
                     {project.name || 'Unavailable project'} →
                   </Link>

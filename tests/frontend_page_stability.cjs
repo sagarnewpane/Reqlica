@@ -17,6 +17,7 @@ function component(file, props, request, exposeWorkspace=false) {
  const imports = name=>{
   if(name==='react')return react;
   if(name==='react/jsx-runtime')return{jsx,jsxs:jsx,Fragment:'Fragment'};
+  if(name==='@/lib/drafts')return{orderedDrafts:drafts=>drafts,draftLabel:draft=>draft.name||draft.id,draftCreatedLabel:()=>"today"};
   if(name==='@/lib/chat')return{workspaceRequest:request};
   if(name==='@radix-ui/react-tabs')return{Root:'Tabs.Root',Content:'Tabs.Content',List:'Tabs.List',Trigger:'Tabs.Trigger'};
   if(name==='@/hooks/use-unsaved-draft-navigation')return{useUnsavedDraftNavigation(){}};
@@ -31,7 +32,7 @@ function component(file, props, request, exposeWorkspace=false) {
 function all(tree){if(!tree||typeof tree!=='object')return[];const children=tree.props?.children;return[tree,...(Array.isArray(children)?children:[children]).flatMap(all)];}
 function node(tree,type){return all(tree).find(n=>n.type===type);}
 test('project metadata refresh failure retains the mounted chat',async()=>{
- let fail=false;const app=component('frontend/src/pages/projects/[projectId].tsx',{projectId:id},async()=>{if(fail)throw Error('offline');return{id,name:'Project'};},true);
+ let fail=false;const app=component('frontend/src/pages/project.tsx',{projectId:id},async()=>{if(fail)throw Error('offline');return{id,name:'Project'};},true);
  app.render();await flush();assert.ok(node(app.render(),'@/components/chat/ProjectChat'));
  fail=true;app.replay();await flush();const tree=app.render();assert.ok(node(tree,'@/components/chat/ProjectChat'));assert.ok(all(tree).some(n=>n.props.role==='alert'));app.unmount();
 });

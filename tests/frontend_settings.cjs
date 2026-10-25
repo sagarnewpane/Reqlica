@@ -60,3 +60,16 @@ test('cumulative budgets persist per project and older settings inherit the defa
     assert.throws(() => s.saveSettings({ ...s.defaultSettings, totalTokenLimit }));
   }
 });
+test('model-call budgets persist and cannot put the per-request ceiling above the chat ceiling', () => {
+  const s = settings();
+  s.data.set('reqlica.settings.workspace', JSON.stringify({ model: 'legacy-model' }));
+  assert.equal(s.readSettings().modelCallLimit, 24);
+  assert.equal(s.readSettings().perTurnModelCallLimit, 16);
+  s.saveSettings({ ...s.defaultSettings, modelCallLimit: 40, perTurnModelCallLimit: 32 }, 'one');
+  assert.equal(s.readSettings('one').modelCallLimit, 40);
+  assert.equal(s.readSettings('one').perTurnModelCallLimit, 32);
+  assert.equal(s.readSettings('two').perTurnModelCallLimit, 16);
+  for (const patch of [{ modelCallLimit: 0 }, { modelCallLimit: 1.5 }, { perTurnModelCallLimit: 0 }, { perTurnModelCallLimit: 25 }]) {
+    assert.throws(() => s.saveSettings({ ...s.defaultSettings, ...patch }));
+  }
+});

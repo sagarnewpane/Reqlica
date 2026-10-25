@@ -44,6 +44,8 @@ async def preview_mock_data(
     importer resolves real IDs later. Validation uses disposable database copies
     and the same application-format/refusal checks as the manual data screen.
     Inspect validation.status; failed previews are feedback, not ready to insert.
+    Once validation passes, stop and ask the user to review the preview. Do not
+    generate another batch or call finish_task repeatedly while awaiting review.
     The dashboard offers review/edit/download and separately confirmed insertion.
     """
     def preview():

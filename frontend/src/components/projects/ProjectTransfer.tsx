@@ -23,7 +23,7 @@ export function ImportProject({ onImported }: { onImported?: () => void }) {
         clone: String(clone),
         ...(name ? { name } : {}),
       });
-      const reply = await fetch(`/api/transfer?${query}`, {
+      const reply = await fetch(`/api/ui/transfer?${query}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/zip' },
         body: file,
@@ -134,7 +134,7 @@ export default function ProjectTransfer({
     setError('');
     try {
       const reply = await fetch(
-        `/api/transfer?action=workspace-export&projectId=${projectId}`,
+        `/api/ui/transfer?action=workspace-export&projectId=${projectId}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -167,7 +167,7 @@ export default function ProjectTransfer({
         preserves drafts, versions and local settings. Backup stops the worker.
       </p>
       <div className={s.row}>
-        <a href={`/api/transfer?action=export&projectId=${projectId}`}>
+        <a href={`/api/ui/transfer?action=export&projectId=${projectId}`}>
           Download active-project ZIP
         </a>
       </div>
