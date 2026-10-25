@@ -16,7 +16,7 @@ import Card from '@/components/ui/Card/Card';
 import Input from '@/components/ui/Input/Input';
 import Select from '@/components/ui/Select/Select';
 import PageHeader from '@/components/ui/PageHeader/PageHeader';
-import { Plus } from 'lucide-react';
+import { ChevronRight, Plus } from 'lucide-react';
 import { projectRequest, type Project } from '@/lib/projects';
 import styles from './Home.module.css';
 
@@ -127,8 +127,11 @@ export default function Home() {
             </Button>
           }
         />
-        <details>
-          <summary>Import project / restore workspace</summary>
+        <details className={styles.importPanel}>
+          <summary>
+            <ChevronRight size={16} aria-hidden="true" />
+            <span>Import project / restore workspace</span>
+          </summary>
           <ImportProject onImported={() => void refresh()} />
         </details>
         {notice && (

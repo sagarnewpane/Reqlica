@@ -197,6 +197,44 @@
   }
 }
 
+.importPanel {
+  margin-bottom: 12px;
+}
+.importPanel > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 0;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.importPanel > summary::-webkit-details-marker {
+  display: none;
+}
+.importPanel > summary:hover,
+.importPanel[open] > summary {
+  color: var(--text-primary);
+}
+.importPanel > summary:focus-visible {
+  outline: 2px solid var(--reqlica-lime);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+.importPanel > summary > svg {
+  flex-shrink: 0;
+  transition: transform 120ms ease;
+}
+.importPanel[open] > summary {
+  margin-bottom: 12px;
+}
+.importPanel[open] > summary > svg {
+  transform: rotate(90deg);
+}
 .toolbar {
   display: flex;
   align-items: end;
@@ -211,7 +249,17 @@
 .filterField {
   min-width: 160px;
 }
-.toolbar label,
+.toolbar label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.toolbar .secondaryButton {
+  font-weight: 500;
+}
 .field label {
   display: block;
   margin-bottom: 8px;
@@ -431,4 +479,9 @@
 }
 .cardActions > [data-slot='badge'] {
   text-transform: capitalize;
+}
+@media (prefers-reduced-motion: reduce) {
+  .importPanel > summary > svg {
+    transition: none;
+  }
 }
