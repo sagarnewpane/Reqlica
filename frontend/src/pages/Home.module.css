@@ -78,9 +78,7 @@
 }
 
 .content {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 36px 32px;
+  composes: page from '../components/ui/PageHeader/PageHeader.module.css';
 }
 
 .pageHeading {
@@ -189,10 +187,6 @@
     padding: 16px 20px;
   }
 
-  .content {
-    padding: 24px 20px;
-  }
-
   .pageHeading {
     align-items: flex-start;
     flex-direction: column;
@@ -201,4 +195,240 @@
   .projectGrid {
     grid-template-columns: 1fr;
   }
+}
+
+.toolbar {
+  display: flex;
+  align-items: end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.searchField {
+  flex: 1;
+  min-width: 200px;
+  max-width: 480px;
+}
+.filterField {
+  min-width: 160px;
+}
+.toolbar label,
+.field label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.secondaryButton {
+  composes: button secondary from '../components/ui/Button/Button.module.css';
+}
+.secondaryButton:hover {
+  background: var(--background-primary);
+}
+.secondaryButton:focus-visible,
+.details summary:focus-visible,
+.notice button:focus-visible {
+  outline: 2px solid var(--reqlica-lime);
+  outline-offset: 3px;
+}
+.secondaryButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.resultCount {
+  margin: 20px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.directory,
+.projectError {
+  overflow-wrap: anywhere;
+}
+.projectHeading h2 {
+  overflow-wrap: anywhere;
+}
+.projectHeading > span {
+  text-transform: capitalize;
+  flex-shrink: 0;
+}
+.empty {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.empty h2 {
+  color: var(--text-primary);
+  font-size: 20px;
+  margin: 0 0 8px;
+}
+.empty p {
+  margin: 0 0 24px;
+}
+.notice,
+.error {
+  border-radius: 8px;
+  padding: 16px;
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--status-success-background);
+  color: var(--reqlica-green);
+}
+.notice button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  min-width: 40px;
+  min-height: 40px;
+  font-size: 24px;
+}
+.error {
+  background: var(--status-danger-background);
+  color: var(--text-primary);
+  margin-top: 20px;
+}
+.error p {
+  margin: 4px 0 12px;
+}
+.projectCard .projectError {
+  color: var(--status-danger);
+}
+.projectFooter {
+  flex-wrap: wrap;
+}
+.details {
+  width: 100%;
+}
+.details summary {
+  cursor: pointer;
+  color: var(--reqlica-green);
+  padding: 12px 0;
+  font-weight: 600;
+}
+.details dl {
+  margin: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.details dt {
+  font-weight: 600;
+  margin-top: 12px;
+}
+.details dd {
+  margin: 4px 0 0;
+}
+.details ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.details li {
+  padding: 4px 0;
+}
+.dialog {
+  border: 1px solid var(--border-primary);
+  border-radius: 16px;
+  padding: 0;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  background: var(--background-secondary);
+  color: var(--text-primary);
+}
+.dialog::backdrop {
+  background: rgb(23 35 29 / 50%);
+}
+.createForm {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 28px;
+}
+.createForm h2 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+.createForm p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 8px 0 0;
+}
+.createForm .error {
+  color: var(--text-primary);
+  margin: 0;
+}
+.formHint {
+  padding-top: 16px;
+  border-top: 1px solid var(--border-primary);
+}
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+@media (max-width: 480px) {
+  .searchField {
+    max-width: none;
+    flex-basis: 100%;
+  }
+  .filterField {
+    flex: 1;
+  }
+  .createForm {
+    padding: 20px;
+  }
+}
+.projectLink {
+  color: var(--reqlica-green);
+  text-decoration: none;
+}
+.projectLink:hover {
+  text-decoration: underline;
+}
+.projectLink:focus-visible {
+  outline: 2px solid var(--reqlica-lime);
+  outline-offset: 4px;
+}
+.openProject {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--reqlica-green);
+  font-weight: 600;
+  text-decoration: none;
+}
+.openProject:hover {
+  text-decoration: underline;
+}
+.openProject:focus-visible {
+  outline: 2px solid var(--reqlica-lime);
+  outline-offset: 3px;
+}
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.projectGrid > [data-slot='card'] {
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.projectGrid > [data-slot='card']:has(a):hover {
+  border-color: var(--reqlica-green);
+  box-shadow: 0 3px 12px rgb(27 66 50 / 7%);
+}
+.cardActions > [data-slot='badge'] {
+  text-transform: capitalize;
 }

@@ -1,5 +1,5 @@
-import type { TableHTMLAttributes } from "react";
-import styles from "./Table.module.css";
+import type { TableHTMLAttributes } from 'react';
+import styles from './Table.module.css';
 
 type TableProps = TableHTMLAttributes<HTMLTableElement>;
 

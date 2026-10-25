@@ -1,0 +1,39 @@
+.attachment {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0;
+  font-size: 13px;
+}
+.upload,
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.upload {
+  font-weight: 600;
+}
+.attachment small {
+  opacity: 0.75;
+}
+.attachment summary {
+  cursor: pointer;
+}
+.attachment textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 8px;
+  font: 12px monospace;
+}
+.operations {
+  display: grid;
+  gap: 6px;
+  max-height: 160px;
+  overflow: auto;
+  padding: 8px 0;
+}
+.attachment p {
+  color: var(--color-error, #c33);
+  margin: 0;
+}

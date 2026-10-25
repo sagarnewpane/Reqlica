@@ -1,12 +1,14 @@
-import type { HTMLAttributes } from "react";
-import styles from "./Card.module.css";
-
-type CardProps = HTMLAttributes<HTMLDivElement>;
-
-export default function Card({ children, ...props }: CardProps) {
+import type { HTMLAttributes } from 'react';
+import { Card as ShadcnCard } from '@/components/ui/shadcn/card';
+import styles from './Card.module.css';
+export default function Card({
+  children,
+  className,
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={styles.card} {...props}>
+    <ShadcnCard className={`${styles.card} ${className || ''}`} {...props}>
       {children}
-    </div>
+    </ShadcnCard>
   );
 }

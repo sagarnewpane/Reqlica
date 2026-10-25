@@ -1,0 +1,135 @@
+.section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-primary);
+}
+.heading,
+.actions,
+.buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.heading,
+.actions {
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.heading h2 {
+  margin-bottom: 8px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.heading p,
+.files p,
+.meta {
+  margin: 8px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 24px;
+  margin-top: 24px;
+}
+.files,
+.editor {
+  min-width: 0;
+}
+.files label,
+.editor label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.files ul {
+  max-height: 560px;
+  overflow: auto;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+.file {
+  width: 100%;
+  min-height: 44px;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.file[aria-pressed='true'] {
+  border-color: var(--border-primary);
+  background: var(--background-primary);
+  color: var(--reqlica-green);
+}
+.file:hover:not(:disabled) {
+  background: var(--background-primary);
+}
+.field {
+  margin-bottom: 12px;
+}
+.editor textarea {
+  width: 100%;
+  min-height: 440px;
+  padding: 16px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--background-primary);
+  color: var(--text-primary);
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  tab-size: 4;
+  resize: vertical;
+}
+.actions {
+  margin-top: 16px;
+}
+.secondary {
+  composes: button secondary from '../ui/Button/Button.module.css';
+}
+.secondary:hover:not(:disabled) {
+  background: var(--background-primary);
+}
+.secondary:disabled,
+.file:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.secondary:focus-visible,
+.file:focus-visible,
+.editor textarea:focus-visible {
+  outline: 2px solid var(--reqlica-lime);
+  outline-offset: 3px;
+}
+.warning,
+.notice {
+  padding: 16px;
+  margin: 16px 0;
+  border-radius: 8px;
+  background: var(--status-warning-background);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.notice {
+  background: var(--status-success-background);
+}
+@media (max-width: 900px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+  .files ul {
+    max-height: 240px;
+  }
+}

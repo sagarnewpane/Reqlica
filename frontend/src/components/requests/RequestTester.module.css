@@ -1,0 +1,52 @@
+.requestFields {
+  margin-top: 16px;
+}
+
+.requestBody {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.response {
+  margin-top: 20px;
+}
+
+.requestLine {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.requestLine label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.requestBody {
+  background: var(--background-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.response > pre {
+  max-height: 480px;
+  padding: 16px;
+  background: var(--background-primary);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .requestLine {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 8px;
+  }
+}

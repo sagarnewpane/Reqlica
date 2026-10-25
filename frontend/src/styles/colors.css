@@ -15,3 +15,14 @@
   --status-danger: #d64545;
   --status-danger-background: rgba(214, 69, 69, 0.12);
 }
+
+:root.dark {
+  color-scheme: dark;
+  --reqlica-green: #9fd7b5;
+  --button-primary: #245641;
+  --background-primary: #111b16;
+  --background-secondary: #19261f;
+  --text-primary: #e4efe8;
+  --text-secondary: #a2b5a9;
+  --border-primary: #34463b;
+}

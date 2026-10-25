@@ -3,5 +3,7 @@
   background-color: var(--background-secondary);
   color: var(--text-primary);
   border: 1px solid var(--border-primary);
-  border-radius: 8px;
+  border-radius: 12px;
+  gap: 0;
+  box-shadow: none;
 }

@@ -1,0 +1,33 @@
+.panel {
+  padding: 20px 0;
+}
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+.panel h3 {
+  margin: 20px 0 8px;
+  font-size: 14px;
+}
+.panel p {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.panel pre {
+  padding: 14px;
+  max-height: 360px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--background-primary);
+  font-size: 12px;
+}
+.preview {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+}
+.error {
+  color: var(--status-danger) !important;
+}

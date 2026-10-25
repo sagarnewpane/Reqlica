@@ -1,5 +1,5 @@
-import type { TextareaHTMLAttributes } from "react";
-import styles from "./Textarea.module.css";
+import type { TextareaHTMLAttributes } from 'react';
+import styles from './Textarea.module.css';
 
 type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement>;
 

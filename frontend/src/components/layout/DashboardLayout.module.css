@@ -1,101 +1,195 @@
 .dashboard {
   display: flex;
-  min-height: 100vh;
-  background-color: var(--background-primary);
+  width: 100%;
+  min-height: 100dvh;
+  background: var(--background-primary);
   color: var(--text-primary);
 }
-
-.sidebar {
-  width: 240px;
-  min-height: 100vh;
-  flex-shrink: 0;
-  padding: 28px 16px;
-  background-color: var(--reqlica-green);
-  color: var(--background-secondary);
-}
-
-.logo {
-  margin: 0 0 48px;
-  padding: 0 12px;
-  font-size: 26px;
-  font-weight: 700;
-}
-
-.menuTitle {
-  margin: 0 0 16px;
-  padding: 0 12px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  opacity: 0.7;
-}
-
-.navigation {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.navLink,
-.active {
-  display: block;
-  padding: 12px 14px;
-  border-radius: 8px;
-  color: var(--background-secondary);
-  font-size: 14px;
-  text-decoration: none;
-  transition: background-color 0.2s;
-}
-
-.navLink:hover {
-  background-color: rgb(255 255 255 / 10%);
-}
-
-.active {
-  background-color: var(--reqlica-lime);
-  color: var(--reqlica-green);
-  font-weight: 600;
-}
-
 .main {
   flex: 1;
   min-width: 0;
 }
-
+.main > main:focus {
+  outline: none;
+}
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 72px;
-  padding: 0 32px;
-  background-color: var(--background-secondary);
+  gap: 16px;
+  min-height: 64px;
+  padding: 0 28px;
+  background: var(--background-secondary);
   border-bottom: 1px solid var(--border-primary);
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 13px;
 }
-
-@media (max-width: 768px) {
-  .dashboard {
-    flex-direction: column;
-  }
-
-  .sidebar {
-    width: 100%;
-    min-height: auto;
-    padding: 20px;
-  }
-
-  .logo {
-    margin-bottom: 20px;
-  }
-
-  .navigation {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
+.sidebarHeader {
+  padding: 20px 20px 16px;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--sidebar-foreground);
+}
+.brandMark {
+  display: inline-block;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  background-image: url('/branding/reqlica-mark.svg');
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+}
+.groupLabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--sidebar-foreground);
+  opacity: 0.65;
+  margin-bottom: 4px;
+}
+.menuButton {
+  min-height: 44px;
+  padding: 12px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  font-size: 13px;
+  gap: 12px;
+}
+.menuButton[data-active='true'] {
+  background: var(--reqlica-lime);
+  color: var(--reqlica-green);
+  font-weight: 600;
+}
+.sidebarFooter {
+  border-top: 1px solid var(--sidebar-border);
+  margin: 12px;
+  padding: 16px 8px;
+  color: var(--sidebar-foreground);
+  font-size: 11px;
+  opacity: 0.7;
+  gap: 4px;
+}
+.sidebarToggle {
+  min-width: 40px;
+  min-height: 40px;
+  color: var(--reqlica-green);
+  cursor: pointer;
+}
+.workspaceBrand {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-width: 0;
+}
+.workspaceBrand a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--reqlica-green);
+  font-size: 24px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.workspaceBrand > span {
+  border-left: 1px solid var(--border-primary);
+  padding-left: 24px;
+}
+.projectBreadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.backToProjects {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--reqlica-green);
+  text-decoration: none;
+  white-space: nowrap;
+  font-weight: 500;
+  font-size: 12px;
+}
+.backToProjects:hover,
+.headerSettings:hover {
+  text-decoration: underline;
+}
+.projectBreadcrumb > span {
+  border-left: 1px solid var(--border-primary);
+  padding-left: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.headerSettings {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--reqlica-green);
+  text-decoration: none;
+  min-height: 44px;
+  padding: 0 8px;
+}
+.workspaceBrand a:focus-visible,
+.backToProjects:focus-visible,
+.headerSettings:focus-visible {
+  outline: 2px solid var(--reqlica-lime);
+  outline-offset: 4px;
+}
+.skip {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  transform: translateY(-200%);
+  background: var(--reqlica-green);
+  color: var(--background-secondary);
+  padding: 12px;
+  border-radius: 8px;
+}
+.skip:focus {
+  transform: none;
+}
+@media (max-width: 640px) {
   .header {
-    padding: 16px 20px;
+    padding: 0 12px;
+    gap: 8px;
+    min-height: 64px;
+  }
+  .projectBreadcrumb {
+    gap: 8px;
+    flex: 1;
+  }
+  .projectBreadcrumb > span {
+    padding-left: 8px;
+  }
+  .headerSettings span {
+    display: none;
+  }
+  .workspaceBrand {
     gap: 12px;
   }
+  .workspaceBrand > span {
+    padding-left: 12px;
+  }
+}
+/* Separate the dark-green frog folds from the sidebar without changing the mark. */
+.sidebarHeader .brandMark {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background-color: #edf3df;
+  background-size: 34px 34px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 12%);
 }

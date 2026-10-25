@@ -1,7 +1,8 @@
-import type { HTMLAttributes } from "react";
-import styles from "./Badge.module.css";
+import type { HTMLAttributes } from 'react';
+import { Badge as ShadcnBadge } from '@/components/ui/shadcn/badge';
+import styles from './Badge.module.css';
 
-type BadgeVariant = "success" | "warning" | "danger";
+type BadgeVariant = 'success' | 'warning' | 'danger';
 
 type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
   variant?: BadgeVariant;
@@ -9,12 +10,17 @@ type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
 
 export default function Badge({
   children,
-  variant = "success",
+  variant = 'success',
+  className,
   ...props
 }: BadgeProps) {
   return (
-    <span className={`${styles.badge} ${styles[variant]}`} {...props}>
+    <ShadcnBadge
+      variant="outline"
+      className={`${styles.badge} ${styles[variant]} ${className || ''}`}
+      {...props}
+    >
       {children}
-    </span>
+    </ShadcnBadge>
   );
 }
