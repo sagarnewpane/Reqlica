@@ -8,8 +8,7 @@
 
 SQLite is included with Python; no database server or container is needed.
 The built dashboard is included in the repository and Python wheel. Users do
-not need Node.js, npm, or a frontend build. The demo and manually written APIs
-work without an AI account.
+not need Node.js, npm, or a frontend build.
 
 Check your tools:
 
@@ -38,8 +37,14 @@ from `backend/reqlica/static/`; no separate frontend server or build is needed.
 
 ## 3. Configure the servers
 
-Defaults work without a configuration file. To change them, create `.env` in
-the repository root:
+Copy the provided [environment example](../../.env.example) to `.env` in the
+repository root, then edit it as needed:
+
+```bash
+cp .env.example .env
+```
+
+The defaults are:
 
 ```dotenv
 CONSOLE_HOST=127.0.0.1
@@ -79,25 +84,9 @@ Check the console from another terminal:
 curl --fail http://127.0.0.1:3000/api/health
 ```
 
-## 5. Try the demo
+## 5. Create a project
 
-In another terminal, from the checkout:
-
-```bash
-uv run reqlica demo /absolute/new/bookstore
-```
-
-Use the printed ID in place of `PROJECT_ID`:
-
-```bash
-curl http://127.0.0.1:4000/mock/PROJECT_ID/books
-curl -X POST http://127.0.0.1:4000/mock/PROJECT_ID/orders \
-  -H 'Content-Type: application/json' -d '{"book_id":1,"quantity":1}'
-curl http://127.0.0.1:4000/mock/PROJECT_ID/books
-```
-
-The order reduces stock in the same transaction. Records survive worker restarts.
-To create an empty starter project instead:
+Use **Create project** in the web interface, or run this from another terminal:
 
 ```bash
 uv run reqlica project create /absolute/new/books --name "Book API"

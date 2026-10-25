@@ -6,6 +6,13 @@ Reqlica creates stateful mock APIs from a description or OpenAPI specification.
 You review the generated Python, run checks, then approve and publish it.
 Endpoints run with FastAPI and SQLite; serving requests does not call an AI model.
 
+Use Reqlica through either:
+
+- **The web interface:** create projects, chat with Project AI, review drafts,
+  and test requests in the browser.
+- **An agent of your choice:** connect any MCP-capable agent, such as OpenCode,
+  to Reqlica's MCP server. The agent uses its own model and credentials.
+
 ![Reqlica project chat dashboard](docs/images/project-chat.png)
 
 ## Documentation
@@ -24,12 +31,15 @@ Run from the repository root:
 
 ```bash
 uv sync --locked
+cp .env.example .env
 uv run reqlica start
 ```
 
 Open the dashboard at http://127.0.0.1:3000. Mock requests use port `4000`.
 MCP clients connect to `http://127.0.0.1:3000/mcp` using Streamable HTTP.
-See the [installation guide](docs/guides/installation.md) for the full setup.
+[.env.example](.env.example) documents the defaults. Edit `.env` to change ports
+or the app-state directory. See [installation](docs/guides/installation.md)
+for the full setup.
 
 ## What you can do
 
@@ -38,24 +48,6 @@ See the [installation guide](docs/guides/installation.md) for the full setup.
 - Test persistent APIs with a request tester, request chains, and Swagger.
 - Simulate delays, failures, rate limits, authentication, and CORS.
 - Manage data, environment variables, packages, backups, and project transfers.
-
-## Try it without AI
-
-With Reqlica running, open another terminal:
-
-```bash
-uv run reqlica demo /absolute/new/bookstore
-```
-
-Replace `PROJECT_ID` with the printed ID:
-
-```bash
-curl http://127.0.0.1:4000/mock/PROJECT_ID/books
-curl -X POST http://127.0.0.1:4000/mock/PROJECT_ID/orders \
-  -H 'Content-Type: application/json' -d '{"book_id":1,"quantity":1}'
-```
-
-Creating an order reduces stock. Data survives worker restarts.
 
 ## AI use
 
@@ -69,14 +61,8 @@ model's tool calls. See the [disclosure](docs/ai-usage.md) for details.
 
 ## Development
 
-```bash
-uv run python -m unittest discover -s tests
-npm --prefix frontend run typecheck
-npm --prefix frontend run lint
-npm --prefix frontend test
-```
-
-See [development](docs/guides/development.md) for more commands.
+See [development](docs/guides/development.md) for frontend builds, server integration,
+and checks. Users can run the included dashboard without rebuilding it.
 
 Reqlica is for trusted local use. Management APIs are unauthenticated, and
 workers run Python with your OS permissions. Keep both servers on loopback.

@@ -3,6 +3,25 @@
 Follow [installation](installation.md) for prerequisites and setup.
 Run commands from the repository root.
 
+## Build and connect the frontend
+
+For frontend changes, install Node.js 20.9+ and npm, then run:
+
+```bash
+npm --prefix frontend ci
+python3 scripts/build_frontend.py
+uv run reqlica start
+```
+
+The script builds `frontend/out/` and copies it into `backend/reqlica/static/`.
+The Python console serves these files at `http://127.0.0.1:3000`; frontend calls
+use its same-origin `/api/ui/` adapters. No separate frontend server is needed.
+Rebuild after UI changes and commit the updated static files. Build a Python
+wheel with `uv build`; it includes those assets.
+
+Server settings come from `.env`; copy [`.env.example`](../../.env.example)
+if needed. Restart after Python or configuration changes.
+
 ## Run and check
 
 ```bash
@@ -14,9 +33,7 @@ npm --prefix frontend run format:check
 npm --prefix frontend test
 ```
 
-Rebuild after frontend changes with `python3 scripts/build_frontend.py`.
-Restart after Python/configuration changes. Backend integration tests need local
-socket access. Frontend tests use Node's test runner; check the UI in a browser too.
+Backend integration tests need local socket access. Frontend tests use Node's test runner; check the UI in a browser too.
 
 To debug a server independently:
 
