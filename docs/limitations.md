@@ -37,6 +37,10 @@ for implemented workflows.
 - Each step advances one model request or tool call. Browser-driven advancement
   stops after an in-flight step when paused or closed; this is not an unattended
   background job service. Uncertain interrupted writes are not replayed blindly.
+- AI request payloads, tool schemas, and project/conversation context are
+  currently relatively large. They can increase token usage, latency, and provider
+  cost. Further optimization could reduce their size while retaining the context
+  needed for correct tool use and API generation.
 - Default conversation budgets are 24 model calls, 16 model calls per turn,
   64 tool calls, and 100,000 provider-reported tokens. Explicit budget updates
   preserve recorded usage; they do not reset it. Model/tool limits allow 1–1,000,
