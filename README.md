@@ -6,6 +6,8 @@ Reqlica creates stateful mock APIs from a description or OpenAPI specification.
 You review the generated Python, run checks, then approve and publish it.
 Endpoints run with FastAPI and SQLite; serving requests does not call an AI model.
 
+![Reqlica project chat dashboard](docs/images/project-chat.png)
+
 ## Documentation
 
 - [Installation](docs/guides/installation.md)
