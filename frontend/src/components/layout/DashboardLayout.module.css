@@ -37,6 +37,8 @@
   font-size: 26px;
   font-weight: 700;
   color: var(--sidebar-foreground);
+  text-decoration: none;
+  white-space: nowrap;
 }
 .brandMark {
   display: inline-block;
@@ -80,8 +82,8 @@
   gap: 4px;
 }
 .sidebarToggle {
-  min-width: 40px;
-  min-height: 40px;
+  min-width: 44px;
+  min-height: 44px;
   color: var(--reqlica-green);
   cursor: pointer;
 }
@@ -99,10 +101,16 @@
   font-size: 24px;
   font-weight: 700;
   text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .workspaceBrand > span {
   border-left: 1px solid var(--border-primary);
   padding-left: 24px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .projectBreadcrumb {
   display: flex;
@@ -139,8 +147,12 @@
   color: var(--reqlica-green);
   text-decoration: none;
   min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
+  flex-shrink: 0;
   padding: 0 8px;
 }
+.logo:focus-visible,
 .workspaceBrand a:focus-visible,
 .backToProjects:focus-visible,
 .headerSettings:focus-visible {

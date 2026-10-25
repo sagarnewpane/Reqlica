@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { type ReactNode } from 'react';
 import { useHydrated } from '@/hooks/use-hydrated';
@@ -79,10 +80,15 @@ function ProjectSidebar({ projectId }: { projectId: string }) {
       aria-label="Project navigation"
     >
       <SidebarHeader className={styles.sidebarHeader}>
-        <div className={styles.logo}>
+        <Link
+          href="/"
+          className={styles.logo}
+          aria-label="Reqlica projects"
+          onClick={() => setOpenMobile(false)}
+        >
           <span className={styles.brandMark} aria-hidden="true" />
           Reqlica
-        </div>
+        </Link>
       </SidebarHeader>
       <SidebarContent>
         {['Build', 'Test & inspect', 'Configure'].map((group) => (
@@ -120,7 +126,7 @@ function ProjectSidebar({ projectId }: { projectId: string }) {
                               : undefined
                           }
                         >
-                          <item.icon size={18} />
+                          <item.icon size={18} aria-hidden="true" />
                           <span>{item.label}</span>
                         </Link>
                       </SidebarMenuButton>
@@ -153,6 +159,9 @@ export default function DashboardLayout({
     : null;
   return (
     <div className={styles.dashboard}>
+      <Head>
+        <title>{`${title} · Reqlica`}</title>
+      </Head>
       <a className={styles.skip} href="#main-content">
         Skip to content
       </a>
@@ -163,29 +172,31 @@ export default function DashboardLayout({
             <div className={styles.projectBreadcrumb}>
               <SidebarTrigger className={styles.sidebarToggle} />
               <Link href="/" className={styles.backToProjects}>
-                <ArrowLeft size={15} />
+                <ArrowLeft size={15} aria-hidden="true" />
                 Back to projects
               </Link>
-              <span>{title}</span>
+              <span title={title}>{title}</span>
             </div>
           ) : (
             <div className={styles.workspaceBrand}>
-              <Link href="/">
+              <Link href="/" aria-label="Reqlica projects">
                 <span className={styles.brandMark} aria-hidden="true" />
                 Reqlica
               </Link>
-              <span>{title}</span>
+              <span title={title}>{title}</span>
             </div>
           )}
           <Link
             className={styles.headerSettings}
+            aria-label="Settings"
+            aria-current={router.pathname === '/settings' ? 'page' : undefined}
             href={
               projectId
                 ? { pathname: '/settings', query: { projectId } }
                 : '/settings'
             }
           >
-            <Settings size={16} />
+            <Settings size={16} aria-hidden="true" />
             <span>Settings</span>
           </Link>
         </header>
