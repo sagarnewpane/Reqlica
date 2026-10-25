@@ -29,7 +29,7 @@
 }
 .actions a,
 .details a {
-  color: var(--reqlica-green);
+  color: var(--text-accent);
 }
 .panel label {
   display: block;

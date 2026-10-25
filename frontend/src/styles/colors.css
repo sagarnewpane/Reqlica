@@ -1,5 +1,6 @@
 :root {
   --reqlica-green: #1b4232;
+  --text-accent: var(--reqlica-green);
   --reqlica-lime: #b5ce26;
   --button-primary: var(--reqlica-green);
   --button-primary-text: #ffffff;
@@ -34,26 +35,27 @@
 
 :root.dark {
   color-scheme: dark;
-  --reqlica-green: #9fd7b5;
-  --button-primary: #245641;
+  --reqlica-green: #8aaa98;
+  --text-accent: var(--text-primary);
+  --button-primary: #3b574a;
   --button-danger: #a73535;
-  --selection-background: #344329;
-  --selection-foreground: #e0edb6;
-  --background-primary: #111b16;
-  --background-secondary: #19261f;
-  --background-elevated: #203128;
-  --text-primary: #e4efe8;
-  --text-secondary: #a2b5a9;
-  --border-primary: #34463b;
-  --status-success: #9bd58a;
+  --selection-background: #30363c;
+  --selection-foreground: #f5f6f7;
+  --background-primary: #111315;
+  --background-secondary: #1a1d20;
+  --background-elevated: #23272b;
+  --text-primary: #f0f1f2;
+  --text-secondary: #adb2b8;
+  --border-primary: #34393f;
+  --status-success: #8dbb98;
   --status-success-background: rgba(95, 159, 74, 0.14);
   --status-warning: #edc16c;
   --status-warning-background: rgba(217, 155, 43, 0.14);
   --status-danger: #ff9994;
   --status-danger-background: rgba(214, 69, 69, 0.14);
-  --sidebar: #142019;
-  --sidebar-foreground: #dce8df;
-  --sidebar-accent: #22352a;
+  --sidebar: #171a1d;
+  --sidebar-foreground: #e2e4e7;
+  --sidebar-accent: #262b30;
   --sidebar-accent-foreground: var(--text-primary);
-  --sidebar-border: #2e4235;
+  --sidebar-border: #30353b;
 }

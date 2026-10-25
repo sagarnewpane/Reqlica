@@ -76,7 +76,7 @@
 }
 .tabs button[data-state='active'] {
   border-bottom-color: var(--reqlica-green);
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-weight: 600;
 }
 .tabs button:focus-visible {
@@ -123,7 +123,7 @@
 .method {
   font-size: 12px;
   font-weight: 700;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
 }
 
 .path {

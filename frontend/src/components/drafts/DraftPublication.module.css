@@ -44,7 +44,7 @@
   padding: 8px 12px;
   border-radius: 8px;
   background: var(--status-success-background);
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-size: 12px;
   font-weight: 600;
 }
@@ -137,7 +137,7 @@
   align-items: center;
   min-height: 44px;
   margin-top: 16px;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-size: 13px;
   text-decoration: underline;
   text-underline-offset: 4px;

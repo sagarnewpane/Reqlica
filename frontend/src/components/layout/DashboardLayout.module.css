@@ -84,7 +84,7 @@
 .sidebarToggle {
   min-width: 44px;
   min-height: 44px;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   cursor: pointer;
 }
 .workspaceBrand {
@@ -97,7 +97,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-size: 24px;
   font-weight: 700;
   text-decoration: none;
@@ -123,7 +123,7 @@
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   text-decoration: none;
   white-space: nowrap;
   font-weight: 500;
@@ -144,7 +144,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   text-decoration: none;
   min-height: 44px;
   min-width: 44px;

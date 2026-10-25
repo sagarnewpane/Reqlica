@@ -11,7 +11,7 @@ export function applyTheme() {
     (preference !== 'light' &&
       preference !== 'dark' &&
       matchMedia('(prefers-color-scheme: dark)').matches);
-  const color = dark ? '#111b16' : '#f7faf8';
+  const color = dark ? '#111315' : '#f7faf8';
   document.documentElement.classList.toggle('dark', dark);
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
   document

@@ -76,7 +76,7 @@
   background: var(--status-danger-background);
 }
 .catalogKey .notice {
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   background: var(--status-success-background);
 }
 .profiles {
@@ -106,7 +106,7 @@
   font-weight: 600;
 }
 .keyAvailable {
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-size: 11px;
   font-weight: 600;
 }
@@ -234,7 +234,7 @@
 .advanced summary {
   cursor: pointer;
   padding: 12px 0;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-weight: 600;
 }
 .advanced .grid {
@@ -285,7 +285,7 @@
 }
 .notice {
   background: var(--status-success-background);
-  color: var(--reqlica-green);
+  color: var(--text-accent);
 }
 @media (max-width: 640px) {
   .savedKeyHeading {

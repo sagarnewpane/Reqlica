@@ -69,7 +69,7 @@
 
 .activeTab {
   border-bottom-color: var(--reqlica-green);
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-weight: 600;
 }
 

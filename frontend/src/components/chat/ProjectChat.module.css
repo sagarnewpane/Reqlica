@@ -13,7 +13,7 @@
   display: inline-flex;
   align-items: center;
   min-height: 40px;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-size: 13px;
   text-decoration: none;
 }
@@ -72,7 +72,7 @@
 .secondary {
   min-height: 42px;
   background: transparent;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   border: 1px solid var(--border-primary);
   border-radius: 8px;
   padding: 8px 12px;
@@ -288,7 +288,7 @@
   margin: 0 0 8px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
 }
 .messageText {
   white-space: pre-wrap;
@@ -322,7 +322,7 @@
   flex-shrink: 0;
 }
 .toolEvent[data-status='done'] summary > svg:first-child {
-  color: var(--reqlica-green);
+  color: var(--text-accent);
 }
 .toolEvent[data-status='failed'],
 .toolEvent[data-status='error'] {
@@ -400,7 +400,7 @@
   margin-bottom: 12px;
 }
 .statusRow > :first-child {
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-weight: 600;
   text-transform: capitalize;
 }
@@ -533,7 +533,7 @@
   white-space: pre;
 }
 .markdown a {
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   text-decoration: underline;
 }
 .markdown blockquote {
@@ -597,7 +597,7 @@
 .chatToolbar .secondary:hover,
 .chatToolbar .secondary[aria-expanded='true'] {
   background: var(--background-secondary);
-  color: var(--reqlica-green);
+  color: var(--text-accent);
 }
 .settings {
   flex: none;
@@ -800,7 +800,7 @@
   display: inline-flex;
   align-items: center;
   min-height: 40px;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-weight: 600;
   text-decoration: none;
 }

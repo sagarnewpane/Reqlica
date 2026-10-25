@@ -23,7 +23,7 @@
   color: var(--text-secondary);
 }
 .contextBar .contextButton:hover:not(:disabled) {
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   background: var(--background-secondary);
 }
 .progress {
@@ -48,7 +48,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-weight: 500;
 }
 .elapsed {
@@ -65,7 +65,7 @@
 }
 .spinner {
   flex-shrink: 0;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   animation: spin 1s linear infinite;
 }
 .contextSheet[data-slot='sheet-content'] {
@@ -127,7 +127,7 @@
   cursor: pointer;
   min-height: 44px;
   padding: 12px 0;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-weight: 600;
 }
 .payload pre {

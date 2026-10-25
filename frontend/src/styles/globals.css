@@ -57,7 +57,7 @@ body {
   --color-background: var(--background-secondary);
   --color-foreground: var(--text-primary);
   --color-accent: var(--background-primary);
-  --color-accent-foreground: var(--reqlica-green);
+  --color-accent-foreground: var(--text-accent);
   --color-border: var(--border-primary);
   --color-ring: var(--reqlica-lime);
   --color-popover: var(--background-elevated);
@@ -92,7 +92,7 @@ body {
 [data-slot='select-item'][data-highlighted],
 [data-slot='dropdown-menu-item'][data-highlighted] {
   background: var(--background-primary);
-  color: var(--reqlica-green);
+  color: var(--text-accent);
 }
 [data-slot='select-content'],
 [data-slot='dropdown-menu-content'],

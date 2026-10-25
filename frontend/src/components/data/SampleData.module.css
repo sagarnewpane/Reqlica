@@ -225,7 +225,7 @@
 }
 
 .passed {
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-size: 13px;
 }
 
@@ -273,7 +273,7 @@
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-size: 13px;
   text-decoration: underline;
   text-underline-offset: 4px;

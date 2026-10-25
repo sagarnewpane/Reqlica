@@ -70,7 +70,7 @@
 .file[aria-pressed='true'] {
   border-color: var(--border-primary);
   background: var(--background-primary);
-  color: var(--reqlica-green);
+  color: var(--text-accent);
 }
 .file:hover:not(:disabled) {
   background: var(--background-primary);

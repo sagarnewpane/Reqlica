@@ -26,12 +26,12 @@
 .secondary {
   background: var(--background-secondary);
   border-color: var(--border-primary);
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   box-shadow: none;
 }
 .ghost {
   background: transparent;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   box-shadow: none;
 }
 .danger {

@@ -89,7 +89,7 @@
   color: var(--status-danger);
 }
 .manualAction button {
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -115,7 +115,7 @@
 }
 .list [cmdk-item][data-selected='true'] {
   background: var(--background-primary);
-  color: var(--reqlica-green);
+  color: var(--text-accent);
 }
 .list strong {
   font-weight: 500;
@@ -138,7 +138,7 @@
   color: var(--text-secondary);
 }
 .meta button {
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   text-decoration: underline;
   cursor: pointer;
 }

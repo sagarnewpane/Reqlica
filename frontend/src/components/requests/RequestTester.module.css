@@ -138,7 +138,7 @@
 }
 .notice {
   background: var(--status-success-background);
-  color: var(--reqlica-green);
+  color: var(--text-accent);
 }
 .grid {
   display: grid;
@@ -185,7 +185,7 @@
   cursor: pointer;
 }
 .editorTabs button[data-state='active'] {
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   border-bottom-color: var(--reqlica-green);
 }
 .editorTabs button:disabled {
@@ -193,7 +193,7 @@
   cursor: not-allowed;
 }
 .editorTabs button:hover:not(:disabled) {
-  color: var(--reqlica-green);
+  color: var(--text-accent);
 }
 .editorTabs button:focus-visible,
 .chainPanel > summary:focus-visible {

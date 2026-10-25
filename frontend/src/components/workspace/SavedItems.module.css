@@ -9,7 +9,7 @@
   min-height: 44px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   cursor: pointer;
 }
 .panel > summary:focus-visible {
@@ -49,7 +49,7 @@
 }
 .panel .notice {
   background: var(--status-success-background);
-  color: var(--reqlica-green);
+  color: var(--text-accent);
 }
 @media (max-width: 640px) {
   .grid {

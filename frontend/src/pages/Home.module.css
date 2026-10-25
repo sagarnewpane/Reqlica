@@ -279,7 +279,7 @@
   justify-content: space-between;
   gap: 16px;
   background: var(--status-success-background);
-  color: var(--reqlica-green);
+  color: var(--text-accent);
 }
 .notice button {
   border: 0;
@@ -309,7 +309,7 @@
 }
 .details summary {
   cursor: pointer;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   padding: 12px 0;
   font-weight: 600;
 }
@@ -389,7 +389,7 @@
   }
 }
 .projectLink {
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   text-decoration: none;
 }
 .projectLink:hover {
@@ -403,7 +403,7 @@
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-weight: 600;
   text-decoration: none;
 }

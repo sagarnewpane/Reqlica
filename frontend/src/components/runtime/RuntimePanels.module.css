@@ -13,7 +13,7 @@
 }
 .heading {
   margin-bottom: 20px;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
 }
 .heading h2 {
   font-size: 18px;
@@ -121,7 +121,7 @@
 }
 .link {
   display: inline-flex;
-  color: var(--reqlica-green);
+  color: var(--text-accent);
   font-size: 13px;
   min-height: 44px;
   align-items: center;
