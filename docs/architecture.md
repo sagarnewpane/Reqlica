@@ -28,7 +28,8 @@ flowchart TB
 | Worker     | `backend/reqlica/runtime/worker.py` | Loads one project's published FastAPI handlers.     |
 | Storage    | `backend/reqlica/projects/`         | Manages files, revisions, settings, and data.       |
 
-The Next.js dashboard is exported as static files and bundled with Python.
+The Next.js dashboard is exported as static files, committed under
+`backend/reqlica/static/`, and bundled with Python.
 There is no Node.js server at runtime. Dashboard requests use `/api/ui/` adapters.
 
 ## Authoring

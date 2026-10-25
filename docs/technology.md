@@ -12,9 +12,9 @@
 | Specifications             | OpenAPI, JSON, PyYAML                                          |
 | Build and checks           | uv, Hatchling, npm, ESLint, Prettier, Node's test runner       |
 
-The frontend build exports static assets into `frontend/out/`.
-`scripts/build_frontend.py` copies them into the Python package. Node.js 20.9+
-is needed to build the dashboard, but not to run an installed wheel.
+The built dashboard is committed in `backend/reqlica/static/` and included in
+the Python wheel. Users do not need Node.js. Frontend contributors use Node.js
+20.9+ and `scripts/build_frontend.py` to regenerate these assets from `frontend/out/`.
 
 AI authoring requires tool calls. External clients connect through MCP; built-in
 Project AI manages the model/tool loop itself. Published endpoints use FastAPI

@@ -4,19 +4,18 @@
 
 - macOS or Linux.
 - Python 3.12 or newer and [uv](https://docs.astral.sh/uv/getting-started/installation/).
-- Node.js 20.9 or newer and npm to build the dashboard.
 - Git to clone the repository.
 
 SQLite is included with Python; no database server or container is needed.
-The demo and manually written APIs work without an AI account.
+The built dashboard is included in the repository and Python wheel. Users do
+not need Node.js, npm, or a frontend build. The demo and manually written APIs
+work without an AI account.
 
 Check your tools:
 
 ```bash
 python3 --version
 uv --version
-node --version
-npm --version
 ```
 
 ## 1. Get the source
@@ -28,16 +27,14 @@ cd Reqlica
 
 Run the remaining checkout commands from this directory.
 
-## 2. Install dependencies and build
+## 2. Install Python dependencies
 
 ```bash
 uv sync --locked
-npm --prefix frontend ci
-python3 scripts/build_frontend.py
 ```
 
-`uv sync` creates the root `.venv`. The build script exports the dashboard and
-copies it into `backend/reqlica/static/`. Rebuild after frontend changes.
+`uv sync` creates the root `.venv`. The console serves the included dashboard
+from `backend/reqlica/static/`; no separate frontend server or build is needed.
 
 ## 3. Configure the servers
 
@@ -129,7 +126,7 @@ draft, run validation and tests, then approve and activate it separately.
 
 ## Build and install a local wheel
 
-After building the dashboard:
+The included dashboard is packaged automatically:
 
 ```bash
 uv build
@@ -164,16 +161,28 @@ Declare needed checkout dependencies with `uv add DISTRIBUTION` for reproducibil
 
 ## Troubleshooting
 
-| Problem                                        | Fix                                                                     |
-| ---------------------------------------------- | ----------------------------------------------------------------------- |
-| `reqlica` command missing                      | Run `uv run reqlica` from the checkout.                                 |
-| Python version too old                         | Install Python 3.12+ and rerun `uv sync --locked`.                      |
-| Dashboard missing or stale                     | Run `npm --prefix frontend ci`, then rebuild with the script.           |
-| Port already in use                            | Stop the conflicting service or choose different console/gateway ports. |
-| Project missing from the CLI                   | Check that CLI and servers use the same `REQLICA_HOME`.                 |
-| Model fails to use tools                       | Check credentials, provider URL, model access, and tool-call support.   |
-| Worker reports a missing module                | Use the reviewed package installer, then restart and rerun checks.      |
-| Backend integration tests cannot start workers | Allow local socket connections in the test environment.                 |
+| Problem                                        | Fix                                                                                               |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `reqlica` command missing                      | Run `uv run reqlica` from the checkout.                                                           |
+| Python version too old                         | Install Python 3.12+ and rerun `uv sync --locked`.                                                |
+| Dashboard missing or stale                     | Update to a complete checkout or reinstall the wheel. Rebuild only after frontend source changes. |
+| Port already in use                            | Stop the conflicting service or choose different console/gateway ports.                           |
+| Project missing from the CLI                   | Check that CLI and servers use the same `REQLICA_HOME`.                                           |
+| Model fails to use tools                       | Check credentials, provider URL, model access, and tool-call support.                             |
+| Worker reports a missing module                | Use the reviewed package installer, then restart and rerun checks.                                |
+| Backend integration tests cannot start workers | Allow local socket connections in the test environment.                                           |
+
+## Frontend development only
+
+If you change frontend source, install Node.js 20.9+ and npm, then run:
+
+```bash
+npm --prefix frontend ci
+python3 scripts/build_frontend.py
+```
+
+Commit the updated `backend/reqlica/static/` files with the frontend changes so
+users receive the rebuilt dashboard. `frontend/out/` remains a temporary export.
 
 ## Verify the checkout
 

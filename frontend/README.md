@@ -5,6 +5,8 @@ the static export and `/api/ui/` adapters; there is no runtime Node.js server.
 
 ## Build and run
 
+Users can run the included dashboard without building it. The commands below
+are for frontend development and require Node.js 20.9+ and npm.
 From the repository root:
 
 ```bash
@@ -16,7 +18,8 @@ uv run reqlica start
 
 Open http://127.0.0.1:3000. Rebuild after frontend changes; restart after Python
 or configuration changes. A standalone Next.js dev server lacks the Python API
-adapters. See [installation](../docs/guides/installation.md) for prerequisites.
+adapters. Commit rebuilt `backend/reqlica/static/` files with frontend changes.
+See [installation](../docs/guides/installation.md) for prerequisites.
 
 ## Source layout
 

@@ -17,13 +17,11 @@ Endpoints run with FastAPI and SQLite; serving requests does not call an AI mode
 
 ## Quick start
 
-Requires macOS or Linux, Python 3.12+, uv, Node.js 20.9+, and npm.
+Requires macOS or Linux, Python 3.12+, and uv. The built dashboard is included.
 Run from the repository root:
 
 ```bash
 uv sync --locked
-npm --prefix frontend ci
-python3 scripts/build_frontend.py
 uv run reqlica start
 ```
 
