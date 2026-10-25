@@ -55,3 +55,31 @@ test('a busy response keeps the unconfirmed mutation available for an identical 
  let puts=0;const app=harness(async(_p,path,method)=>{if(path==='agent-runs')return{runs:[]};if(method==='PUT'){puts++;throw new app.WorkspaceError('busy',409);}throw Error('not yet saved');});
  app.render();await flush();app.render().setMessage('Hello');await app.render().send();assert.equal(app.render().hasPending,true);await app.render().send();assert.equal(puts,2);app.unmount();
 });
+
+test('new chat clears a rejected pending reply without replaying it and survives remount',async()=>{
+ const storage=new Map();let replies=0,creates=0;
+ const request=async(_p,path,method)=>{
+  if(path==='agent-runs')return{runs:[run]};
+  if(path.endsWith('/replies')){replies++;throw new app.WorkspaceError('Published version changed',409);}
+  if(method==='PUT'){creates++;return run;}
+  return run;
+ };
+ const app=harness(request,storage);app.render();await flush();
+ app.render().setMessage('Follow up after publication');await app.render().send();
+ assert.equal(app.render().hasPending,true);
+ app.render().startNew();
+ assert.equal(app.render().run,null);assert.equal(app.render().hasPending,false);
+ assert.equal(app.render().message,'');assert.equal(app.render().error,'');
+ app.unmount();
+ const restored=harness(request,storage);restored.render();await flush();
+ assert.equal(restored.render().run,null);assert.equal(restored.render().hasPending,false);
+ restored.render().setMessage('Start fresh');await restored.render().send();
+ assert.equal(creates,1);assert.equal(replies,1);restored.unmount();
+});
+
+test('new chat cannot abandon a submission while its request is still running',async()=>{
+ const ack=deferred();const app=harness(async(_p,path,method)=>method==='PUT'?ack.promise:({runs:[]}));
+ app.render();await flush();app.render().setMessage('Still sending');const sending=app.render().send();
+ await flush();app.render().startNew();assert.equal(app.render().hasPending,true);
+ ack.resolve(run);await sending;assert.equal(app.render().run.id,runId);app.unmount();
+});

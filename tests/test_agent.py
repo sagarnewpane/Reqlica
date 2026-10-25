@@ -32,6 +32,139 @@ def tool_message(name, arguments):
 
 
 class AgentTests(unittest.TestCase):
+    def test_failed_write_cancels_dependent_batch_and_recovers_without_user_error(self):
+        self.create()
+        self.tool("create_draft")
+        revision = self.run["revision"]
+        batch = tool_message("write_draft_file", {"path": "endpoints/greetings.py", "content": "def broken(:\n"})
+        batch["tool_calls"] += tool_message("upsert_endpoint", {"endpoint": {
+            "method": "GET", "path": "/greet", "handler": "endpoints/greetings.py:greet"}})["tool_calls"]
+        batch["tool_calls"] += tool_message("finish_task", {})["tool_calls"]
+        self.complete.return_value = (batch, None)
+        self.step()
+        result = self.step()
+        self.assertEqual(result["status"], "ready")
+        self.assertIsNone(result["error"])
+        self.assertEqual(result["revision"], revision)
+        saved = agent._read(agent._path(self.project.id, self.run_id))
+        self.assertFalse(saved["pending"])
+        self.assertEqual([e["status"] for e in saved["events"][-3:]], ["error", "skipped", "skipped"])
+        results = {m["tool_call_id"]: json.loads(m["content"]) for m in saved["messages"] if m["role"] == "tool"}
+        for call in batch["tool_calls"][1:]:
+            self.assertEqual(results[call["id"]]["code"], "batch_cancelled")
+        feedback = results[batch["tool_calls"][0]["id"]]
+        self.assertEqual(feedback["line"], 1)
+        self.assertEqual(feedback["recovery"]["remaining"], 2)
+        self.tool("write_draft_file", path="endpoints/greetings.py", content=HANDLER)
+        self.tool("upsert_endpoint", endpoint={"method": "GET", "path": "/greet", "handler": "endpoints/greetings.py:greet"})
+        self.complete.return_value = (tool_message("finish_task", {}), None)
+        self.step()
+        self.step()
+        self.assertEqual(self.run["status"], "completed")
+        self.assertIsNone(self.run["error"])
+
+
+    def test_identical_failed_call_is_blocked_before_mcp_and_changed_arguments_can_recover(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+        self.create()
+        run = agent._read(agent._path(self.project.id, self.run_id))
+        session = SimpleNamespace(call_tool=AsyncMock(return_value=SimpleNamespace(
+            isError=True, structuredContent={"error": "Invalid source path", "issues": [{"loc": ["source_paths", 0], "msg": "Missing file"}]})))
+        call = tool_message("get_project_context", {"source_paths": ["missing.py"]})["tool_calls"][0]
+        asyncio.run(agent._tool(session, self.project.id, run, call))
+        asyncio.run(agent._tool(session, self.project.id, run, call))
+        self.assertEqual(session.call_tool.await_count, 1)
+        feedback = json.loads(run["messages"][-1]["content"])
+        self.assertTrue(feedback["recovery"]["unchanged_call_blocked"])
+        self.assertEqual(feedback["issues"][0]["loc"], ["source_paths", 0])
+        session.call_tool.return_value = SimpleNamespace(isError=False, structuredContent={"source": {}})
+        corrected = tool_message("get_project_context", {"include_source": False})["tool_calls"][0]
+        asyncio.run(agent._tool(session, self.project.id, run, corrected))
+        self.assertEqual(session.call_tool.await_count, 2)
+        self.assertNotIn("unresolved_tool_failure", run)
+
+
+    def test_three_consecutive_tool_failures_stop_automatic_repair(self):
+        self.create()
+        self.tool("create_draft")
+        for index in range(3):
+            self.tool("write_draft_file", path="endpoints/broken.py", content=f"def broken_{index}(:\n")
+            self.assertEqual(self.run["status"], "failed" if index == 2 else "ready")
+        self.assertEqual(self.run["error"]["code"], "repeated_tool_rejection")
+
+
+    def test_unresolved_tool_error_cannot_be_hidden_by_final_success_claim(self):
+        self.create()
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="endpoints/broken.py", content="def broken(:\n")
+        self.complete.return_value = ({"role": "assistant", "content": "Everything succeeded."}, None)
+        self.assertEqual(self.step()["status"], "ready")
+        self.assertEqual(self.step()["status"], "failed")
+        self.assertIsNone(self.run["answer"])
+        self.assertEqual(self.run["error"]["code"], "repair_exhausted")
+
+
+    def test_chat_continues_after_its_saved_draft_is_published(self):
+        self.create()
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="endpoints/greetings.py", content=HANDLER)
+        self.finish_with_question()
+        original_id = self.run["draft_id"]
+        original_revision = self.run["revision"]
+        calls = self.run["model_calls"], self.run["tool_calls"]
+        published = self.publish_snapshot(drafts.draft_directory(self.project, original_id))
+        original = drafts.inspect_draft(self.project.id, original_id)
+        body = self.reply_body()
+        response = self.post_reply(body)
+        self.assertEqual(response.status_code, 200, response.text)
+        continued = response.json()
+        self.assertEqual(continued["id"], self.run_id)
+        self.assertIsNone(continued["draft_id"])
+        self.assertEqual(continued["source_draft_id"], original_id)
+        self.assertEqual(continued["revision"], original_revision)
+        self.assertEqual((continued["model_calls"], continued["tool_calls"]), calls)
+        self.assertEqual(continued["turn"], 1)
+        self.assertEqual(self.post_reply(body).json(), continued)
+        self.tool("create_draft")
+        fresh = drafts.inspect_draft(self.project.id, self.run["draft_id"])
+        self.assertNotEqual(fresh["id"], original_id)
+        self.assertEqual(fresh["base_version"], published)
+        self.assertEqual(fresh["revision"], original_revision)
+        self.assertEqual(drafts.inspect_draft(self.project.id, original_id), original)
+
+
+    def test_publication_with_different_code_cannot_rebind_a_chat(self):
+        self.create()
+        self.tool("create_draft")
+        self.tool("write_draft_file", path="endpoints/greetings.py", content=HANDLER)
+        self.finish_with_question()
+        self.publish_snapshot(code_directory(self.project))
+        path = agent._path(self.project.id, self.run_id)
+        before = agent._read(path)
+        self.assertEqual(self.post_reply(self.reply_body()).status_code, 409)
+        self.assertEqual(agent._read(path), before)
+
+
+    def test_chat_already_stopped_on_publication_can_accept_a_new_reply(self):
+        self.create()
+        self.tool("create_draft")
+        original_id = self.run["draft_id"]
+        self.publish_snapshot(drafts.draft_directory(self.project, original_id))
+        self.assertEqual(self.step()["status"], "conflict")
+        path = agent._path(self.project.id, self.run_id)
+        before = agent._read(path)
+        public = self.client.get(f"{self.root}/{self.run_id}").json()
+        self.assertTrue(public["can_reply"])
+        self.assertEqual(agent._read(path), before)
+        listed = self.client.get(self.root).json()["runs"][0]
+        self.assertTrue(listed["can_reply"])
+        response = self.post_reply(self.reply_body())
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["status"], "ready")
+        self.assertIsNone(response.json()["draft_id"])
+
+
     def setUp(self):
         self.directory = Path(self.enterContext(tempfile.TemporaryDirectory())).resolve()
         self.enterContext(patch.dict(os.environ, {"REQLICA_HOME": str(self.directory / "home")}))

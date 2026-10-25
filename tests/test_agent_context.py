@@ -5,10 +5,37 @@ import json
 import unittest
 
 from jsonschema import Draft202012Validator
-from reqlica.generation.context import model_messages, model_tool_schema
+from reqlica.generation.context import lean_tool_schema, model_messages, model_tool_schema
 
 
 class AgentContextTests(unittest.TestCase):
+    def test_error_feedback_deduplicates_text_and_omits_echoed_input(self):
+        from reqlica.generation.context import compact_tool_feedback
+        message = "1 validation error\nrecords_json\n  Expected string [type=string_type, input_value={'secret': 'value'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2/v/string_type"
+        result = compact_tool_feedback({"error": message, "message": message,
+            "errors": [{"loc": ["records_json"], "msg": "Expected string", "type": "string_type", "input": {"secret": "value"}, "url": "long documentation"}]})
+        self.assertNotIn("message", result)
+        self.assertNotIn("secret", json.dumps(result))
+        self.assertNotIn("https://", json.dumps(result))
+        self.assertEqual(result["errors"][0]["loc"], ["records_json"])
+
+    def test_lean_schema_preserves_complete_argument_help_and_validation(self):
+        description = 'JSON STRING: ' + 'Existing tables only. ' * 20 + 'Use {"$ref":"users.0.id"} for related IDs.'
+        schema = {"type": "object", "required": ["records_json"], "properties": {
+            "records_json": {"type": "string", "minLength": 2, "description": description,
+                             "title": "Records", "examples": ['[{"name":"Example"}]']},
+            "items": {"type": "array", "items": {"type": "string", "description": "Exact registered path, not a URL."}}}}
+        before = deepcopy(schema)
+        projected = lean_tool_schema(schema, description_limit=None)
+        self.assertEqual(projected["properties"]["records_json"]["description"], description)
+        self.assertEqual(projected["properties"]["items"]["items"]["description"], "Exact registered path, not a URL.")
+        self.assertNotIn("examples", projected["properties"]["records_json"])
+        validator = Draft202012Validator(projected)
+        self.assertTrue(validator.is_valid({"records_json": "[]"}))
+        self.assertFalse(validator.is_valid({"records_json": []}))
+        self.assertFalse(validator.is_valid({"records_json": ""}))
+        self.assertEqual(schema, before)
+
     def test_scope_and_revision_are_bound_but_business_constraints_remain(self):
         schema = {"type": "object", "title": "Tool", "additionalProperties": False,
             "required": ["project_id", "draft_id", "expected_revision", "endpoint"],
@@ -99,7 +126,7 @@ class AgentContextTests(unittest.TestCase):
         latest = json.loads(projected[3]["tool_calls"][0]["function"]["arguments"])
         self.assertEqual(old["path"], "endpoints/first.py")
         self.assertEqual(old["expected_revision"], "a" * 64)
-        self.assertIn("omitted", old["content"])
+        self.assertNotIn("content", old)
         self.assertEqual(latest["content"], source)
         self.assertEqual(projected[2:3], messages[2:3])
         self.assertEqual(projected[4:], messages[4:])
@@ -144,10 +171,120 @@ class AgentContextTests(unittest.TestCase):
         self.assertEqual(json.loads(model_messages(messages)[1]["content"]), payload)
 
 class ContextSelectionTests(unittest.TestCase):
+    def test_corrected_route_receipt_replaces_obsolete_argument_failure(self):
+        from reqlica.generation.context import select_messages
+        messages = [{"role": "user", "content": "Fix greeting"}]
+        messages += self.exchange("bad", "upsert_endpoint", {"endpoint": {
+            "method": "GET", "path": "/greet", "handler": "wrong_handler"}},
+            {"error": "Obsolete handler error", "code": "invalid_endpoint"})
+        messages += self.exchange("fixed", "upsert_endpoint", {"endpoint": {
+            "method": "GET", "path": "/greet", "handler": "endpoints/greetings.py:greet"}},
+            {"revision": "saved", "status": "saved"})
+        for index in range(3):
+            messages += self.exchange(str(index), "get_draft_changes", {}, {"status": "ready"})
+        projected = select_messages(messages)
+        text = json.dumps(projected)
+        self.assertNotIn("Obsolete handler error", text)
+        self.assertIn("endpoints/greetings.py:greet", text)
+        self.assertIn("Obsolete handler error", json.dumps(messages))
+
+    def test_rolling_ledger_preserves_structured_repair_locations_and_recovery(self):
+        from reqlica.generation.context import select_messages
+        diagnostic = {"status": "failed", "revision": "checked-revision", "error": "Invalid handler",
+                      "line": 12, "column": 4,
+                      "issues": [{"loc": ["endpoint", "handler"], "msg": "Missing function"}],
+                      "source_issues": [{"path": "endpoints/a.py", "line": 12, "message": "Unknown name"}],
+                      "recovery": {"attempt": 1, "remaining": 2, "tool": "upsert_endpoint"}}
+        messages = [{"role": "user", "content": "Repair handlers"}]
+        messages += self.exchange("bad", "upsert_endpoint", {"endpoint": {"method": "GET", "path": "/a"}}, diagnostic)
+        for index in range(3):
+            messages += self.exchange(str(index), "get_draft_changes", {}, {"status": "ready"})
+        projected = select_messages(messages)
+        ledger = next(m["content"] for m in projected if (m.get("content") or "").startswith("Tool evidence"))
+        evidence = json.loads(ledger.split(": ", 1)[1])
+        receipt = next(r for r in evidence["receipts"] if r["tool"] == "upsert_endpoint")
+        for key in ("revision", "line", "column", "issues", "source_issues", "recovery"):
+            self.assertEqual(receipt[key], diagnostic[key])
+
+    def test_rolling_history_never_invents_source_content_or_extra_arguments(self):
+        from reqlica.generation.context import select_messages
+        messages = [{"role": "user", "content": "Update handlers"}]
+        for i in range(4):
+            messages += self.exchange(str(i), "write_draft_file",
+                {"path": f"endpoints/{i}.py", "content": f"def handler_{i}(): return {i}\n"},
+                {"revision": str(i), "status": "saved"})
+        original = deepcopy(messages)
+        projected = select_messages(messages)
+        self.assertFalse(any(call["function"]["name"] == "write_draft_file"
+                             for item in projected for call in item.get("tool_calls", [])))
+        self.assertIn("Historical file-write receipts", json.dumps(projected))
+        self.assertNotIn("[Saved source", json.dumps(projected))
+        ledger = next(m["content"] for m in projected if m.get("content", "") and m["content"].startswith("Tool evidence"))
+        self.assertIn("def handler_3()", ledger)
+        self.assertEqual(messages, original)
+
+    def test_old_rejected_source_marker_is_removed_from_model_view_only(self):
+        from reqlica.generation.context import select_messages, OMITTED_SOURCE_MARKERS
+        for marker in OMITTED_SOURCE_MARKERS:
+            messages = [{"role": "user", "content": "Finish QR codes"}] + self.exchange(
+                "bad", "write_draft_file", {"path": "endpoints/qr_codes.py", "content": marker},
+                {"code": "source_syntax", "error": "Invalid syntax on line 1"})
+            projected = select_messages(messages)
+            self.assertNotIn(marker, json.dumps(projected))
+            self.assertFalse(any(m.get("tool_calls") or m.get("role") == "tool" for m in projected))
+            self.assertIn("get_project_context", projected[1]["content"])
+            self.assertEqual(json.loads(messages[1]["tool_calls"][0]["function"]["arguments"])["content"], marker)
+
+    def test_one_large_saved_file_can_be_omitted_without_losing_requirements(self):
+        from reqlica.generation.context import select_messages
+        messages = [{"role": "user", "content": "Keep authentication"}]
+        messages += self.exchange("write", "write_draft_file",
+            {"path": "endpoints/a.py", "content": "x" * 40000},
+            {"revision": "saved", "status": "saved"})
+        projected = select_messages(messages, max_bytes=3000)
+        self.assertEqual(projected[0], messages[0])
+        self.assertFalse(any(m.get("tool_calls") or m.get("role") == "tool" for m in projected))
+        self.assertIn("Do not repeat", projected[1]["content"])
+        self.assertIn("endpoints/a.py", projected[1]["content"])
+        self.assertEqual(json.loads(messages[1]["tool_calls"][0]["function"]["arguments"])["content"], "x" * 40000)
+
+    def test_active_source_ledger_is_bounded_and_original_history_unchanged(self):
+        from reqlica.generation.context import select_messages
+        messages = [{"role": "user", "content": "Keep auth and finish all routes"}]
+        for i in range(12):
+            messages += self.exchange(str(i), "write_draft_file",
+                {"path": f"endpoints/{i}.py", "content": "x" * 5000},
+                {"revision": str(i), "status": "saved"})
+        original = deepcopy(messages)
+        projected = select_messages(messages, max_bytes=10000)
+        self.assertLessEqual(len(json.dumps(projected, separators=(",", ":")).encode()), 10000)
+        self.assertIn("Some source omitted", json.dumps(projected))
+        self.assertEqual(messages, original)
+        ids = {c["id"] for m in projected for c in m.get("tool_calls", [])}
+        outputs = {m["tool_call_id"] for m in projected if m["role"] == "tool"}
+        self.assertEqual(ids, outputs)
+
     def exchange(self, identifier, name, arguments, payload):
         return [{"role": "assistant", "content": None, "tool_calls": [{"id": identifier,
                  "type": "function", "function": {"name": name, "arguments": json.dumps(arguments)}}]},
                 {"role": "tool", "tool_call_id": identifier, "content": json.dumps(payload)}]
+
+    def test_compacted_write_in_mixed_batch_preserves_other_tool_pairs(self):
+        from reqlica.generation.context import select_messages
+        write = self.exchange("write", "write_draft_file", {"path": "endpoints/a.py"},
+                              {"error": "Missing content", "next_step": "Read saved source"})
+        read = self.exchange("read", "get_project_context", {"source_paths": ["endpoints/a.py"]},
+                             {"source": {"endpoints/a.py": "def hello(): return {}"}})
+        messages = [{"role": "user", "content": "Fix A"},
+                    {"role": "assistant", "content": None, "tool_calls":
+                        write[0]["tool_calls"] + read[0]["tool_calls"]}, write[1], read[1]]
+        original = deepcopy(messages)
+        projected = select_messages(messages)
+        calls = [c for m in projected for c in m.get("tool_calls", [])]
+        self.assertEqual([c["id"] for c in calls], ["read"])
+        self.assertEqual([m["tool_call_id"] for m in projected if m["role"] == "tool"], ["read"])
+        self.assertIn("Missing content", projected[1]["content"])
+        self.assertEqual(messages, original)
 
     def test_new_turn_preserves_requirements_and_answers_without_historical_source(self):
         from reqlica.generation.context import select_messages
@@ -209,7 +346,9 @@ class ContextSelectionTests(unittest.TestCase):
         projected = select_messages(messages)
         source = json.loads(projected[2]["content"])["source"]
         self.assertEqual(source, {"endpoints/b.py": "still current"})
-        self.assertNotIn("replacement", json.dumps(projected))
+        # Retain one current implementation so the model does not regenerate a
+        # successful save. Only the stale read must lose that file's contents.
+        self.assertEqual(json.loads(projected[3]["tool_calls"][0]["function"]["arguments"])["content"], "replacement")
 
 
     def test_large_previous_answer_is_abridged_before_refusing_a_new_request(self):

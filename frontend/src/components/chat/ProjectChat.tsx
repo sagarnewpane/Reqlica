@@ -75,6 +75,7 @@ export default function ProjectChat({
     runs,
     run,
     setRun,
+    startNew,
     loading,
     busy,
     hasPending,
@@ -217,6 +218,12 @@ export default function ProjectChat({
             disabled={frozen || hasPending}
             value={run?.id || ''}
             onValueChange={(nextValue) => {
+              if (!nextValue) {
+                setAttachment({ ready: true });
+                setSelectedDraftId('');
+                startNew();
+                return;
+              }
               setRun(runs.find((item) => item.id === nextValue) || null);
               setMessage('');
               setError('');
@@ -244,12 +251,11 @@ export default function ProjectChat({
           className={styles.secondary}
           aria-label="New chat"
           title="New chat"
-          disabled={frozen || hasPending}
+          disabled={frozen}
           onClick={() => {
             setAttachment({ ready: true });
-            setRun(null);
-            setMessage('');
-            setError('');
+            setSelectedDraftId('');
+            startNew();
             textarea.current?.focus();
           }}
         >
@@ -686,9 +692,7 @@ export default function ProjectChat({
                       ]);
                       setSelectedDraftId(saved.id);
                       setAttachment({ ready: true });
-                      setRun(null);
-                      setMessage('');
-                      setError('');
+                      startNew();
                       textarea.current?.focus();
                     })
                     .catch((err) => setError((err as Error).message));

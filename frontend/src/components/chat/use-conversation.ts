@@ -504,6 +504,19 @@ export function useConversation({
     setPausing(true);
   }
 
+  function startNew() {
+    if (locked.current || loading) return;
+    // Explicitly leaving an unconfirmed submission must not replay it in a new
+    // chat. Any server checkpoint remains available in conversation history.
+    pending.current = null;
+    setHasPending(false);
+    setRun(null);
+    setMessage('');
+    setError('');
+    setOutgoing('');
+    setActivity(null);
+  }
+
   async function resetReasoning() {
     const generation = epoch.current;
     const currentLifecycle = () =>
@@ -536,6 +549,7 @@ export function useConversation({
     runs,
     run,
     setRun,
+    startNew,
     loading,
     busy,
     hasPending,
