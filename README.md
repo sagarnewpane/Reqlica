@@ -15,6 +15,25 @@ Use Reqlica through either:
 
 ![Reqlica project chat dashboard](docs/images/project-chat.png)
 
+## Features
+
+- **AI API generation:** turn a description or OpenAPI specification into Python
+  endpoints, route definitions, and tests.
+- **Persistent data:** keep SQLite records across requests, worker restarts,
+  and code updates.
+- **Review before publishing:** edit drafts, run validation and behavior tests,
+  then approve and activate the checked version.
+- **Sample data:** generate and validate JSON fixtures or related database
+  records before confirming insertion.
+- **Request testing:** try endpoints with the built-in tester, chain requests,
+  and inspect OpenAPI contracts in Swagger.
+- **Traffic controls:** configure delays, failures, rate limits, mock credentials,
+  and browser access through CORS.
+- **Logs and recovery:** inspect requests and errors, restore data baselines,
+  and back up or transfer projects.
+- **Runtime management:** start and stop APIs, configure environment variables,
+  review package installs, and apply database changes.
+
 ## Documentation
 
 - [Installation](docs/guides/installation.md)
@@ -40,14 +59,6 @@ MCP clients connect to `http://127.0.0.1:3000/mcp` using Streamable HTTP.
 [.env.example](.env.example) documents the defaults. Edit `.env` to change ports
 or the app-state directory. See [installation](docs/guides/installation.md)
 for the full setup.
-
-## What you can do
-
-- Generate handlers, routes, tests, and sample data through Project AI or MCP.
-- Edit drafts, run validation and tests, then approve and activate a revision.
-- Test persistent APIs with a request tester, request chains, and Swagger.
-- Simulate delays, failures, rate limits, authentication, and CORS.
-- Manage data, environment variables, packages, backups, and project transfers.
 
 ## AI use
 
