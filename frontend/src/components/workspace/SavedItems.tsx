@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import Button from '@/components/ui/Button/Button';
+import Input from '@/components/ui/Input/Input';
+import Select from '@/components/ui/Select/Select';
 import { newRequestId } from '@/lib/ids';
 import { useResource } from './use-resource';
-import s from './Workspace.module.css';
+import s from './SavedItems.module.css';
 export type LibraryItem = {
   id: string;
   kind: string;
@@ -27,6 +29,7 @@ export default function SavedItems({
   const [selected, setSelected] = useState('');
   const [name, setName] = useState('');
   const [notice, setNotice] = useState('');
+  const id = useId();
   const item = resource.data?.items.find((i) => i.id === selected);
   async function save() {
     try {
@@ -49,12 +52,13 @@ export default function SavedItems({
             : 'requests'}
       </summary>
       <div className={s.grid}>
-        <label>
-          Saved item
-          <select
+        <div>
+          <label htmlFor={`${id}-item`}>Saved item</label>
+          <Select
+            id={`${id}-item`}
             value={selected}
             disabled={disabled || resource.busy}
-            onChange={(e) => setSelected(e.target.value)}
+            onValueChange={setSelected}
           >
             <option value="">Select saved item</option>
             {resource.data?.items
@@ -64,18 +68,19 @@ export default function SavedItems({
                   {i.name}
                 </option>
               ))}
-          </select>
-        </label>
-        <label>
-          Save as
-          <input
+          </Select>
+        </div>
+        <div>
+          <label htmlFor={`${id}-name`}>Save as</label>
+          <Input
+            id={`${id}-name`}
             value={name}
             disabled={disabled || resource.busy}
             onChange={(e) => setName(e.target.value)}
             maxLength={100}
             placeholder={`${kind} ${new Date().toLocaleDateString()}`}
           />
-        </label>
+        </div>
       </div>
       <div className={s.row}>
         <Button
@@ -125,8 +130,16 @@ export default function SavedItems({
           Refresh
         </Button>
       </div>
-      {resource.error && <p role="alert">{resource.error}</p>}
-      {notice && <p role="status">{notice}</p>}
+      {resource.error && (
+        <p className={s.error} role="alert">
+          {resource.error}
+        </p>
+      )}
+      {notice && (
+        <p className={s.notice} role="status">
+          {notice}
+        </p>
+      )}
     </details>
   );
 }

@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import Button from '@/components/ui/Button/Button';
-import s from '@/components/workspace/Workspace.module.css';
+import Input from '@/components/ui/Input/Input';
+import Select from '@/components/ui/Select/Select';
+import Card from '@/components/ui/Card/Card';
+import s from './Settings.module.css';
 export default function ConnectionSettings({
   projectId,
 }: {
@@ -63,89 +66,109 @@ export default function ConnectionSettings({
     }
   }
   return (
-    <section className={s.panel}>
-      <h2>Connections and appearance</h2>
-      <p>
-        Configure the local console and mock runtime used by this dashboard.
-      </p>
-      <div className={s.grid}>
-        <label>
-          Console URL
-          <input
-            value={consoleUrl}
-            disabled={busy}
-            onChange={(e) => setConsoleUrl(e.target.value)}
-          />
-          {health.console || 'Not checked'}
-        </label>
-        <label>
-          Runtime URL
-          <input
-            value={runtime}
-            disabled={busy}
-            onChange={(e) => setRuntime(e.target.value)}
-          />
-          {health.runtime || 'Not checked'}
-        </label>
-        <label>
-          Theme
-          <select
-            value={theme}
-            onChange={(e) => {
-              const choice = e.target.value;
-              try {
-                localStorage.setItem('reqlica:theme', choice);
-              } catch {
-                setError(
-                  'Theme applies now, but browser storage is unavailable.',
+    <div className={s.form}>
+      <Card className={s.section}>
+        <div className={s.sectionHeading}>
+          <div>
+            <h2>Connections and appearance</h2>
+            <p>
+              Configure the local console and mock runtime used by this
+              dashboard.
+            </p>
+          </div>
+        </div>
+        <div className={s.grid}>
+          <div>
+            <label htmlFor="console-url">Console URL</label>
+            <Input
+              id="console-url"
+              type="url"
+              value={consoleUrl}
+              disabled={busy}
+              onChange={(e) => setConsoleUrl(e.target.value)}
+            />
+            <p>{health.console || 'Not checked'}</p>
+          </div>
+          <div>
+            <label htmlFor="runtime-url">Runtime URL</label>
+            <Input
+              id="runtime-url"
+              type="url"
+              value={runtime}
+              disabled={busy}
+              onChange={(e) => setRuntime(e.target.value)}
+            />
+            <p>{health.runtime || 'Not checked'}</p>
+          </div>
+          <div>
+            <label htmlFor="theme">Theme</label>
+            <Select
+              id="theme"
+              value={theme}
+              onValueChange={(choice) => {
+                try {
+                  localStorage.setItem('reqlica:theme', choice);
+                } catch {
+                  setError(
+                    'Theme applies now, but browser storage is unavailable.',
+                  );
+                }
+                setTheme(choice);
+                document.documentElement.classList.toggle(
+                  'dark',
+                  choice === 'dark' ||
+                    (choice === 'system' &&
+                      matchMedia('(prefers-color-scheme: dark)').matches),
                 );
-              }
-              setTheme(choice);
-              document.documentElement.classList.toggle(
-                'dark',
-                choice === 'dark' ||
-                  (choice === 'system' &&
-                    matchMedia('(prefers-color-scheme: dark)').matches),
-              );
-              window.dispatchEvent(new Event('reqlica:theme'));
-            }}
+                window.dispatchEvent(new Event('reqlica:theme'));
+              }}
+            >
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </Select>
+            <p>Applies immediately in this browser.</p>
+          </div>
+        </div>
+        <div className={s.connectionActions}>
+          <Button
+            disabled={busy || !consoleUrl || !runtime}
+            onClick={() => void request(true)}
           >
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </label>
-      </div>
-      <div className={s.row}>
-        <Button
-          disabled={busy || !consoleUrl || !runtime}
-          onClick={() => void request(true)}
-        >
-          Save connections
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={busy}
-          onClick={() => void request()}
-        >
-          Check connection health
-        </Button>
-        {projectId && (
+            Save connections
+          </Button>
           <Button
             variant="secondary"
-            onClick={() => {
-              void navigator.clipboard
-                .writeText(`${runtime}/mock/${projectId}`)
-                .then(() => setNotice('Published API base URL copied.'))
-                .catch(() => setError('Clipboard unavailable.'));
-            }}
+            disabled={busy}
+            onClick={() => void request()}
           >
-            Copy API base URL
+            Check connection health
           </Button>
+          {projectId && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                void navigator.clipboard
+                  .writeText(`${runtime}/mock/${projectId}`)
+                  .then(() => setNotice('Published API base URL copied.'))
+                  .catch(() => setError('Clipboard unavailable.'));
+              }}
+            >
+              Copy API base URL
+            </Button>
+          )}
+        </div>
+        {error && (
+          <p className={s.error} role="alert">
+            {error}
+          </p>
         )}
-      </div>
-      {error && <p role="alert">{error}</p>}
-      {notice && <p role="status">{notice}</p>}
-    </section>
+        {notice && (
+          <p className={s.notice} role="status">
+            {notice}
+          </p>
+        )}
+      </Card>
+    </div>
   );
 }

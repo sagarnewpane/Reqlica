@@ -67,6 +67,8 @@ export type AgentRun = {
     reasoning_mode?: ReasoningMode;
   };
   can_reset_reasoning?: boolean;
+  can_change_reasoning?: boolean;
+  can_change_limits?: boolean;
   allow_edits: boolean;
   allow_execution: boolean;
   usage?: (TokenUsage | null)[];

@@ -189,20 +189,20 @@ CONSOLE_PORT=3001 uv run python -m reqlica.console.app
 `REQLICA_CONSOLE_URL` defaults to `http://127.0.0.1:3001`. Override it in
 `frontend/.env.local` if needed. The runtime remains on port 4000.
 Choose a provider and a tool-capable model ID under **Model & permissions**.
-Enter a provider key once in the project's **Settings → AI connection → API key**
+Enter a provider key once in **Settings → AI connection → App API key**
 and click **Save key**. Model discovery and chat reuse it automatically, including
 after refresh or restart. **Remove key** deletes it; entering another key replaces it.
 Local Ollama does not require a key. The selected provider receives project context.
 
-Keys are scoped to the project, provider, and provider URL. The console keeps them
-in `$REQLICA_HOME/provider-keys/<project-id>.json` (default `~/.reqlica/provider-keys/`),
+Keys are shared across all projects, scoped to provider and provider URL. The console keeps them
+in `$REQLICA_HOME/provider-keys/application.json` (default `~/.reqlica/provider-keys/`),
 with owner-only file/directory permissions (`0600`/`0700`). These are local plaintext
 secrets protected by filesystem permissions, not encryption. They stay outside
 project source, drafts, exports, browser storage, model input, and saved conversations.
 The status API reports only whether a key is configured. The explicit **Show key**
 action returns its value to the current page without caching it; **Hide key** clears
 the displayed value. Protect your local account and backups. The console's environment key remains a fallback
-when no project key is configured.
+when no app key is configured.
 
 Chat advances one saved backend step at a time. Pause takes effect after the
 current step completes; navigating away prevents further steps. An unconfirmed
@@ -250,14 +250,30 @@ non-read methods can modify live project data.
 
 ## Model profiles
 
+Conversation budgets are configured in Settings for new chats: 1,000–1,000,000
+cumulative provider-reported tokens and 1–1,000 tool calls (defaults: 100,000
+tokens and 64 tool calls). Existing chats keep their saved limits. In chat,
+open **Model & permissions → Conversation budgets**, enter new limits, and click
+**Update this chat’s budgets** to change that chat explicitly. Usage and pending
+tools are preserved; updating limits does not execute anything. Review the draft
+before resuming. Separate model-call and serialized-context size limits still apply.
+
 Settings → AI connection supports up to 30 named model profiles per browser.
 Create, rename/update, duplicate, or delete profiles. A profile contains provider,
-model ID, base URL, response token limit, and request timeout. API keys and project
+model ID, base URL, and reasoning level. API keys, response limits, and project
 permissions are excluded. Selecting a profile loads it into the settings form;
-**Save changes** makes that configuration the workspace/project default. New chats
+**Save defaults** makes that API connection app-wide; chat behavior and token limits can still be project-specific. Use
+**Save as new profile**, name the current connection, then **Create profile** to
+save a reusable connection without changing defaults. New chats
 can choose any saved profile under **Model & permissions**. Selecting a different
-profile selects its matching saved project key and preserves edit/test permissions.
+profile selects its matching saved app key and preserves edit/test permissions.
 Existing conversations retain their original model configuration.
+
+App API keys are saved separately on the local console for a provider
+and optional provider URL, shared by all projects. Saving a key does not save the connection as a default
+or verify the key with the provider. Saved keys have explicit show, replace, and
+confirmed removal actions. Save or cancel a pending key entry before changing
+providers or saving defaults; profiles never contain keys.
 
 ## Shared UI patterns and legacy parity
 
@@ -346,3 +362,14 @@ create a new draft for further changes.
 
 The brand mark is a dedicated SVG, replacing the cropped raster draft so it
 stays sharp and contains no wordmark fragments at different sizes.
+
+
+### Shared AI configuration
+
+API keys are app-wide and remain private server-side. Existing project-key files
+migrate once: matching keys are shared automatically; conflicting keys require an
+explicit app-key choice in Settings. Removing an app key affects all projects and
+does not reimport old project keys. Provider and URL isolation still applies.
+Model profile lists synchronize across open project views in this browser;
+profiles never contain credentials. Existing conversations keep their selected
+model, and new chats use the current shared API defaults.

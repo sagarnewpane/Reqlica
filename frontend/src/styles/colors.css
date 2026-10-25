@@ -2,9 +2,17 @@
   --reqlica-green: #1b4232;
   --reqlica-lime: #b5ce26;
   --button-primary: var(--reqlica-green);
+  --button-primary-text: #ffffff;
+  --button-danger: #c73737;
+  --button-danger-text: #ffffff;
   --button-accent: var(--reqlica-lime);
+  --selection-background: var(--reqlica-lime);
+  --selection-foreground: #1b4232;
+  --switch-thumb: #ffffff;
   --background-primary: #f7faf8;
   --background-secondary: #ffffff;
+  --background-elevated: #ffffff;
+  --control-background: var(--background-primary);
   --text-primary: #17231d;
   --text-secondary: #66736c;
   --border-primary: #dfe7e2;
@@ -14,15 +22,38 @@
   --status-warning-background: rgba(217, 155, 43, 0.12);
   --status-danger: #d64545;
   --status-danger-background: rgba(214, 69, 69, 0.12);
+  --sidebar: #1b4232;
+  --sidebar-foreground: #f1f7f3;
+  --sidebar-primary: var(--selection-background);
+  --sidebar-primary-foreground: var(--selection-foreground);
+  --sidebar-accent: #295440;
+  --sidebar-accent-foreground: #f1f7f3;
+  --sidebar-border: #37604d;
+  --sidebar-ring: var(--reqlica-lime);
 }
 
 :root.dark {
   color-scheme: dark;
   --reqlica-green: #9fd7b5;
   --button-primary: #245641;
+  --button-danger: #a73535;
+  --selection-background: #344329;
+  --selection-foreground: #e0edb6;
   --background-primary: #111b16;
   --background-secondary: #19261f;
+  --background-elevated: #203128;
   --text-primary: #e4efe8;
   --text-secondary: #a2b5a9;
   --border-primary: #34463b;
+  --status-success: #9bd58a;
+  --status-success-background: rgba(95, 159, 74, 0.14);
+  --status-warning: #edc16c;
+  --status-warning-background: rgba(217, 155, 43, 0.14);
+  --status-danger: #ff9994;
+  --status-danger-background: rgba(214, 69, 69, 0.14);
+  --sidebar: #142019;
+  --sidebar-foreground: #dce8df;
+  --sidebar-accent: #22352a;
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: #2e4235;
 }

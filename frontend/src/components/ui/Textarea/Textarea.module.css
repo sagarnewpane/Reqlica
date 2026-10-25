@@ -1,0 +1,28 @@
+.textarea {
+  display: block;
+  width: 100%;
+  min-height: 120px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--control-background);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.textarea::placeholder {
+  color: var(--text-secondary);
+}
+.textarea:hover:not(:disabled) {
+  border-color: var(--reqlica-green);
+}
+.textarea:focus-visible {
+  outline: 2px solid var(--reqlica-lime);
+  outline-offset: 2px;
+}
+.textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

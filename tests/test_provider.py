@@ -11,6 +11,16 @@ from reqlica.generation.schemas import AgentRequest
 from ai_fixtures import ProviderFixture
 
 class ProviderTests(ProviderFixture, unittest.TestCase):
+    def test_cerebras_qwen_reasoning_reaches_native_wire_field(self):
+        for mode, effort in [("off", "none"), ("low", "low"), ("medium", "medium"), ("high", "high"), ("default", None)]:
+            request = AgentRequest(message="Explain", provider="compatible", model="qwen-3.8-27b",
+                                   base_url="https://api.cerebras.ai/v1", reasoning_mode=mode)
+            provider.complete(self.messages, request, SecretStr("explicit-key"), tools=[])
+            body = json.loads(self.requests[-1].content)
+            self.assertEqual(body.get("reasoning_effort"), effort)
+            self.assertNotIn("reasoning", body)
+            self.assertNotIn("reasoning_mode", body)
+
     def test_64k_output_budget_reaches_each_provider_and_larger_values_are_rejected(self):
         from pydantic import ValidationError
         for kind in ("groq", "openai", "compatible", "ollama"):
@@ -232,7 +242,7 @@ class ProviderTests(ProviderFixture, unittest.TestCase):
 
     def test_default_reasoning_is_left_to_every_provider(self):
         for kind in ("groq", "compatible", "openai"):
-            request = AgentRequest(message="x", provider=kind, model="brand-new-model", base_url=provider.GROQ_BASE_URL if kind != "openai" else None)
+            request = AgentRequest(message="x", provider=kind, model="brand-new-model", base_url=provider.GROQ_BASE_URL if kind != "openai" else None, reasoning_mode="default")
             provider.complete(self.messages, request, SecretStr("private-provider-key"), tools=[])
             body = json.loads(self.requests[-1].content)
             self.assertEqual(body["model"], "brand-new-model")
@@ -242,7 +252,7 @@ class ProviderTests(ProviderFixture, unittest.TestCase):
                 self.assertIn("max_completion_tokens", body)
 
     def test_unlisted_model_and_catalog_outage_do_not_block_or_substitute_inference(self):
-        request = AgentRequest(message="x", provider="compatible", base_url="https://openrouter.ai/api/v1", model="unlisted/model:free")
+        request = AgentRequest(message="x", provider="compatible", base_url="https://openrouter.ai/api/v1", model="unlisted/model:free", reasoning_mode="default")
         for options in ({"return_value": None}, {"side_effect": GenerationError("Catalog unavailable", 503)}):
             with self.subTest(options=options), patch("reqlica.generation.provider.openrouter_model", **options):
                 provider.complete(self.messages, request, SecretStr("private-provider-key"), tools=[])
@@ -264,7 +274,7 @@ class ProviderTests(ProviderFixture, unittest.TestCase):
     def test_openrouter_404_reports_empty_endpoint_list_without_retrying_inference(self):
         self.status = 404
         self.payload = {"error": {"message": "Unknown model private-provider-key private-source"}}
-        request = AgentRequest(message="x", provider="compatible", base_url="https://openrouter.ai/api/v1", model="unlisted/model:free")
+        request = AgentRequest(message="x", provider="compatible", base_url="https://openrouter.ai/api/v1", model="unlisted/model:free", reasoning_mode="default")
         with patch("reqlica.generation.provider.openrouter_model", return_value=None), patch("reqlica.generation.provider.openrouter_availability", return_value={"endpoint_count": 0}) as lookup:
             with self.assertRaises(GenerationError) as caught:
                 provider.complete(self.messages, request, SecretStr("private-provider-key"), tools=[])
@@ -276,7 +286,7 @@ class ProviderTests(ProviderFixture, unittest.TestCase):
     def test_openrouter_404_with_unknown_availability_does_not_claim_model_is_invalid(self):
         self.status = 404
         self.payload = {"error": {"message": "private error"}}
-        request = AgentRequest(message="x", provider="compatible", base_url="https://openrouter.ai/api/v1", model="unlisted/model:free")
+        request = AgentRequest(message="x", provider="compatible", base_url="https://openrouter.ai/api/v1", model="unlisted/model:free", reasoning_mode="default")
         with patch("reqlica.generation.provider.openrouter_model", return_value=None), patch("reqlica.generation.provider.openrouter_availability", return_value=None):
             with self.assertRaises(GenerationError) as caught:
                 provider.complete(self.messages, request, SecretStr("private-provider-key"), tools=[])

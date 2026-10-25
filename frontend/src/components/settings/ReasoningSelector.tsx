@@ -31,7 +31,7 @@ export default function ReasoningSelector({
   onChange: (value: ReasoningMode) => void;
   disabled?: boolean;
 }) {
-  const [modes, setModes] = useState<ReasoningMode[]>(['default']);
+  const [modes, setModes] = useState<ReasoningMode[]>(['default', 'off']);
   const [message, setMessage] = useState(
     'Choose a model to see its reasoning options.',
   );
@@ -89,7 +89,7 @@ export default function ReasoningSelector({
 
   const checking = hasModel && (loading || loadedScope !== scope);
   const shownModes: ReasoningMode[] =
-    hasModel && loadedScope === scope ? modes : ['default'];
+    hasModel && loadedScope === scope ? modes : ['default', 'off'];
   const available = shownModes.includes(value);
   return (
     <div className={styles.root}>

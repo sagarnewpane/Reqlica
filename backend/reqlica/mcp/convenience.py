@@ -23,7 +23,7 @@ RouteFilter = Annotated[
 
 
 async def get_project_urls(project_id: ProjectID, path: RouteFilter = None) -> dict:
-    """Convenience only: get published endpoint URLs for the user to call directly.
+    """Convenience only: list published endpoint/docs/OpenAPI URLs without executing requests. Optional path is a registered pattern, not a concrete URL. Following these URLs uses persistent LIVE data; use draft URLs for disposable previews.
 
     Returns kind='published', base_url, active_version and endpoints with method,
     path, handler, url, requires_path_parameters. Optional path filters registered
@@ -41,7 +41,7 @@ async def get_project_urls(project_id: ProjectID, path: RouteFilter = None) -> d
 async def get_draft_urls(
     project_id: ProjectID, draft_id: DraftID, path: RouteFilter = None
 ) -> dict:
-    """Convenience only: get draft preview URLs for browser, curl, or Postman testing.
+    """Convenience only: list current draft endpoint/docs/OpenAPI preview URLs without executing requests. Optional path is a registered pattern. Following endpoint URLs runs the current unpinned draft with fresh disposable data per request; does not validate or test it.
 
     Returns kind='draft_preview', draft_id, current revision, base_url and endpoint
     method/path/handler/url/requires_path_parameters. Requires an existing draft,

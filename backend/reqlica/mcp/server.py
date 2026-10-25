@@ -119,6 +119,12 @@ NOT a persistent session. Use a test for multi-step stateful behavior. There is 
 direct database browsing, live schema migration or live-request MCP tool.
 Prefer the SDK connection()/transaction() helpers for data access. Disposable
 execution is NOT a sandbox: Python can still access OS files and the network.
+New tables use a draft database/schema.json additive plan with version=1 and
+tables=[{name,columns:[{name,type,...}]}]. Supported types are INTEGER/TEXT/REAL/
+BLOB/NUMERIC; primary keys must be INTEGER; required columns use nullable=false,
+not not_null. preview_database_migration changes EXISTING tables only and never
+accepts add_table. Save its returned plan as database/migration.json, not invented
+schema fingerprints. Setup/migration previews do not apply changes to live data.
 
 PROJECT OPERATIONS
 Read get_traffic_policies, get_worker_status, get_data_baseline and
@@ -155,7 +161,7 @@ EXECUTE = ToolAnnotations(readOnlyHint=False, openWorldHint=True)
 
 
 async def list_projects() -> dict:
-    """Find an existing project and obtain its project_id before working on its API.
+    """List existing projects and obtain projects[].id; no arguments. Select an error-free match, then read get_project_context; ask which project if ambiguous.
 
     Returns {projects: [{id, name, directory, active_version, error}, ...]};
     broken entries may contain only id/error. Select an error-free match, ask if
@@ -170,10 +176,10 @@ async def read_project_logs(
     project_id: ProjectID,
     limit: Annotated[int, Field(ge=1, le=100, description="Maximum events per page; newest first.")] = 50,
     before_id: Annotated[int | None, Field(ge=1, description="Use next_before_id from the previous page; omit for latest events.")] = None,
-    kind: Annotated[EventKind | None, Field(description="Filter requests, runtime_error or startup_error; omit for all events.")] = None,
+    kind: Annotated[EventKind | None, Field(description="Filter request, runtime_error, startup_error, stdout or stderr; omit for all events.")] = None,
     request_id: Annotated[str | None, Field(pattern=r"^[0-9a-f]{32}$", description="Gateway X-Reqlica-Request-ID to correlate a request and its errors.")] = None,
 ) -> dict:
-    """Inspect published gateway request history and structured Python errors.
+    """Read published request/error logs, not draft test output. Filter by request_id/kind; page newest-first using next_before_id. Returns saved evidence, not a live health check.
 
     Returns bounded metadata, status, duration and exception frame locations.
     No query strings, headers, exception messages, source or locals. Manually
@@ -186,9 +192,14 @@ async def read_project_logs(
 
 async def preview_database_migration(
     project_id: ProjectID,
-    operations_json: Annotated[str, Field(min_length=2, max_length=65536, description="JSON array of declarative add/drop/rename column/table or rebuild_table operations; never raw SQL.")],
+    operations_json: Annotated[str, Field(min_length=2, max_length=65536, description='JSON array encoded as a string, 1–50 operations on EXISTING tables. Allowed shapes: {"op":"add_column","table":"users","column":{"name":"nickname","type":"TEXT","nullable":true}}; {"op":"drop_column","table":"users","name":"nickname"}; {"op":"rename_column","table":"users","name":"nickname","new_name":"display_name"}; {"op":"rename_table","table":"users","new_name":"accounts"}; {"op":"drop_table","table":"users"}; {"op":"rebuild_table","table":"users","definition":{"name":"users","columns":[{"name":"id","type":"INTEGER","primary_key":true}]},"copy_columns":{"id":"id"}}. Rebuild requires definition.name equal to table and nonempty copy_columns mapping destination names to source names; columns goes inside definition. Column types: INTEGER, TEXT, REAL, BLOB, NUMERIC; use nullable:false, never not_null. add_column cannot be primary_key or unique. No add_table or raw SQL. Create new tables by saving database/schema.json in the draft: {"version":1,"tables":[{"name":"users","columns":[{"name":"id","type":"INTEGER","primary_key":true}]}]}.')],
 ) -> dict:
-    """Preview schema changes on disposable SQLite data; never apply to live data.
+    """Preview changes to EXISTING LIVE SQLite tables on disposable data; never apply live. First read get_project_context(include_database=true) and verify source tables/columns exist. Draft-only tables are not migration sources. Rebuilds support only INTEGER primary keys; copy_columns maps destination to existing source columns without generating/backfilling values. No add_table: create new tables with a draft database/schema.json additive plan instead.
+
+    Rebuild definitions support INTEGER primary keys only, not TEXT/UUID keys.
+    copy_columns maps destination names to EXISTING source names and copies values
+    without backfilling or converting UUIDs to integers. New required columns need
+    valid defaults or source values; nullable new columns may be omitted from copying.
 
     Returns a reviewed database/migration.json plan and digest. Save the plan in
     the task's draft, validate/test it, then leave live apply/rollback to the human
@@ -226,7 +237,7 @@ async def list_drafts(
         ),
     ] = 0,
 ) -> dict:
-    """Discover existing drafts so a new LLM session can resume work without guessing IDs.
+    """Find a task's existing draft before creating another. Returns drafts[].id/revision and next_offset; inspect matching changes/context and ask if ambiguous. Stale-base drafts need review before reuse.
 
     Discover prior work before creating another draft. Returns project_id,
     drafts, total, offset, limit, next_offset. Summaries contain id, revision,
@@ -292,7 +303,7 @@ async def get_project_context(
         ),
     ] = True,
 ) -> dict:
-    """Read existing implementation before editing, or inspect source in a known draft.
+    """Read files/routes before editing. Omit draft_id for active code; pass a known draft ID for unpublished edits. Use source_paths for exact files and database_tables for live metadata; returns no stored records.
 
     Omit draft_id for published code; pass it to see unpublished edits.
     Returns project/draft metadata, revision, endpoints, files, source (relative
@@ -340,7 +351,7 @@ async def create_draft(
         ),
     ] = None,
 ) -> dict:
-    """Begin API changes by creating ONE editable draft of an existing versioned project.
+    """Create ONE unpublished copy of active code after reading context and finding no matching draft. Supply a short name; returns id and revision for subsequent edits. Reuse it for the whole change; legacy projects need CLI conversion first.
 
     Read context and discover existing work first; create only if no task-matching
     draft exists. Takes project_id, not draft_id/revision. Copies active code;
@@ -362,9 +373,10 @@ async def write_draft_file(
         str,
         Field(
             description=(
-                "File path relative to the draft code root, e.g. endpoints/books.py "
-                "or tests/test_books.py. Not a URL, absolute path, or drafts/<id>/ "
-                "path. No '..', symlinks, database paths, or reserved control files."
+                "Code-root-relative file, e.g. endpoints/books.py, tests/test_books.py, "
+                "PROJECT_CONTEXT.md, database/schema.json or database/migration.json. "
+                "Not a URL, absolute path or drafts/<id>/ path. No '..', symlinks, "
+                "live .sqlite/.db files or reserved control directories."
             ),
             examples=["endpoints/books.py", "tests/test_books.py"],
         ),
@@ -375,7 +387,12 @@ async def write_draft_file(
             description=(
                 "Complete UTF-8 file content, not a diff, patch, filename, or prompt. "
                 "Replaces the whole file; preserve needed existing definitions. "
-                "Supply valid Python for .py files; write meaningful unittest tests."
+                "Supply valid Python for .py files and meaningful unittest tests. "
+                'New-table database/schema.json format: {"version":1,"tables":[{"name":"users",'
+                '"columns":[{"name":"id","type":"INTEGER","primary_key":true}]}]}. '
+                "Column types: INTEGER, TEXT, REAL, BLOB, NUMERIC. Use nullable:false, "
+                "not not_null; primary keys must be INTEGER. Migration files use the "
+                "plan returned by preview_database_migration, never invented hashes."
             ),
         ),
     ],
@@ -468,7 +485,7 @@ async def remove_endpoint(
 
 
 async def get_draft_changes(project_id: ProjectID, draft_id: DraftID) -> dict:
-    """Inspect draft progress, recover its current revision, or prepare human review.
+    """Read draft progress and current revision after a conflict or before review. Returns changed file names and saved checks; read source with get_project_context. Runs no checks.
 
     No expected_revision needed. Returns id, revision, base_version, files,
     changes (added/modified/deleted filenames), validation, test and approval.
@@ -503,7 +520,7 @@ async def get_api_schema(
         ),
     ] = None,
 ) -> dict:
-    """Inspect the generated input/output contract for an API or a single endpoint.
+    """Read saved OpenAPI after validation of the current draft revision. Supply both method and registered path for one operation, or omit both for the full API. Returns schema, warnings and referenced components; never generates missing contracts.
 
     Read expected parameters/body/formats, required fields, responses or OpenAPI.
     Drafts require successful validation at the current revision; omit draft_id for
@@ -528,7 +545,7 @@ async def get_api_schema(
 async def validate_draft(
     project_id: ProjectID, draft_id: DraftID, expected_revision: Revision
 ) -> dict:
-    """Check that the final draft's Python and route definitions can load. Supply the revision returned by the most recent successful edit.
+    """Validate final saved source/routes at expected_revision before test_draft. Executes imports in a disposable code/DB copy and generates OpenAPI; inspect status/output/schema warnings. Does not test business behavior.
 
     After final file/route edits, before test_draft: checks syntax, manifest/handler
     definitions, imports and application loading in a disposable code/database copy.
@@ -550,7 +567,7 @@ async def validate_draft(
 async def test_draft(
     project_id: ProjectID, draft_id: DraftID, expected_revision: Revision
 ) -> dict:
-    """Run the draft's unittest behavior tests against a disposable data copy. Supply the revision returned by the most recent successful edit.
+    """Run tests/test*.py unittest behavior tests after validation at the same final revision. Uses disposable data; inspect status, tests_run/tests_passed and output. Zero/all-skipped tests do not prove coverage.
 
     After validation passes at the final revision, run meaningful tests/test*.py
     unittest tests. The starter hello test alone does not cover new endpoints.
@@ -598,7 +615,7 @@ async def call_draft_endpoint(
         ),
     ] = None,
 ) -> dict:
-    """Send ONE isolated HTTP request to a draft handler to inspect its response/data.
+    """Send ONE isolated draft request with method, concrete path/query and optional native json_body. Inspect status_code/body: execution status='passed' does not mean HTTP success. Writes disappear between calls; use test_draft for multi-request workflows.
 
     After writing/registering the route, preferably validating, send an uppercase
     method, concrete API path and optional json_body. Query parameters belong in

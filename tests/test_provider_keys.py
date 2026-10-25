@@ -1,4 +1,4 @@
-"""Persistent private keys remain project/provider scoped and write-only."""
+"""Private provider keys are app-wide, endpoint-scoped and never echoed."""
 
 import os
 import stat
@@ -31,7 +31,7 @@ class ProviderKeyTests(unittest.TestCase):
 
     def test_persists_with_private_permissions_outside_project_source(self):
         self.save()
-        path = registry_directory().parent / "provider-keys" / f"{self.project.id}.json"
+        path = registry_directory().parent / "provider-keys" / "application.json"
         self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
         self.assertEqual(stat.S_IMODE(path.parent.stat().st_mode), 0o700)
         self.assertFalse(path.is_relative_to(self.project.directory))
@@ -40,13 +40,13 @@ class ProviderKeyTests(unittest.TestCase):
             self.assertEqual(result.json(), {"configured": True})
         self.assertEqual(get_key(self.project.id, ProviderEndpoint()).get_secret_value(), "private-test-key")
 
-    def test_isolated_by_project_provider_and_endpoint(self):
+    def test_shared_across_projects_but_isolated_by_provider_and_endpoint(self):
         self.save(provider="compatible", base_url="https://one.example/v1/")
         self.assertIsNone(get_key(self.project.id, ProviderEndpoint()))
         self.assertIsNone(get_key(self.project.id, ProviderEndpoint(provider="compatible", base_url="https://two.example/v1")))
         self.assertIsNotNone(get_key(self.project.id, ProviderEndpoint(provider="compatible", base_url="https://one.example/v1")))
         other = create_project(self.directory / "other", "Other")
-        self.assertIsNone(get_key(other.id, ProviderEndpoint(provider="compatible", base_url="https://one.example/v1")))
+        self.assertIsNotNone(get_key(other.id, ProviderEndpoint(provider="compatible", base_url="https://one.example/v1")))
 
     def test_replace_and_remove(self):
         self.save()
@@ -67,7 +67,7 @@ class ProviderKeyTests(unittest.TestCase):
         self.assertEqual(self.client.post(self.root + "/key/reveal", json={"provider": "openai"}).status_code, 404)
         other = create_project(self.directory / "other", "Other")
         other_root = f"/api/projects/{other.id}/ai"
-        self.assertEqual(self.client.post(other_root + "/key/reveal", json={"provider": "groq"}).status_code, 404)
+        self.assertEqual(self.client.post(other_root + "/key/reveal", json={"provider": "groq"}).json(), {"api_key":"private-test-key"})
         self.client.request("DELETE", self.root + "/key", json={"provider": "groq"})
         self.assertEqual(self.client.post(self.root + "/key/reveal", json={"provider": "groq"}).status_code, 404)
 
@@ -94,7 +94,7 @@ class ProviderKeyTests(unittest.TestCase):
 
     def test_rejects_symlinked_key_file_without_reading_target(self):
         self.save()
-        path = registry_directory().parent / "provider-keys" / f"{self.project.id}.json"
+        path = registry_directory().parent / "provider-keys" / "application.json"
         path.unlink()
         target = self.directory / "outside.json"
         target.write_text('{"private-test-key":"secret"}')
@@ -102,3 +102,43 @@ class ProviderKeyTests(unittest.TestCase):
         response = self.client.post(self.root + "/key/status", json={"provider": "groq"})
         self.assertEqual(response.status_code, 409)
         self.assertNotIn("private-test-key", response.text)
+
+
+    def test_app_endpoints_work_without_a_project_and_supply_model_discovery(self):
+        response = self.client.put("/api/ai/key", json={"provider":"groq","api_key":"app-test-key"})
+        self.assertEqual(response.json(), {"configured":True})
+        other = create_project(self.directory / "other", "Other")
+        self.assertEqual(get_key(other.id, ProviderEndpoint()).get_secret_value(), "app-test-key")
+        with patch("reqlica.console.routes.generation.discover_models", return_value={"models":[]}) as discover:
+            response = self.client.post("/api/ai/models", json={"provider":"groq"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(discover.call_args.args[1].get_secret_value(), "app-test-key")
+        self.assertNotIn("app-test-key", response.text)
+        self.client.request("DELETE", "/api/ai/key", json={"provider":"groq"})
+        self.assertIsNone(get_key(self.project.id, ProviderEndpoint()))
+
+    def test_legacy_keys_migrate_once_and_removal_does_not_resurrect_them(self):
+        import json
+        from reqlica.generation.credentials import _scope
+        folder=registry_directory().parent / "provider-keys"
+        folder.mkdir(parents=True)
+        (folder/f"{self.project.id}.json").write_text(json.dumps({_scope(ProviderEndpoint()):"legacy-test-key"}))
+        self.assertEqual(get_key(None,ProviderEndpoint()).get_secret_value(),"legacy-test-key")
+        self.client.request("DELETE","/api/ai/key",json={"provider":"groq"})
+        self.assertIsNone(get_key(None,ProviderEndpoint()))
+        self.assertTrue((folder/f"{self.project.id}.json").exists())
+
+    def test_conflicting_legacy_keys_require_explicit_app_choice(self):
+        import json
+        from reqlica.generation.credentials import _scope
+        other=create_project(self.directory/"other","Other")
+        folder=registry_directory().parent/"provider-keys"
+        folder.mkdir(parents=True)
+        for project,value in ((self.project,"first-key"),(other,"second-key")):
+            (folder/f"{project.id}.json").write_text(json.dumps({_scope(ProviderEndpoint()):value}))
+        response=self.client.post("/api/ai/key/status",json={"provider":"groq"})
+        self.assertEqual(response.json(),{"configured":False,"migration_conflict":True})
+        self.assertIsNone(get_key(None,ProviderEndpoint()))
+        response=self.client.put("/api/ai/key",json={"provider":"groq","api_key":"chosen-key"})
+        self.assertTrue(response.json()["configured"])
+        self.assertEqual(get_key(other.id,ProviderEndpoint()).get_secret_value(),"chosen-key")

@@ -35,9 +35,10 @@ const PACKAGE_INSTALL_ROUTE = new RegExp(
 const AGENT_RUN_ROUTE = new RegExp(`^agent-runs/${RESOURCE_ID}$`);
 const AGENT_CONTEXT_ROUTE = new RegExp(`^agent-runs/${RESOURCE_ID}/context$`);
 const AGENT_REASONING_ROUTE = new RegExp(
-  `^agent-runs/${RESOURCE_ID}/reasoning-default$`,
+  `^agent-runs/${RESOURCE_ID}/(reasoning-default|reasoning)$`,
 );
 const AGENT_RECOVER_ROUTE = new RegExp(`^agent-runs/${RESOURCE_ID}/recover$`);
+const AGENT_LIMITS_ROUTE = new RegExp(`^agent-runs/${RESOURCE_ID}/limits$`);
 const ACTIVITY_ROUTE = new RegExp(`^activity/${RESOURCE_ID}$`);
 const AGENT_ACTION_ROUTE = new RegExp(
   `^agent-runs/${RESOURCE_ID}/(step|replies)$`,
@@ -136,7 +137,8 @@ function isAllowedOperation(method: string | undefined, route: string) {
         PACKAGE_INSTALL_ROUTE.test(route) ||
         AGENT_ACTION_ROUTE.test(route) ||
         AGENT_RECOVER_ROUTE.test(route) ||
-        AGENT_REASONING_ROUTE.test(route)
+        AGENT_REASONING_ROUTE.test(route) ||
+        AGENT_LIMITS_ROUTE.test(route)
       );
     default:
       return false;

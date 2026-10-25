@@ -3,6 +3,10 @@ import Link from 'next/link';
 import Button from '@/components/ui/Button/Button';
 import Input from '@/components/ui/Input/Input';
 import Select from '@/components/ui/Select/Select';
+import Textarea from '@/components/ui/Textarea/Textarea';
+import Card from '@/components/ui/Card/Card';
+import Badge from '@/components/ui/Badge/Badge';
+import * as Tabs from '@radix-ui/react-tabs';
 import { workspaceRequest } from '@/lib/chat';
 import {
   requestHeaders,
@@ -15,8 +19,7 @@ import { sample } from '@/components/endpoints/ContractViewer';
 import type { Endpoint, Project } from '@/lib/projects';
 import { draftLabel, orderedDrafts, type Draft } from '@/lib/drafts';
 import { REQUEST_METHODS, resolveTesterEndpoint } from '@/lib/endpoints';
-import styles from '@/components/runtime/RuntimePanels.module.css';
-import testerStyles from './RequestTester.module.css';
+import styles from './RequestTester.module.css';
 
 function formatResponseBody(body: string) {
   try {
@@ -57,6 +60,7 @@ export default function RequestTester({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [loadingTarget, setLoadingTarget] = useState(false);
+  const [editorTab, setEditorTab] = useState('body');
   useEffect(() => {
     let active = true;
     Promise.allSettled([
@@ -283,6 +287,7 @@ export default function RequestTester({
         Object.values(media.examples || {})[0]?.value ??
         sample(media.schema, doc as Parameters<typeof sample>[1]);
       setBody(JSON.stringify(example, null, 2));
+      setEditorTab('body');
       if (
         !requestHeaders(projectId, headerText).some(
           (h) => h.enabled && h.name.toLowerCase() === 'content-type',
@@ -298,41 +303,82 @@ export default function RequestTester({
     }
   }
   return (
-    <>
-      <div className={styles.panel}>
-        <h2>Send a request</h2>
-        <label htmlFor="request-target">Target</label>
-        <Select
-          id="request-target"
-          value={draftId}
-          disabled={busy}
-          onValueChange={(next) => {
-            setDraftId(next);
-            setDraft(null);
-            setDraftEndpoints([]);
-            setLoadingTarget(false);
-            setResult(null);
-            setError('');
-            if (!next) {
-              const first = resolveTesterEndpoint(project?.endpoints || []);
-              if (first) {
-                setMethod(first.method);
-                setPath(first.path);
+    <div className={styles.workspace}>
+      <Card className={styles.panel}>
+        <div className={styles.heading}>
+          <div>
+            <h2>Send a request</h2>
+          </div>
+          <Button asChild variant="ghost">
+            <Link
+              href={{
+                pathname: '/runtime',
+                query: { projectId, tab: 'headers' },
+              }}
+            >
+              Shared headers →
+            </Link>
+          </Button>
+        </div>
+        <div className={styles.targetGrid}>
+          <div className={styles.field}>
+            <label htmlFor="request-target">Target</label>
+            <Select
+              id="request-target"
+              value={draftId}
+              disabled={busy}
+              onValueChange={(next) => {
+                setDraftId(next);
+                setDraft(null);
+                setDraftEndpoints([]);
+                setLoadingTarget(false);
+                setResult(null);
+                setError('');
+                if (!next) {
+                  const first = resolveTesterEndpoint(project?.endpoints || []);
+                  if (first) {
+                    setMethod(first.method);
+                    setPath(first.path);
+                  }
+                }
+              }}
+            >
+              <option value="">Published API · live data</option>
+              {orderedDrafts(drafts).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {draftLabel(item)} · disposable data
+                </option>
+              ))}
+              {draftId && !drafts.some((item) => item.id === draftId) && (
+                <option value={draftId}>Selected draft · loading</option>
+              )}
+            </Select>
+          </div>
+          <div className={styles.field}>
+            <label htmlFor="saved-endpoint">Choose an endpoint</label>
+            <Select
+              id="saved-endpoint"
+              value={
+                selectedEndpointIndex < 0 ? '' : String(selectedEndpointIndex)
               }
-            }
-          }}
-        >
-          <option value="">Published API · live data</option>
-          {orderedDrafts(drafts).map((item) => (
-            <option key={item.id} value={item.id}>
-              {draftLabel(item)} · disposable data
-            </option>
-          ))}
-          {draftId && !drafts.some((item) => item.id === draftId) && (
-            <option value={draftId}>Selected draft · loading</option>
-          )}
-        </Select>
-        <p>
+              disabled={busy}
+              onValueChange={selectEndpoint}
+            >
+              <option value="" disabled>
+                Choose a configured route…
+              </option>
+              {endpoints.map(
+                (endpoint, index) =>
+                  REQUEST_METHODS.includes(endpoint.method) && (
+                    <option key={index} value={index}>
+                      {endpoint.method} {endpoint.path}
+                    </option>
+                  ),
+              )}
+            </Select>
+          </div>
+        </div>
+        <p className={styles.targetNote}>
           {draftId
             ? 'Draft requests run project code against a disposable database copy. Writes are discarded.'
             : 'Requests run against this project’s live API and may change its data.'}
@@ -345,12 +391,6 @@ export default function RequestTester({
               : 'Enter a method and path manually; validate the draft to list routes.'}
           </p>
         )}
-        <Link
-          className={styles.link}
-          href={{ pathname: '/runtime', query: { projectId, tab: 'headers' } }}
-        >
-          Request headers →
-        </Link>
         <SavedItems
           projectId={projectId}
           kind="request"
@@ -380,29 +420,18 @@ export default function RequestTester({
             setHeaderText('');
           }}
         />
-        <form onSubmit={send}>
-          <label htmlFor="saved-endpoint">Choose an endpoint</label>
-          <Select
-            id="saved-endpoint"
-            value={
-              selectedEndpointIndex < 0 ? '' : String(selectedEndpointIndex)
-            }
-            disabled={busy}
-            onValueChange={selectEndpoint}
-          >
-            <option value="" disabled>
-              Choose a configured route…
-            </option>
-            {endpoints.map(
-              (endpoint, index) =>
-                REQUEST_METHODS.includes(endpoint.method) && (
-                  <option key={index} value={index}>
-                    {endpoint.method} {endpoint.path}
-                  </option>
-                ),
-            )}
-          </Select>
-          <div className={testerStyles.requestLine}>
+        {error && (
+          <p role="alert" className={styles.error}>
+            {error}
+          </p>
+        )}
+        {notice && (
+          <p className={styles.notice} role="status">
+            {notice}
+          </p>
+        )}
+        <form onSubmit={send} className={styles.form}>
+          <div className={styles.requestLine}>
             <div>
               <label htmlFor="method">Method</label>
               <Select
@@ -427,6 +456,13 @@ export default function RequestTester({
                 placeholder="/hello"
               />
             </div>
+            <Button
+              className={styles.sendAction}
+              disabled={busy || loadingTarget || (draftId ? !draft : !project)}
+              type="submit"
+            >
+              {busy ? 'Sending…' : 'Send request'}
+            </Button>
           </div>
           {/\{[^}]+\}/.test(path) && (
             <p role="status">
@@ -434,101 +470,142 @@ export default function RequestTester({
               request.
             </p>
           )}
-          {!['GET', 'HEAD'].includes(method) && (
-            <div className={testerStyles.requestFields}>
-              <label htmlFor="request-body">Request body</label>
-              <textarea
+          <Tabs.Root
+            value={['GET', 'HEAD'].includes(method) ? 'headers' : editorTab}
+            onValueChange={setEditorTab}
+          >
+            <Tabs.List className={styles.editorTabs} aria-label="Request data">
+              <Tabs.Trigger
+                value="body"
+                disabled={['GET', 'HEAD'].includes(method)}
+              >
+                Body
+              </Tabs.Trigger>
+              <Tabs.Trigger value="headers">
+                Headers{headerText.trim() ? ' · overrides' : ''}
+              </Tabs.Trigger>
+            </Tabs.List>
+            <Tabs.Content value="body" className={styles.editorContent}>
+              <label className={styles.srOnly} htmlFor="request-body">
+                Request body
+              </label>
+              <Textarea
                 id="request-body"
-                rows={6}
+                rows={5}
                 disabled={busy}
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
-                className={testerStyles.requestBody}
+              />
+              <p>For JSON, add Content-Type: application/json under Headers.</p>
+            </Tabs.Content>
+            <Tabs.Content value="headers" className={styles.editorContent}>
+              <label className={styles.srOnly} htmlFor="inline-headers">
+                Request header overrides
+              </label>
+              <Textarea
+                id="inline-headers"
+                rows={5}
+                value={headerText}
+                disabled={busy}
+                onChange={(event) => setHeaderText(event.target.value)}
+                placeholder="Content-Type: application/json"
               />
               <p>
-                Add Content-Type in request headers when sending JSON. Replace
-                path parameters with actual values.
+                One Header: value per line. Overrides apply only to this
+                request; saved requests omit header values.
               </p>
+            </Tabs.Content>
+          </Tabs.Root>
+          <div className={styles.toolbar}>
+            <div className={styles.actions}>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={
+                  busy || loadingTarget || ['GET', 'HEAD'].includes(method)
+                }
+                onClick={() => void insertExample()}
+              >
+                Insert contract example
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy || !!draftId}
+                onClick={() => void copyRequest()}
+              >
+                Copy cURL
+              </Button>
             </div>
-          )}
-          <label htmlFor="inline-headers">
-            Request header overrides (one Header: value per line)
-          </label>
-          <textarea
-            id="inline-headers"
-            rows={3}
-            value={headerText}
-            disabled={busy}
-            onChange={(event) => setHeaderText(event.target.value)}
-            placeholder="Content-Type: application/json"
-          />
-          <p>
-            Overrides apply to this request. Saved requests omit header values.
-          </p>
-          <div className={styles.actions}>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={busy || loadingTarget}
-              onClick={() => void insertExample()}
-            >
-              Insert contract example
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={busy || !!draftId}
-              onClick={() => void copyRequest()}
-            >
-              Copy cURL
-            </Button>
           </div>
-          <div className={styles.actions}>
-            <p>Redirects are not followed.</p>
-            <Button
-              disabled={busy || loadingTarget || (draftId ? !draft : !project)}
-              type="submit"
-            >
-              {busy ? 'Sending…' : 'Send request'}
-            </Button>
-          </div>
+          <p>Redirects are not followed.</p>
         </form>
-      </div>
-      {error && (
-        <p role="alert" className={styles.error}>
-          {error}
-        </p>
-      )}
-      {notice && <p role="status">{notice}</p>}
-      {result && (
-        <section className={`${styles.panel} ${testerStyles.response}`}>
-          <div className={styles.heading}>
-            <h2>Response · {result.status}</h2>
-            <span>{result.duration} ms</span>
+      </Card>
+      <Card
+        className={`${styles.panel} ${styles.responsePanel}`}
+        role="region"
+        aria-labelledby="response-heading"
+        aria-busy={busy}
+      >
+        <div className={styles.heading}>
+          <div className={styles.responseHeading}>
+            <h2 id="response-heading">Response</h2>
+            {result && (
+              <>
+                <Badge
+                  variant={
+                    result.status >= 200 && result.status < 300
+                      ? 'success'
+                      : result.status >= 400
+                        ? 'danger'
+                        : 'warning'
+                  }
+                >
+                  HTTP {result.status}
+                </Badge>
+                <span className={styles.duration}>{result.duration} ms</span>
+              </>
+            )}
           </div>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              void navigator.clipboard
-                .writeText(result.body)
-                .then(() => setNotice('Response copied.'))
-                .catch(() =>
-                  setError(
-                    'Clipboard unavailable. Select and copy the response.',
-                  ),
-                );
-            }}
-          >
-            Copy response
-          </Button>
-          <pre>{formatResponseBody(result.body)}</pre>
-          <details>
-            <summary>Response headers</summary>
-            <pre>{JSON.stringify(result.headers, null, 2)}</pre>
-          </details>
-        </section>
-      )}
-      <RequestChains projectId={projectId} current={current} />
-    </>
+          {result && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                void navigator.clipboard
+                  .writeText(result.body)
+                  .then(() => setNotice('Response copied.'))
+                  .catch(() =>
+                    setError(
+                      'Clipboard unavailable. Select and copy the response.',
+                    ),
+                  );
+              }}
+            >
+              Copy response
+            </Button>
+          )}
+        </div>
+        {result ? (
+          <>
+            <pre className={styles.code}>{formatResponseBody(result.body)}</pre>
+            <details className={styles.details}>
+              <summary>Response headers</summary>
+              <pre className={styles.code}>
+                {JSON.stringify(result.headers, null, 2)}
+              </pre>
+            </details>
+          </>
+        ) : (
+          <p className={styles.empty} role="status">
+            {busy
+              ? 'Waiting for the response…'
+              : 'Send a request to see its status, timing, body and headers here.'}
+          </p>
+        )}
+      </Card>
+      <div className={styles.chains}>
+        <RequestChains projectId={projectId} current={current} />
+      </div>
+    </div>
   );
 }

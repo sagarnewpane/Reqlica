@@ -5,7 +5,7 @@ import RequestTester from '@/components/requests/RequestTester';
 import PageHeader from '@/components/ui/PageHeader/PageHeader';
 import { useHydrated } from '@/hooks/use-hydrated';
 import { isProjectId } from '@/lib/project-route';
-import styles from './Runtime.module.css';
+import styles from './RequestTester.module.css';
 
 export default function RequestTesterPage() {
   const hydrated = useHydrated();
@@ -17,7 +17,7 @@ export default function RequestTesterPage() {
       <div className={styles.content}>
         <PageHeader title="Request tester" />
         {!hydrated || !router.isReady ? (
-          <p>Loading…</p>
+          <p role="status">Loading request tester…</p>
         ) : isProjectId(projectId) ? (
           <RequestTester
             key={`${projectId}:${typeof draftId === 'string' ? draftId : ''}:${typeof method === 'string' ? method : ''}:${typeof path === 'string' ? path : ''}`}

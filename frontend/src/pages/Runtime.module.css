@@ -39,8 +39,8 @@
   cursor: pointer;
 }
 .tabs button[data-state='active'] {
-  background: var(--reqlica-green);
-  color: var(--background-secondary);
+  background: var(--button-primary);
+  color: var(--button-primary-text);
 }
 .tabs button:focus-visible {
   outline: 2px solid var(--reqlica-lime);

@@ -2,9 +2,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const vm = require('node:vm');
 const ts = require('../frontend/node_modules/typescript');
-function setup() {
+function setup(browser = {}) {
   const data = new Map(); const storage={getItem:key=>data.get(key)||null,setItem:(key,value)=>data.set(key,value),removeItem:key=>data.delete(key)};
-  function load(file,require) { const exports={}; const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText; vm.runInNewContext(code,{exports,require,URL,localStorage:storage}); return exports; }
+  function load(file,require) { const exports={}; const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText; vm.runInNewContext(code,{exports,require,URL,localStorage:storage,...browser}); return exports; }
   const settings=load('frontend/src/lib/settings.ts'); const profiles=load('frontend/src/lib/model-profiles.ts',()=>settings);
   return {...profiles,data,settings};
 }
@@ -36,10 +36,21 @@ test('corrupt and invalid profile storage falls back safely',()=>{
   const s=setup(); s.data.set('reqlica.model-profiles.v1','{bad'); assert.equal(s.readModelProfiles().length,0);
   s.data.set('reqlica.model-profiles.v1',JSON.stringify([null,{...profile(),model:32},profile()])); assert.equal(s.readModelProfiles().length,1);
 });
-test('profiles retain reasoning and older profiles use provider default',()=>{
+test('profiles retain reasoning and older profiles default to off',()=>{
   const s=setup();
   s.saveModelProfile({...profile(),reasoningMode:'low'});
   assert.equal(s.readModelProfiles()[0].reasoningMode,'low');
   s.data.set('reqlica.model-profiles.v1',JSON.stringify([profile()]));
-  assert.equal(s.readModelProfiles()[0].reasoningMode,'default');
+  assert.equal(s.readModelProfiles()[0].reasoningMode,'off');
+});
+
+
+test('profile lists notify open project views and unsubscribe cleanly',()=>{
+ const listeners=new Map();class Event { constructor(type){this.type=type;} }
+ const window={addEventListener(type,fn){if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type).add(fn);},removeEventListener(type,fn){listeners.get(type)?.delete(fn);},dispatchEvent(event){for(const fn of listeners.get(event.type)||[])fn(event);}};
+ const s=setup({window,Event});let changed=0;const unsubscribe=s.subscribeModelProfiles(()=>changed++);
+ s.saveModelProfile(profile());assert.equal(changed,1);
+ window.dispatchEvent({type:'storage',key:'reqlica.model-profiles.v1'});assert.equal(changed,2);
+ window.dispatchEvent({type:'storage',key:'unrelated'});assert.equal(changed,2);
+ unsubscribe();s.deleteModelProfile(a);assert.equal(changed,2);
 });

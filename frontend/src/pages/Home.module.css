@@ -12,8 +12,8 @@
   min-height: 100vh;
   flex-shrink: 0;
   padding: 28px 16px;
-  background-color: var(--reqlica-green);
-  color: var(--background-secondary);
+  background-color: var(--sidebar);
+  color: var(--sidebar-foreground);
 }
 
 .logo {
@@ -42,7 +42,7 @@
   display: block;
   padding: 12px 14px;
   border-radius: 8px;
-  color: var(--background-secondary);
+  color: var(--sidebar-foreground);
   font-size: 14px;
   text-decoration: none;
   transition: background-color 0.2s;
@@ -53,8 +53,8 @@
 }
 
 .navigation .active {
-  background-color: var(--reqlica-lime);
-  color: var(--reqlica-green);
+  background-color: var(--selection-background);
+  color: var(--selection-foreground);
   font-weight: 600;
 }
 

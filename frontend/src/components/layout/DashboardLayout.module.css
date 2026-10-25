@@ -66,8 +66,8 @@
   gap: 12px;
 }
 .menuButton[data-active='true'] {
-  background: var(--reqlica-lime);
-  color: var(--reqlica-green);
+  background: var(--selection-background);
+  color: var(--selection-foreground);
   font-weight: 600;
 }
 .sidebarFooter {
@@ -153,8 +153,8 @@
   left: 8px;
   z-index: 100;
   transform: translateY(-200%);
-  background: var(--reqlica-green);
-  color: var(--background-secondary);
+  background: var(--button-primary);
+  color: var(--button-primary-text);
   padding: 12px;
   border-radius: 8px;
 }

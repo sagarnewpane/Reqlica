@@ -11,18 +11,20 @@ export type ChatSettings = {
   sendWithEnter: boolean;
   maxTokens: number;
   totalTokenLimit: number;
+  toolCallLimit: number;
   timeoutSeconds: number;
 };
 export const defaultSettings: ChatSettings = {
   provider: 'groq',
   model: '',
   baseUrl: '',
-  reasoningMode: 'default',
+  reasoningMode: 'off',
   allowEdits: true,
   allowExecution: false,
   sendWithEnter: true,
   maxTokens: 8192,
   totalTokenLimit: 100000,
+  toolCallLimit: 64,
   timeoutSeconds: 300,
 };
 const key = (projectId?: string) =>
@@ -84,6 +86,12 @@ export function validateSettings(value: ChatSettings): string | null {
   )
     return 'Cumulative token limit must be between 1,000 and 1,000,000 tokens.';
   if (
+    !Number.isInteger(value.toolCallLimit) ||
+    value.toolCallLimit < 1 ||
+    value.toolCallLimit > 1000
+  )
+    return 'Tool-call limit must be between 1 and 1,000.';
+  if (
     !Number.isInteger(value.timeoutSeconds) ||
     value.timeoutSeconds < 30 ||
     value.timeoutSeconds > 600
@@ -115,7 +123,23 @@ function saved(projectId?: string): ChatSettings | null {
   }
 }
 export function readSettings(projectId?: string): ChatSettings {
-  return (projectId && saved(projectId)) || saved() || { ...defaultSettings };
+  const preferences = (projectId && saved(projectId)) ||
+    saved() || { ...defaultSettings };
+  try {
+    const raw = localStorage.getItem('reqlica.settings.connection.v1');
+    if (!raw) return preferences;
+    const connection = JSON.parse(raw);
+    const shared = {
+      provider: connection.provider,
+      model: connection.model,
+      baseUrl: connection.baseUrl,
+      reasoningMode: connection.reasoningMode ?? defaultSettings.reasoningMode,
+    };
+    const value = { ...preferences, ...shared };
+    return validateSettings(value) ? preferences : value;
+  } catch {
+    return preferences;
+  }
 }
 export function hasProjectSettings(projectId: string) {
   return !!saved(projectId);
@@ -130,6 +154,15 @@ export function saveSettings(value: ChatSettings, projectId?: string) {
     ]),
   );
   localStorage.setItem(key(projectId), JSON.stringify(safe));
+  localStorage.setItem(
+    'reqlica.settings.connection.v1',
+    JSON.stringify({
+      provider: value.provider,
+      model: value.model,
+      baseUrl: value.baseUrl,
+      reasoningMode: value.reasoningMode,
+    }),
+  );
 }
 export function clearProjectSettings(projectId: string) {
   localStorage.removeItem(key(projectId));

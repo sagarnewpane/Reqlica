@@ -348,10 +348,18 @@
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
-.toolDetail p { margin: 6px 0 0; }
-.toolChevron { transition: transform 120ms ease; }
-.toolEvent[open] .toolChevron { transform: rotate(90deg); }
-.activeStep { margin: 12px 0 24px; }
+.toolDetail p {
+  margin: 6px 0 0;
+}
+.toolChevron {
+  transition: transform 120ms ease;
+}
+.toolEvent[open] .toolChevron {
+  transform: rotate(90deg);
+}
+.activeStep {
+  margin: 12px 0 24px;
+}
 .draft {
   background: var(--status-warning-background);
   border-radius: 8px;
@@ -691,8 +699,8 @@
   width: 24px;
   height: 24px;
   border-radius: 8px;
-  background: var(--reqlica-lime);
-  color: var(--reqlica-green);
+  background: var(--selection-background);
+  color: var(--selection-foreground);
   font-size: 12px;
   font-weight: 700;
   flex-shrink: 0;
@@ -809,15 +817,26 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .toolChevron { transition: none; }
+  .toolChevron {
+    transition: none;
+  }
   .dots {
     animation: none;
   }
 }
 @media (max-width: 768px) {
-  .toolEvent summary { flex-wrap: wrap; }
-  .toolLabel { flex: 1; min-width: 0; }
-  .toolTarget { order: 1; flex-basis: 100%; padding-left: 23px; }
+  .toolEvent summary {
+    flex-wrap: wrap;
+  }
+  .toolLabel {
+    flex: 1;
+    min-width: 0;
+  }
+  .toolTarget {
+    order: 1;
+    flex-basis: 100%;
+    padding-left: 23px;
+  }
   .chat {
     min-height: 180px;
   }

@@ -68,7 +68,7 @@
   overflow-wrap: anywhere;
 }
 .error {
-  color: var(--error, #ba3636);
+  color: var(--status-danger);
   font-size: 13px;
 }
 .list {

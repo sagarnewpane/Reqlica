@@ -57,6 +57,7 @@ def create_app() -> FastAPI:
     app.include_router(generation.router)
     app.include_router(generation.provider_router)
     app.include_router(provider_keys.router)
+    app.include_router(provider_keys.app_router)
     app.include_router(data.router)
     app.include_router(environment.router)
     app.include_router(scenarios.router)

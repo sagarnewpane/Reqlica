@@ -9,12 +9,29 @@ export type ModelConnection = Pick<
 >;
 export type ModelProfile = ModelConnection & { id: string; name: string };
 const key = 'reqlica.model-profiles.v1';
+export function subscribeModelProfiles(refresh: () => void) {
+  const storage = (event: StorageEvent) => {
+    if (event.key === key || event.key === null) refresh();
+  };
+  window.addEventListener('storage', storage);
+  window.addEventListener('reqlica:model-profiles', refresh);
+  window.addEventListener('focus', refresh);
+  return () => {
+    window.removeEventListener('storage', storage);
+    window.removeEventListener('reqlica:model-profiles', refresh);
+    window.removeEventListener('focus', refresh);
+  };
+}
+function notify() {
+  if (typeof window !== 'undefined')
+    window.dispatchEvent(new Event('reqlica:model-profiles'));
+}
 export function modelConnection(value: ModelConnection): ModelConnection {
   return {
     provider: value.provider,
     model: value.model.trim(),
     baseUrl: value.baseUrl.trim(),
-    reasoningMode: value.reasoningMode || 'default',
+    reasoningMode: value.reasoningMode || defaultSettings.reasoningMode,
   };
 }
 function valid(profile: ModelProfile) {
@@ -78,10 +95,12 @@ export function saveModelProfile(profile: ModelProfile): ModelProfile[] {
     ? profiles.map((item) => (item.id === profile.id ? clean : item))
     : [...profiles, clean];
   localStorage.setItem(key, JSON.stringify(next));
+  notify();
   return next;
 }
 export function deleteModelProfile(id: string): ModelProfile[] {
   const next = readModelProfiles().filter((item) => item.id !== id);
   localStorage.setItem(key, JSON.stringify(next));
+  notify();
   return next;
 }

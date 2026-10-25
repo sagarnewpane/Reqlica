@@ -22,12 +22,17 @@ import { conversationMessages, workspaceRequest } from '@/lib/chat';
 import { draftLabel, orderedDrafts, type Draft } from '@/lib/drafts';
 import { useConversation } from './use-conversation';
 import ChatContext from './ChatContext';
+import ConversationBudgets from './ConversationBudgets';
 import SpecificationAttachment, {
   type Attachment,
 } from './SpecificationAttachment';
 import GenerationStatus from './GenerationStatus';
 import styles from './ProjectChat.module.css';
-import { readModelProfiles, type ModelProfile } from '@/lib/model-profiles';
+import {
+  readModelProfiles,
+  subscribeModelProfiles,
+  type ModelProfile,
+} from '@/lib/model-profiles';
 import {
   readSettings,
   defaultSettings,
@@ -61,7 +66,7 @@ export default function ProjectChat({
   const [provider, setProvider] = useState('groq');
   const [model, setModel] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
-  const [reasoningMode, setReasoningMode] = useState<ReasoningMode>('default');
+  const [reasoningMode, setReasoningMode] = useState<ReasoningMode>('off');
   const [edits, setEdits] = useState(true);
   const [execution, setExecution] = useState(false);
   const [preferences, setPreferences] = useState(defaultSettings);
@@ -92,6 +97,8 @@ export default function ProjectChat({
     reload,
     pause,
     resetReasoning,
+    changeReasoning,
+    changeLimits,
   } = useConversation({
     projectId,
     provider,
@@ -127,6 +134,18 @@ export default function ProjectChat({
       active = false;
     };
   }, [projectId]);
+
+  useEffect(
+    () =>
+      subscribeModelProfiles(() => {
+        try {
+          setProfiles(readModelProfiles());
+        } catch {
+          /* Keep the currently loaded profile list. */
+        }
+      }),
+    [],
+  );
 
   useEffect(() => {
     if (
@@ -292,7 +311,10 @@ export default function ProjectChat({
           <div>
             <h2 id="chat-settings-title">Model & permissions</h2>
             {run && (
-              <p>Model and permissions are fixed for this conversation.</p>
+              <p>
+                Model and permissions are fixed. Reasoning and conversation
+                budgets can change while idle.
+              </p>
             )}
           </div>
           <button
@@ -440,8 +462,13 @@ export default function ProjectChat({
               model={run?.provider.model || model}
               baseUrl={run?.provider.base_url || baseUrl}
               value={run?.provider.reasoning_mode || reasoningMode}
-              onChange={setReasoningMode}
-              disabled={frozen || !!run || hasPending}
+              onChange={(next) => {
+                if (run) void changeReasoning(next);
+                else setReasoningMode(next);
+              }}
+              disabled={
+                frozen || (!!run && !run.can_change_reasoning) || hasPending
+              }
             />
             {run?.can_reset_reasoning && (
               <button
@@ -458,6 +485,20 @@ export default function ProjectChat({
             Manage response limits and API keys in Settings →
           </Link>
         </div>
+        <ConversationBudgets
+          key={
+            run
+              ? `${run.id}:${run.limits?.total_tokens}:${run.limits?.tool_calls}`
+              : 'new'
+          }
+          run={run}
+          preferences={preferences}
+          disabled={frozen || hasPending}
+          onChange={(budgets) =>
+            setPreferences((current) => ({ ...current, ...budgets }))
+          }
+          onApply={changeLimits}
+        />
         <fieldset className={styles.permissions}>
           <legend>Permissions</legend>
           <label>
@@ -675,7 +716,18 @@ export default function ProjectChat({
           <div className={styles.help}>
             {run.status === 'running'
               ? 'A step is still running or its response is unconfirmed. Refresh before continuing.'
-              : 'This conversation cannot continue. Start a new chat to keep working.'}
+              : run.status === 'limit' && run.can_change_limits
+                ? 'A conversation limit was reached. Review usage and adjust budgets, or start a new chat from the saved draft.'
+                : 'This conversation cannot continue. Start a new chat to keep working.'}
+            {run.can_change_limits && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setSettingsOpen(true)}
+              >
+                Adjust conversation budgets
+              </Button>
+            )}
             {run.draft_id && (
               <Button
                 type="button"

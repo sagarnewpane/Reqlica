@@ -9,13 +9,15 @@ function settings() {
   vm.runInNewContext(code, { exports, URL, localStorage: { getItem: key => data.get(key) || null, setItem: (key, value) => data.set(key, value), removeItem: key => data.delete(key) } });
   return { ...exports, data };
 }
-test('workspace defaults inherit, project overrides isolate, and removal restores inheritance', () => {
+test('API defaults sync across projects while chat behavior remains scoped', () => {
   const s = settings();
   s.saveSettings({ ...s.defaultSettings, model: 'workspace-model', sendWithEnter: false });
   assert.equal(s.readSettings('one').model, 'workspace-model');
   s.saveSettings({ ...s.defaultSettings, model: 'project-model' }, 'one');
   assert.equal(s.readSettings('one').model, 'project-model');
-  assert.equal(s.readSettings('two').model, 'workspace-model');
+  assert.equal(s.readSettings('two').model, 'project-model');
+  assert.equal(s.readSettings('one').sendWithEnter, true);
+  assert.equal(s.readSettings('two').sendWithEnter, false);
   s.clearProjectSettings('one');
   assert.equal(s.readSettings('one').sendWithEnter, false);
 });
@@ -39,6 +41,10 @@ test('corrupt or invalid saved settings safely fall back', () => {
 });
 test('reasoning level persists and invalid levels are rejected', () => {
   const s = settings();
+  assert.equal(s.defaultSettings.reasoningMode, 'off');
+  assert.equal(s.readSettings().reasoningMode, 'off');
+  s.data.set('reqlica.settings.connection.v1', JSON.stringify({provider:'openai',model:'example',baseUrl:''}));
+  assert.equal(s.readSettings().reasoningMode, 'off');
   s.saveSettings({ ...s.defaultSettings, reasoningMode: 'high' });
   assert.equal(s.readSettings().reasoningMode, 'high');
   assert.throws(() => s.saveSettings({ ...s.defaultSettings, reasoningMode: 'unknown' }));

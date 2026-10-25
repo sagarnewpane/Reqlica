@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import ModelProfiles from '@/components/settings/ModelProfiles';
 import ProviderKeySettings from './ProviderKeySettings';
 import ModelPicker from '@/components/ui/ModelPicker/ModelPicker';
@@ -28,6 +28,12 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [keyRevision, setKeyRevision] = useState(0);
+  const [keyPending, setKeyPending] = useState(false);
+  const [keyBusy, setKeyBusy] = useState(false);
+  const keyChanged = useCallback(
+    () => setKeyRevision((count) => count + 1),
+    [],
+  );
   useEffect(() => {
     let active = true;
     Promise.resolve().then(() => {
@@ -59,6 +65,10 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
   }
   function save(event: FormEvent) {
     event.preventDefault();
+    if (keyPending || keyBusy) {
+      setError('Save or cancel the API key entry before saving defaults.');
+      return;
+    }
     const invalid = validateSettings(value);
     if (invalid) {
       setError(invalid);
@@ -75,7 +85,9 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
       setBaseline(clean);
       setOverridden(!!projectId);
       setError('');
-      setNotice('Settings saved. They apply to new conversations.');
+      setNotice(
+        'API connection defaults saved for all projects. Chat behavior applies to new conversations.',
+      );
     } catch {
       setError(
         'Could not save settings. Check browser storage permissions and try again.',
@@ -96,39 +108,16 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
       setError('Could not restore workspace defaults.');
     }
   }
-  function keyChanged(configured: boolean) {
-    setKeyRevision((count) => count + 1);
-    if (!projectId || !configured) return;
-    const connection = {
-      ...baseline,
-      provider: value.provider,
-      baseUrl: value.baseUrl.trim(),
-      model: value.model.trim(),
-      reasoningMode: value.reasoningMode,
-    };
-    try {
-      saveSettings(connection, projectId);
-      setBaseline(connection);
-      setOverridden(true);
-      setError('');
-      setNotice('AI connection saved for this project.');
-    } catch {
-      setError(
-        'API key saved, but browser storage could not keep this provider selection. Save changes before leaving.',
-      );
-    }
-  }
   return (
     <form onSubmit={save} className={styles.form}>
       <PageHeader
-        title={projectId ? 'Project settings' : 'Workspace settings'}
+        title="AI settings"
         metadata={
           <span className={styles.scope}>
+            App-wide API ·{' '}
             {projectId
-              ? overridden
-                ? 'Project override'
-                : 'Using workspace defaults'
-              : 'This browser'}
+              ? 'Project chat preferences'
+              : 'Workspace chat preferences'}
           </span>
         }
       />
@@ -151,7 +140,10 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
           <div className={styles.sectionHeading}>
             <div>
               <h2 id="ai-heading">AI connection</h2>
-              <p>Choose a provider, connect it, then select a model.</p>
+              <p>
+                Choose a provider, save its app key, then select a model. Save
+                defaults below to use this connection for new chats.
+              </p>
             </div>
           </div>
           <div className={styles.grid}>
@@ -159,6 +151,7 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
               <label htmlFor="provider">Provider</label>
               <Select
                 id="provider"
+                disabled={keyBusy || keyPending}
                 value={value.provider}
                 onValueChange={(nextValue) => {
                   setValue((current) => ({
@@ -166,7 +159,7 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
                     provider: nextValue as ChatSettings['provider'],
                     model: '',
                     baseUrl: '',
-                    reasoningMode: 'default',
+                    reasoningMode: 'off',
                   }));
                   setNotice('');
                 }}
@@ -182,6 +175,7 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
                 <label htmlFor="base-url">Provider base URL</label>
                 <Input
                   id="base-url"
+                  disabled={keyBusy || keyPending}
                   type="url"
                   required={value.provider === 'compatible'}
                   value={value.baseUrl}
@@ -189,7 +183,7 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
                     setValue((current) => ({
                       ...current,
                       baseUrl: event.target.value,
-                      reasoningMode: 'default',
+                      reasoningMode: 'off',
                     }));
                     setNotice('');
                   }}
@@ -202,19 +196,18 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
               </div>
             )}
           </div>
-          {projectId ? (
-            <ProviderKeySettings
-              key={value.provider}
-              projectId={projectId}
-              provider={value.provider}
-              baseUrl={value.baseUrl}
-              onChanged={keyChanged}
-            />
-          ) : (
-            <p className={styles.caption}>
-              API keys are managed in each project’s settings.
-            </p>
-          )}
+          <ProviderKeySettings
+            key={`${value.provider}:${value.baseUrl.trim()}`}
+            provider={value.provider}
+            baseUrl={value.baseUrl}
+            onChanged={keyChanged}
+            onPendingChange={setKeyPending}
+            onBusyChange={setKeyBusy}
+          />
+          <p className={styles.caption}>
+            API keys, connection defaults and model profiles are app-wide. Chat
+            behavior and token limits can still be configured per project.
+          </p>
           <div className={styles.modelSetup}>
             <div>
               <label htmlFor="model">Default model</label>
@@ -230,9 +223,7 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
                     ...current,
                     model: next,
                     reasoningMode:
-                      next === current.model
-                        ? current.reasoningMode
-                        : 'default',
+                      next === current.model ? current.reasoningMode : 'off',
                   }));
                   setNotice('');
                 }}
@@ -253,17 +244,16 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
               />
             </div>
           </div>
-          <details className={styles.advanced}>
-            <summary>Saved model profiles</summary>
+          <div className={styles.profiles}>
             <ModelProfiles
               value={value}
-              disabled={!loaded}
+              disabled={!loaded || keyBusy || keyPending}
               onApply={(profile) => {
                 setValue((current) => ({ ...current, ...profile }));
                 setNotice('');
               }}
             />
-          </details>
+          </div>
         </Card>
         <Card
           role="region"
@@ -272,16 +262,22 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
         >
           <div className={styles.sectionHeading}>
             <div>
-              <h2 id="limits-heading">Token & response limits</h2>
+              <h2 id="limits-heading">
+                Conversation budgets & response limits
+              </h2>
               <p>
-                These limits apply to every model
+                Defaults for new chats
                 {projectId ? ' in this project' : ' in this workspace'}.
+                Existing chats show their saved budgets under Model &
+                permissions.
               </p>
             </div>
           </div>
           <div className={styles.grid}>
             <div>
-              <label htmlFor="total-token-limit">Cumulative token limit per chat</label>
+              <label htmlFor="total-token-limit">
+                Cumulative token limit per chat
+              </label>
               <Input
                 id="total-token-limit"
                 type="number"
@@ -291,9 +287,36 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
                 step={1}
                 required
                 value={value.totalTokenLimit}
-                onChange={(event) => update('totalTokenLimit', Number(event.target.value))}
+                onChange={(event) =>
+                  update('totalTokenLimit', Number(event.target.value))
+                }
               />
-              <p>Total provider-reported input + output across all turns. Applies to new chats; existing chats keep their saved budget. An in-flight response can exceed the remaining budget.</p>
+              <p>
+                Total provider-reported input + output across all turns. Applies
+                to new chats; existing chats keep their saved budget. An
+                in-flight response can exceed the remaining budget.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="tool-call-limit">Tool calls per chat</label>
+              <Input
+                id="tool-call-limit"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={1000}
+                step={1}
+                required
+                value={value.toolCallLimit}
+                onChange={(event) =>
+                  update('toolCallLimit', Number(event.target.value))
+                }
+              />
+              <p>
+                Cumulative across all turns, including failed attempts. Applies
+                to new chats; use Model & permissions to update an existing
+                chat.
+              </p>
             </div>
             <div>
               <label htmlFor="max-tokens">Maximum output tokens</label>
@@ -392,24 +415,30 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
       </fieldset>
       <footer className={styles.footer}>
         <div>
+          <span role="status">
+            {keyBusy
+              ? 'Saving API key…'
+              : keyPending
+                ? 'API key not saved — save or cancel above'
+                : dirty
+                  ? 'Unsaved defaults'
+                  : 'Defaults are saved'}
+          </span>
           {projectId && overridden ? (
-            <button
+            <Button
               type="button"
-              className={styles.secondary}
+              variant="ghost"
+              disabled={keyBusy || keyPending}
               onClick={inherit}
             >
               Use workspace defaults
-            </button>
-          ) : (
-            <span>
-              {dirty ? 'You have unsaved changes' : 'All changes saved'}
-            </span>
-          )}
+            </Button>
+          ) : null}
         </div>
         <div className={styles.actions}>
-          <button
-            className={styles.secondary}
-            disabled={!dirty}
+          <Button
+            variant="secondary"
+            disabled={!dirty || keyBusy || keyPending}
             type="button"
             onClick={() => {
               setValue(baseline);
@@ -418,9 +447,12 @@ export default function SettingsForm({ projectId }: { projectId?: string }) {
             }}
           >
             Discard
-          </button>
-          <Button type="submit" disabled={!loaded || !dirty}>
-            Save changes
+          </Button>
+          <Button
+            type="submit"
+            disabled={!loaded || !dirty || keyBusy || keyPending}
+          >
+            Save defaults
           </Button>
         </div>
       </footer>

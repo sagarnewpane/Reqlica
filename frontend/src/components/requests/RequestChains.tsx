@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import Button from '@/components/ui/Button/Button';
+import Card from '@/components/ui/Card/Card';
+import Input from '@/components/ui/Input/Input';
+import Select from '@/components/ui/Select/Select';
+import Textarea from '@/components/ui/Textarea/Textarea';
+import Switch from '@/components/ui/Switch/Switch';
 import SavedItems from '@/components/workspace/SavedItems';
 import { executeRequest, type RequestConfig } from '@/lib/request-execution';
 import {
@@ -7,7 +12,7 @@ import {
   type ChainStep,
   type ChainResult,
 } from '@/lib/request-chains';
-import s from '@/components/workspace/Workspace.module.css';
+import s from './RequestTester.module.css';
 export default function RequestChains({
   projectId,
   current,
@@ -74,229 +79,265 @@ export default function RequestChains({
     }
   }
   return (
-    <section className={s.panel}>
-      <h2>Request chains</h2>
-      <p>
-        Run requests in order. Use {'{{create.body.id}}'} in a later path or a
-        JSON string to use an earlier response. JSON bodies preserve the
-        referenced value’s type. Each draft step runs against disposable data;
-        use the published API for chains that need persistent writes. Saved
-        chains omit header overrides; shared runtime headers still apply.
-      </p>
-      <SavedItems
-        projectId={projectId}
-        kind="chain"
-        disabled={busy}
-        data={{
-          steps: steps.map((step) => ({
-            name: step.name,
-            method: step.method,
-            path: step.path,
-            body: step.body,
-            draftId: step.draftId,
-            expectedStatus: step.expectedStatus,
-          })),
-          stopOnFailure,
-        }}
-        onLoad={(data) => {
-          const parsed = data as { steps: ChainStep[]; stopOnFailure: boolean };
-          if (
-            !Array.isArray(parsed.steps) ||
-            parsed.steps.length > 50 ||
-            parsed.steps.some(
-              (step) => !step.name || !step.path || !step.method,
-            )
-          )
-            throw new Error('Invalid saved chain.');
-          setSteps(parsed.steps);
-          setStopOnFailure(parsed.stopOnFailure !== false);
-          setResults([]);
-        }}
-      />
-      <ol className={s.list}>
-        {steps.map((step, index) => (
-          <li className={s.item} key={index}>
-            <div className={s.grid}>
-              <label>
-                Step name
-                <input
-                  value={step.name}
-                  pattern="[A-Za-z][A-Za-z0-9_]*"
-                  onChange={(e) =>
-                    setSteps(
-                      steps.map((item, i) =>
-                        i === index ? { ...item, name: e.target.value } : item,
-                      ),
-                    )
-                  }
-                  disabled={busy}
-                />
-              </label>
-              <label>
-                Method
-                <select
-                  value={step.method}
-                  disabled={busy}
-                  onChange={(e) =>
-                    setSteps(
-                      steps.map((item, i) =>
-                        i === index
-                          ? { ...item, method: e.target.value }
-                          : item,
-                      ),
-                    )
-                  }
-                >
-                  {[
-                    'GET',
-                    'POST',
-                    'PUT',
-                    'PATCH',
-                    'DELETE',
-                    'HEAD',
-                    'OPTIONS',
-                  ].map((v) => (
-                    <option key={v}>{v}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Path
-                <input
-                  value={step.path}
-                  disabled={busy}
-                  onChange={(e) =>
-                    setSteps(
-                      steps.map((item, i) =>
-                        i === index ? { ...item, path: e.target.value } : item,
-                      ),
-                    )
-                  }
-                />
-              </label>
-              <label>
-                Expected status
-                <input
-                  type="number"
-                  min={100}
-                  max={599}
-                  value={step.expectedStatus}
-                  disabled={busy}
-                  onChange={(e) =>
-                    setSteps(
-                      steps.map((item, i) =>
-                        i === index
-                          ? { ...item, expectedStatus: Number(e.target.value) }
-                          : item,
-                      ),
-                    )
-                  }
-                />
-              </label>
-            </div>
-            <label>
-              JSON body
-              <textarea
-                value={step.body}
-                disabled={busy}
-                onChange={(e) =>
-                  setSteps(
-                    steps.map((item, i) =>
-                      i === index ? { ...item, body: e.target.value } : item,
-                    ),
-                  )
-                }
-              />
-            </label>
-            <div className={s.row}>
-              <Button
-                variant="secondary"
-                disabled={busy || index === 0}
-                onClick={() => {
-                  const next = [...steps];
-                  [next[index - 1], next[index]] = [
-                    next[index],
-                    next[index - 1],
-                  ];
-                  setSteps(next);
-                }}
-              >
-                Move up
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={busy}
-                onClick={() => setSteps(steps.filter((_, i) => i !== index))}
-              >
-                Remove step
-              </Button>
-            </div>
-          </li>
-        ))}
-      </ol>
-      <label className={s.check}>
-        <input
-          type="checkbox"
-          checked={stopOnFailure}
+    <details className={s.chainPanel}>
+      <summary>
+        Request chains{' '}
+        <span>
+          {steps.length
+            ? `${steps.length} steps`
+            : 'Optional · run requests in sequence'}
+        </span>
+      </summary>
+      <Card className={s.panel} role="region" aria-label="Request chain editor">
+        <p>
+          Run requests in order. Use {'{{create.body.id}}'} in a later path or a
+          JSON string to use an earlier response. JSON bodies preserve the
+          referenced value’s type. Each draft step runs against disposable data;
+          use the published API for chains that need persistent writes. Saved
+          chains omit header overrides; shared runtime headers still apply.
+        </p>
+        <SavedItems
+          projectId={projectId}
+          kind="chain"
           disabled={busy}
-          onChange={(e) => setStopOnFailure(e.target.checked)}
-        />
-        Stop on first failed status or request
-      </label>
-      <div className={s.row}>
-        <Button
-          variant="secondary"
-          disabled={busy || steps.length >= 50}
-          onClick={() =>
-            setSteps([
-              ...steps,
-              {
-                ...current,
-                name: `step${steps.length + 1}`,
-                expectedStatus: 200,
-              },
-            ])
-          }
-        >
-          Add current request
-        </Button>
-        <Button
-          disabled={busy || !steps.length}
-          onClick={() => {
-            if (
-              new Set(steps.map((step) => step.name)).size !== steps.length ||
-              steps.some((step) => !/^[A-Za-z][A-Za-z0-9_]*$/.test(step.name))
-            ) {
-              setError(
-                'Use unique step names: letters, digits, underscores; start with a letter.',
-              );
-              return;
-            }
-            void run();
+          data={{
+            steps: steps.map((step) => ({
+              name: step.name,
+              method: step.method,
+              path: step.path,
+              body: step.body,
+              draftId: step.draftId,
+              expectedStatus: step.expectedStatus,
+            })),
+            stopOnFailure,
           }}
-        >
-          Run chain
-        </Button>
-        {busy && (
+          onLoad={(data) => {
+            const parsed = data as {
+              steps: ChainStep[];
+              stopOnFailure: boolean;
+            };
+            if (
+              !Array.isArray(parsed.steps) ||
+              parsed.steps.length > 50 ||
+              parsed.steps.some(
+                (step) => !step.name || !step.path || !step.method,
+              )
+            )
+              throw new Error('Invalid saved chain.');
+            setSteps(parsed.steps);
+            setStopOnFailure(parsed.stopOnFailure !== false);
+            setResults([]);
+          }}
+        />
+        {!steps.length && (
+          <p className={s.empty}>
+            No steps yet. Add the current request to start a chain.
+          </p>
+        )}
+        <ol className={s.list}>
+          {steps.map((step, index) => (
+            <li className={s.item} key={index}>
+              <div className={s.grid}>
+                <div>
+                  <label htmlFor={`chain-name-${index}`}>Step name</label>
+                  <Input
+                    id={`chain-name-${index}`}
+                    value={step.name}
+                    pattern="[A-Za-z][A-Za-z0-9_]*"
+                    onChange={(e) =>
+                      setSteps(
+                        steps.map((item, i) =>
+                          i === index
+                            ? { ...item, name: e.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                    disabled={busy}
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`chain-method-${index}`}>Method</label>
+                  <Select
+                    id={`chain-method-${index}`}
+                    value={step.method}
+                    disabled={busy}
+                    onValueChange={(method) =>
+                      setSteps(
+                        steps.map((item, i) =>
+                          i === index ? { ...item, method } : item,
+                        ),
+                      )
+                    }
+                  >
+                    {[
+                      'GET',
+                      'POST',
+                      'PUT',
+                      'PATCH',
+                      'DELETE',
+                      'HEAD',
+                      'OPTIONS',
+                    ].map((v) => (
+                      <option key={v}>{v}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <label htmlFor={`chain-path-${index}`}>Path</label>
+                  <Input
+                    id={`chain-path-${index}`}
+                    value={step.path}
+                    disabled={busy}
+                    onChange={(e) =>
+                      setSteps(
+                        steps.map((item, i) =>
+                          i === index
+                            ? { ...item, path: e.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`chain-status-${index}`}>
+                    Expected status
+                  </label>
+                  <Input
+                    id={`chain-status-${index}`}
+                    type="number"
+                    min={100}
+                    max={599}
+                    value={step.expectedStatus}
+                    disabled={busy}
+                    onChange={(e) =>
+                      setSteps(
+                        steps.map((item, i) =>
+                          i === index
+                            ? {
+                                ...item,
+                                expectedStatus: Number(e.target.value),
+                              }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                </div>
+              </div>
+              <div className={s.field}>
+                <label htmlFor={`chain-body-${index}`}>JSON body</label>
+                <Textarea
+                  id={`chain-body-${index}`}
+                  value={step.body}
+                  disabled={busy}
+                  onChange={(e) =>
+                    setSteps(
+                      steps.map((item, i) =>
+                        i === index ? { ...item, body: e.target.value } : item,
+                      ),
+                    )
+                  }
+                />
+              </div>
+              <div className={s.actions}>
+                <Button
+                  variant="secondary"
+                  disabled={busy || index === 0}
+                  onClick={() => {
+                    const next = [...steps];
+                    [next[index - 1], next[index]] = [
+                      next[index],
+                      next[index - 1],
+                    ];
+                    setSteps(next);
+                  }}
+                >
+                  Move up
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => setSteps(steps.filter((_, i) => i !== index))}
+                >
+                  Remove step
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <label className={s.check} htmlFor="chain-stop-on-failure">
+          Stop on first failed status or request
+          <Switch
+            id="chain-stop-on-failure"
+            checked={stopOnFailure}
+            disabled={busy}
+            onCheckedChange={setStopOnFailure}
+          />
+        </label>
+        <div className={s.actions}>
           <Button
             variant="secondary"
+            disabled={busy || steps.length >= 50}
+            onClick={() =>
+              setSteps([
+                ...steps,
+                {
+                  ...current,
+                  name: `step${steps.length + 1}`,
+                  expectedStatus: 200,
+                },
+              ])
+            }
+          >
+            Add current request
+          </Button>
+          <Button
+            disabled={busy || !steps.length}
             onClick={() => {
-              stop.current = true;
+              if (
+                new Set(steps.map((step) => step.name)).size !== steps.length ||
+                steps.some((step) => !/^[A-Za-z][A-Za-z0-9_]*$/.test(step.name))
+              ) {
+                setError(
+                  'Use unique step names: letters, digits, underscores; start with a letter.',
+                );
+                return;
+              }
+              void run();
             }}
           >
-            Stop after current request
+            Run chain
           </Button>
+          {busy && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                stop.current = true;
+              }}
+            >
+              Stop after current request
+            </Button>
+          )}
+        </div>
+        {error && (
+          <p className={s.error} role="alert">
+            {error}
+          </p>
         )}
-      </div>
-      {error && <p role="alert">{error}</p>}
-      {results.map((row, index) => (
-        <details key={index}>
-          <summary>
-            {row.step}: {row.passed ? 'passed' : 'failed'} {row.result?.status}
-          </summary>
-          <pre>{row.error || JSON.stringify(row.result, null, 2)}</pre>
-        </details>
-      ))}
-    </section>
+        {results.map((row, index) => (
+          <details className={s.details} key={index}>
+            <summary>
+              {row.step}: {row.passed ? 'passed' : 'failed'}{' '}
+              {row.result?.status}
+            </summary>
+            <pre className={s.code}>
+              {row.error || JSON.stringify(row.result, null, 2)}
+            </pre>
+          </details>
+        ))}
+      </Card>
+    </details>
   );
 }

@@ -9,9 +9,10 @@ from reqlica.generation.specifications import Specification
 from reqlica.console.dependencies import draft_operation
 from reqlica.generation.progress import inspect as inspect_activity, track
 from reqlica.generation.errors import GenerationError
-from reqlica.generation.schemas import ProviderEndpoint, ModelSettings, AgentRequest, AgentReplyRequest, AgentReasoningResetRequest
+from reqlica.generation.schemas import ProviderEndpoint, ModelSettings, AgentRequest, AgentReplyRequest, AgentReasoningResetRequest, AgentReasoningChangeRequest, AgentLimitsRequest
 from reqlica.generation.reasoning import reasoning_options
 from reqlica.generation.catalog import discover_models
+from reqlica.generation.credentials import get_key
 
 router = APIRouter(prefix="/api/projects/{project_id}", tags=["Generation"])
 provider_router = APIRouter(prefix="/api/ai", tags=["Generation"])
@@ -22,7 +23,7 @@ def provider_models(body: ProviderEndpoint, response: Response,
                     api_key: Annotated[str | None, Header(alias="X-Reqlica-Provider-Key")] = None) -> dict:
     response.headers["Cache-Control"] = "no-store"
     try:
-        return discover_models(body, SecretStr(api_key) if api_key else None)
+        return discover_models(body, SecretStr(api_key) if api_key else draft_operation(get_key, None, body))
     except GenerationError as error:
         raise HTTPException(error.status_code, error.detail, headers={"Cache-Control": "no-store"}) from error
 
@@ -113,6 +114,21 @@ def reset_agent_reasoning(project_id: str, run_id: str, body: AgentReasoningRese
     response.headers["Cache-Control"] = "no-store"
     try:
         return draft_operation(agent.reset_reasoning, project_id, run_id, body)
+    except GenerationError as error:
+        raise HTTPException(error.status_code, error.detail) from error
+
+
+@router.post("/agent-runs/{run_id}/limits")
+def change_agent_limits(project_id: str, run_id: str, body: AgentLimitsRequest, response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    return draft_operation(agent.change_limits, project_id, run_id, body)
+
+
+@router.post("/agent-runs/{run_id}/reasoning")
+def change_agent_reasoning(project_id: str, run_id: str, body: AgentReasoningChangeRequest, response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return draft_operation(agent.change_reasoning, project_id, run_id, body)
     except GenerationError as error:
         raise HTTPException(error.status_code, error.detail) from error
 

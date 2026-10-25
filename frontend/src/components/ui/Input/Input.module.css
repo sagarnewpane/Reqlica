@@ -2,7 +2,7 @@
   width: 100%;
   min-height: 44px;
   padding: 10px 14px;
-  background-color: var(--background-secondary);
+  background-color: var(--control-background);
   color: var(--text-primary);
   border: 1px solid var(--border-primary);
   border-radius: 8px;
@@ -23,7 +23,8 @@
 .input:focus {
   outline: none;
   border-color: var(--reqlica-green);
-  box-shadow: 0 0 0 3px rgba(27, 66, 50, 0.1);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--reqlica-green) 20%, transparent);
 }
 
 .input:disabled {

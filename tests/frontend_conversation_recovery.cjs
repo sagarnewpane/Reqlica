@@ -23,6 +23,7 @@ function harness(request, storage = new Map()) {
     if(name==='react') return react;
     if(name==='@/lib/chat') return {workspaceRequest:request, WorkspaceError};
     if(name==='@/lib/ids') return {newRequestId:()=>runId};
+    if(name==='@/lib/settings') return {validateSettings:()=>null};
     if(name==='@/lib/conversation-session') return session;
     throw Error(name);
   });
@@ -82,4 +83,22 @@ test('new chat cannot abandon a submission while its request is still running',a
  app.render();await flush();app.render().setMessage('Still sending');const sending=app.render().send();
  await flush();app.render().startNew();assert.equal(app.render().hasPending,true);
  ack.resolve(run);await sending;assert.equal(app.render().run.id,runId);app.unmount();
+});
+
+test('changing saved reasoning sends the current scope without automatically resuming',async()=>{
+ const failed={...run,status:'failed',can_change_reasoning:true,provider:{provider:'compatible',model:'qwen-3.8-27b',base_url:'https://api.cerebras.ai/v1',reasoning_mode:'default'}};
+ const calls=[];
+ const app=harness(async(_p,path,method,body)=>{
+  if(path==='agent-runs')return{runs:[failed]};
+  calls.push({path,method,body});
+  return {...failed,status:'ready',provider:{...failed.provider,reasoning_mode:'off'}};
+ });
+ app.render();await flush();await app.render().changeReasoning('off');
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].path,`agent-runs/${runId}/reasoning`);
+ assert.equal(calls[0].method,'POST');
+ assert.deepEqual(JSON.parse(JSON.stringify(calls[0].body)),{expected_revision:run.revision,expected_reasoning_mode:'default',reasoning_mode:'off'});
+ assert.equal(app.render().run.provider.reasoning_mode,'off');
+ assert.equal(app.render().run.status,'ready');
+ assert.equal(app.render().busy,false);app.unmount();
 });

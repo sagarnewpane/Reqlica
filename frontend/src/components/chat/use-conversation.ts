@@ -14,6 +14,7 @@ import {
 } from '@/lib/chat';
 import type { Attachment } from './SpecificationAttachment';
 import type { ChatSettings, ReasoningMode } from '@/lib/settings';
+import { validateSettings } from '@/lib/settings';
 import { newRequestId } from '@/lib/ids';
 import {
   readConversationSession,
@@ -309,6 +310,13 @@ export function useConversation({
           (run && !run.can_reply)))
     )
       return;
+    if (!run && !pending.current) {
+      const invalid = validateSettings(preferences);
+      if (invalid) {
+        setError(invalid);
+        return;
+      }
+    }
     locked.current = true;
     setBusy(true);
     setActivity({ phase: 'saving', startedAt: Date.now(), events: [] });
@@ -355,6 +363,7 @@ export function useConversation({
                 allow_execution: execution,
                 max_tokens: preferences.maxTokens,
                 total_token_limit: preferences.totalTokenLimit,
+                tool_call_limit: preferences.toolCallLimit,
                 timeout_seconds: preferences.timeoutSeconds,
                 reasoning_mode: reasoningMode,
                 ...(selectedDraft
@@ -517,6 +526,68 @@ export function useConversation({
     setActivity(null);
   }
 
+  async function changeLimits(totalTokenLimit: number, toolCallLimit: number) {
+    const generation = epoch.current;
+    const currentLifecycle = () =>
+      alive.current && generation === epoch.current;
+    if (!run?.can_change_limits || locked.current || pending.current) return;
+    locked.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      const result = await workspaceRequest<AgentRun>(
+        projectId,
+        `agent-runs/${run.id}/limits`,
+        'POST',
+        {
+          expected_revision: run.revision,
+          expected_total_token_limit: run.limits?.total_tokens ?? 100000,
+          expected_tool_call_limit: run.limits?.tool_calls ?? 64,
+          total_token_limit: totalTokenLimit,
+          tool_call_limit: toolCallLimit,
+        },
+      );
+      if (currentLifecycle()) accept(result);
+    } catch (err) {
+      await recover(run.id, generation);
+      if (currentLifecycle()) setError((err as Error).message);
+    } finally {
+      if (currentLifecycle()) {
+        locked.current = false;
+        setBusy(false);
+      }
+    }
+  }
+
+  async function changeReasoning(reasoningMode: ReasoningMode) {
+    const generation = epoch.current;
+    const currentLifecycle = () =>
+      alive.current && generation === epoch.current;
+    if (!run?.can_change_reasoning || locked.current) return;
+    locked.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      const result = await workspaceRequest<AgentRun>(
+        projectId,
+        `agent-runs/${run.id}/reasoning`,
+        'POST',
+        {
+          expected_revision: run.revision,
+          expected_reasoning_mode: run.provider.reasoning_mode || 'default',
+          reasoning_mode: reasoningMode,
+        },
+      );
+      if (currentLifecycle()) accept(result);
+    } catch (err) {
+      await recover(run.id, generation);
+      if (currentLifecycle()) setError((err as Error).message);
+    } finally {
+      if (currentLifecycle()) locked.current = false;
+      if (currentLifecycle()) setBusy(false);
+    }
+  }
+
   async function resetReasoning() {
     const generation = epoch.current;
     const currentLifecycle = () =>
@@ -566,5 +637,7 @@ export function useConversation({
     reload,
     pause,
     resetReasoning,
+    changeReasoning,
+    changeLimits,
   };
 }

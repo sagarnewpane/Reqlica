@@ -21,7 +21,7 @@
 .primary {
   background: var(--button-primary);
   border-color: var(--button-primary);
-  color: var(--background-secondary);
+  color: var(--button-primary-text);
 }
 .secondary {
   background: var(--background-secondary);
@@ -35,9 +35,9 @@
   box-shadow: none;
 }
 .danger {
-  background: var(--status-danger);
-  border-color: var(--status-danger);
-  color: var(--background-secondary);
+  background: var(--button-danger);
+  border-color: var(--button-danger);
+  color: var(--button-danger-text);
 }
 .icon {
   width: 44px;
@@ -51,7 +51,7 @@
   background: var(--button-primary);
 }
 .danger:hover:not(:disabled) {
-  background: var(--status-danger);
+  background: var(--button-danger);
 }
 .secondary:hover:not(:disabled),
 .ghost:hover:not(:disabled) {

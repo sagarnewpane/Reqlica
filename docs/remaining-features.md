@@ -20,6 +20,7 @@ Updated: 2026-10-25. The local dashboard features listed in the audit are now im
 | Environment conveniences | Runtime → Environment | Generate/store a secure secret and select an existing variable for replacement. Secret values are not returned. |
 | Package history | Runtime → Python packages | Recent selector and paged access to older saved operations. |
 | Sample-data conveniences | Sample data | Copy JSON, insert record template, persistent named datasets and loading into the editor. |
+| App-wide AI settings | Settings | Shared provider keys and API defaults; model profile lists synchronize across project views. Legacy keys migrate without overwriting conflicts. |
 | Connection/display | Settings | Persistent loopback console/runtime origins, connection health, published base-URL copy, system/light/dark theme. |
 
 ## Verification

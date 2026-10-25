@@ -8,13 +8,13 @@
   cursor: pointer;
 }
 .root[data-state='checked'] {
-  background: var(--reqlica-green);
+  background: var(--button-primary);
 }
 .thumb {
   display: block;
   width: 18px;
   height: 18px;
-  background: var(--background-secondary);
+  background: var(--switch-thumb);
   border-radius: 50%;
   transition: transform 0.15s ease;
   box-shadow: 0 1px 3px rgb(0 0 0 / 15%);

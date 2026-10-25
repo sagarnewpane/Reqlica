@@ -18,7 +18,6 @@ export default function ModelPicker({
   id,
   provider,
   baseUrl = '',
-  projectId,
   value,
   onChange,
   disabled,
@@ -44,20 +43,17 @@ export default function ModelPicker({
       }
       setLoading(true);
       try {
-        const response = await fetch(
-          projectId ? `/api/projects/${projectId}/ai/models` : '/api/ai/models',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              provider,
-              base_url: baseUrl.trim() || null,
-            }),
-            signal: controller.signal,
+        const response = await fetch('/api/ai/models', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-        );
+          body: JSON.stringify({
+            provider,
+            base_url: baseUrl.trim() || null,
+          }),
+          signal: controller.signal,
+        });
         const data = await response.json();
         if (controller.signal.aborted) return;
         if (!response.ok)
@@ -79,7 +75,7 @@ export default function ModelPicker({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [provider, baseUrl, projectId, disabled, refresh, refreshToken, open]);
+  }, [provider, baseUrl, disabled, refresh, refreshToken, open]);
   return (
     <div className={styles.root}>
       <div className={styles.row}>

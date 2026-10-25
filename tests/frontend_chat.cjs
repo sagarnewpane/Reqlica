@@ -95,6 +95,22 @@ test("reasoning reset is forwarded to the saved conversation", async () => {
   );
   assert.equal(result.status, 200);
 });
+test("reasoning changes are forwarded only as a scoped POST", async () => {
+  const result = await call(
+    ["agent-runs", runId, "reasoning"],
+    "POST",
+    async (url, init) => {
+      assert.match(url.pathname, /\/reasoning$/);
+      assert.equal(init.method, "POST");
+      return success();
+    },
+  );
+  assert.equal(result.status, 200);
+  const rejected = await call(["agent-runs", runId, "reasoning"], "GET", async () => {
+    throw new Error("Must not forward");
+  });
+  assert.equal(rejected.status, 405);
+});
 test("interrupted conversation recovery is a scoped action without a forwarded key", async () => {
   const result = await call(
     ["agent-runs", runId, "recover"],

@@ -131,7 +131,8 @@ def compile_operations(operations):
 
 
 def execute_operations(database, operations):
-    sql = compile_operations(operations)
+    groups = [compile_operations([item]) for item in operations]
+    sql = [statement for group in groups for statement in group]
     try:
         with closing(sqlite3.connect(database)) as db:
             deadline = time.monotonic() + 30
@@ -140,8 +141,15 @@ def execute_operations(database, operations):
             db.execute("PRAGMA trusted_schema=OFF")
             db.execute("BEGIN IMMEDIATE")
             try:
-                for statement in sql:
-                    db.execute(statement)
+                for item, statements_for_operation in zip(operations, groups):
+                    if db.execute("SELECT 1 FROM sqlite_schema WHERE type='table' AND name=? COLLATE NOCASE", (item.table,)).fetchone() is None:
+                        raise ValueError("Migration source table does not exist in the live database. Draft-only tables cannot be migrated with this tool; create new tables using database/schema.json. Inspect the live database schema before retrying.")
+                    if item.op == "rebuild_table":
+                        columns = {row[1].casefold() for row in db.execute("SELECT * FROM pragma_table_xinfo(?)", (item.table,))}
+                        if not {value.casefold() for value in item.copy_columns.values()} <= columns:
+                            raise ValueError("Rebuild copy_columns references a missing source column. Mapping values must be existing source column names, not new destination columns. Inspect the current schema; omit new columns from the mapping and give them valid defaults or allow NULL.")
+                    for statement in statements_for_operation:
+                        db.execute(statement)
                 if db.execute("PRAGMA foreign_key_check").fetchone() is not None:
                     raise ValueError("Migration violates foreign keys")
                 tables = [row[0] for row in db.execute("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
@@ -169,6 +177,15 @@ def execute_operations(database, operations):
             if db.execute("PRAGMA quick_check").fetchall() != [("ok",)]:
                 raise ValueError("Migration integrity check failed")
     except sqlite3.Error as error:
+        causes = {
+            "SQLITE_MISMATCH": "Migration datatype mismatch. Copied values must fit the destination types; text UUIDs cannot be copied into an INTEGER primary key.",
+            "SQLITE_CONSTRAINT_NOTNULL": "Migration violates NOT NULL. Every required destination column needs a non-null source value or a valid default; new columns cannot copy from nonexistent source columns.",
+            "SQLITE_CONSTRAINT_UNIQUE": "Migration violates a UNIQUE constraint. Existing rows contain duplicate values for the proposed unique columns.",
+            "SQLITE_CONSTRAINT_PRIMARYKEY": "Migration violates a PRIMARY KEY constraint. Copied key values must be unique.",
+            "SQLITE_CONSTRAINT_FOREIGNKEY": "Migration violates foreign keys. Preserve valid referenced keys and relationships when rebuilding tables.",
+        }
+        if getattr(error, "sqlite_errorname", None) in causes:
+            raise ValueError(causes[error.sqlite_errorname]) from error
         raise ValueError("Migration SQL or constraint validation failed") from error
     return sql
 

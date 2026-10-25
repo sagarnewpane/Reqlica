@@ -34,6 +34,6 @@
   padding: 8px 0;
 }
 .attachment p {
-  color: var(--color-error, #c33);
+  color: var(--status-danger);
   margin: 0;
 }

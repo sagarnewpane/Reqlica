@@ -1,6 +1,12 @@
 .form {
   composes: page from '../ui/PageHeader/PageHeader.module.css';
 }
+.connectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
 .heading {
   display: flex;
   justify-content: space-between;
@@ -53,6 +59,30 @@
 }
 .catalogKey {
   margin-top: 20px;
+  padding: 16px;
+  background: var(--background-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+}
+.catalogKey > .savedKeyHeading > strong {
+  font-size: 14px;
+}
+.catalogKey > p {
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+.catalogKey .error {
+  color: var(--status-danger);
+  background: var(--status-danger-background);
+}
+.catalogKey .notice {
+  color: var(--reqlica-green);
+  background: var(--status-success-background);
+}
+.profiles {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-primary);
 }
 .savedKeyPanel {
   padding: 12px;
@@ -136,7 +166,7 @@
 }
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
 }
 .grid label {
@@ -211,6 +241,7 @@
   margin-top: 16px;
 }
 .footer {
+  z-index: 10;
   position: sticky;
   bottom: 0;
   display: flex;
@@ -228,6 +259,7 @@
 }
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 .secondary {
@@ -249,6 +281,7 @@
 }
 .error {
   background: var(--status-danger-background);
+  color: var(--status-danger);
 }
 .notice {
   background: var(--status-success-background);
